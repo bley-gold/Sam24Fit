@@ -9,8 +9,8 @@ ALTER TABLE admin_logs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can insert own profile" ON users;
 DROP POLICY IF EXISTS "Users can view own profile" ON users;
 DROP POLICY IF EXISTS "Users can update own profile" ON users;
-DROP POLICY IF EXISTS "Admins can view all users" ON users;
-DROP POLICY IF EXISTS "Admins can update all users" ON users;
+DROP POLICY IF EXISTS "Users can view own profile or if admin" ON users; -- New policy name
+DROP POLICY IF EXISTS "Users can update own profile or if admin" ON users; -- New policy name
 DROP POLICY IF EXISTS "Admins can delete users" ON users;
 
 -- New policies for 'users' table:
@@ -19,40 +19,17 @@ DROP POLICY IF EXISTS "Admins can delete users" ON users;
 CREATE POLICY "Users can insert own profile" ON users
 FOR INSERT WITH CHECK (auth.uid() = id);
 
--- Policy 2: Users can view their own profile
-CREATE POLICY "Users can view own profile" ON users
-FOR SELECT USING (auth.uid() = id);
+-- Policy 2: Users can view their own profile OR if they are admin
+CREATE POLICY "Users can view own profile or if admin" ON users
+FOR SELECT USING (auth.uid() = id OR public.is_admin_rls());
 
--- Policy 3: Users can update their own profile
-CREATE POLICY "Users can update own profile" ON users
-FOR UPDATE USING (auth.uid() = id);
+-- Policy 3: Users can update their own profile OR if they are admin
+CREATE POLICY "Users can update own profile or if admin" ON users
+FOR UPDATE USING (auth.uid() = id OR public.is_admin_rls());
 
--- Policy 4: Admins can view all users
-CREATE POLICY "Admins can view all users" ON users
-FOR SELECT USING (
-    EXISTS (
-        SELECT 1 FROM public.users -- Explicitly use public.users
-        WHERE id = auth.uid() AND role = 'admin'
-    )
-);
-
--- Policy 5: Admins can update all users
-CREATE POLICY "Admins can update all users" ON users
-FOR UPDATE USING (
-    EXISTS (
-        SELECT 1 FROM public.users -- Explicitly use public.users
-        WHERE id = auth.uid() AND role = 'admin'
-    )
-);
-
--- Policy 6: Admins can delete users
+-- Policy 4: Admins can delete users
 CREATE POLICY "Admins can delete users" ON users
-FOR DELETE USING (
-    EXISTS (
-        SELECT 1 FROM public.users -- Explicitly use public.users
-        WHERE id = auth.uid() AND role = 'admin'
-    )
-);
+FOR DELETE USING (public.is_admin_rls());
 
 -- Drop existing policies on receipts to avoid conflicts
 DROP POLICY IF EXISTS "Users can view own receipts" ON receipts;
@@ -69,12 +46,7 @@ CREATE POLICY "Users can insert own receipts" ON receipts
 
 -- Admins can see and update all receipts
 CREATE POLICY "Admins can manage all receipts" ON receipts
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM public.users
-            WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
+    FOR ALL USING (public.is_admin_rls());
 
 -- Drop existing policies on payments to avoid conflicts
 DROP POLICY IF EXISTS "Users can view own payments" ON payments;
@@ -87,12 +59,7 @@ CREATE POLICY "Users can view own payments" ON payments
 
 -- Admins can see all payments
 CREATE POLICY "Admins can view all payments" ON payments
-    FOR SELECT USING (
-        EXISTS (
-            SELECT 1 FROM public.users
-            WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
+    FOR SELECT USING (public.is_admin_rls());
 
 -- Drop existing policies on membership_history to avoid conflicts
 DROP POLICY IF EXISTS "Users can view own membership history" ON membership_history;
@@ -105,12 +72,7 @@ CREATE POLICY "Users can view own membership history" ON membership_history
 
 -- Admins can see all membership history
 CREATE POLICY "Admins can view all membership history" ON membership_history
-    FOR SELECT USING (
-        EXISTS (
-            SELECT 1 FROM public.users
-            WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
+    FOR SELECT USING (public.is_admin_rls());
 
 -- Drop existing policies on admin_logs to avoid conflicts
 DROP POLICY IF EXISTS "Only admins can view admin logs" ON admin_logs;
@@ -118,9 +80,4 @@ DROP POLICY IF EXISTS "Only admins can view admin logs" ON admin_logs;
 -- Policies for 'admin_logs' table:
 -- Only admins can view admin logs
 CREATE POLICY "Only admins can view admin logs" ON admin_logs
-    FOR SELECT USING (
-        EXISTS (
-            SELECT 1 FROM public.users
-            WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
+    FOR SELECT USING (public.is_admin_rls());

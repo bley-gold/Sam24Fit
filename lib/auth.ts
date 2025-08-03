@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from "./supabase"
 import { uploadFile, validateFile } from "./storage"
-import { createUserProfile } from "@/app/actions/user-actions" // Import the new server action
+import { createUserProfile } from "@/app/actions/user-actions"
+import { getUserProfileById } from "@/app/actions/profile-actions" // Import the new server action
 import type { User } from "./supabase"
 
 export interface SignUpData {
@@ -122,20 +123,34 @@ export const signOut = async () => {
 export const getCurrentUser = async (): Promise<User | null> => {
   try {
     if (!isSupabaseConfigured()) {
+      console.warn("Supabase is not configured. Cannot get current user.")
       return null
     }
 
     const {
-      data: { user },
+      data: { user: authUser }, // Renamed to authUser to avoid conflict with public.User type
+      error: authUserError,
     } = await supabase.auth.getUser()
-    if (!user) return null
 
-    const { data: profile, error } = await supabase.from("users").select("*").eq("id", user.id).single()
+    if (authUserError) {
+      console.error("Error fetching auth user:", authUserError)
+      return null
+    }
+    if (!authUser) {
+      return null // No authenticated user
+    }
 
-    if (error) throw error
-    return profile
+    // Use the server action to fetch the user's profile, bypassing RLS
+    const profile = await getUserProfileById(authUser.id)
+
+    if (!profile) {
+      console.warn(`User profile for ${authUser.id} not found in public.users via server action.`)
+      return null
+    }
+
+    return profile // This is the public.User type
   } catch (error) {
-    console.error("Get current user error:", error)
+    console.error("Get current user unexpected error:", error)
     return null
   }
 }
