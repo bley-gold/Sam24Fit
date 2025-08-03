@@ -3,17 +3,17 @@ const nextConfig = {
   // Optimize for production
   swcMinify: true,
   
-  // Image optimization
+  // Image optimization for Vercel
   images: {
     domains: ['cybjdyouocdxrcedtjkq.supabase.co'],
     formats: ['image/webp', 'image/avif'],
-    unoptimized: true,
   },
   
-  // Disable static optimization for pages that use Supabase
-  // This prevents build-time errors when environment variables aren't available
-  output: 'standalone',
-  
+  // Environment variables
+  env: {
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  },
   
   // Redirects
   async redirects() {

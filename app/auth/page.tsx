@@ -249,11 +249,7 @@ export default function AuthPage() {
                     {loading ? <LoadingSpinner size="sm" /> : "Login"}
                   </Button>
                 </form>
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm">
-                  <p className="font-medium text-blue-800">Demo Accounts:</p>
-                  <p className="text-blue-700">Admin: admin@sam24fit.com / password</p>
-                  <p className="text-blue-700">User: demo@sam24fit.com / password</p>
-                </div>
+                {/* Removed demo account display */}
               </TabsContent>
 
               <TabsContent value="signup">
