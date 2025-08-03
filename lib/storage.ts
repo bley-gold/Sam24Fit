@@ -1,0 +1,82 @@
+import { supabase, isSupabaseConfigured } from "./supabase"
+
+export const uploadFile = async (file: File, userId: string) => {
+  try {
+    if (!isSupabaseConfigured()) {
+      throw new Error("Supabase is not properly configured. Please check your environment variables.")
+    }
+
+    // Create unique filename
+    const fileExt = file.name.split(".").pop()
+    const fileName = `${userId}/${Date.now()}.${fileExt}`
+
+    // Upload file to Supabase Storage
+    const { data, error } = await supabase.storage.from("receipts").upload(fileName, file, {
+      cacheControl: "3600",
+      upsert: false,
+    })
+
+    if (error) {
+      console.error("Upload error:", error)
+      throw error
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage.from("receipts").getPublicUrl(fileName)
+
+    return {
+      path: data.path,
+      publicUrl: urlData.publicUrl,
+      error: null,
+    }
+  } catch (error) {
+    console.error("File upload failed:", error)
+    return {
+      path: null,
+      publicUrl: null,
+      error: error as Error,
+    }
+  }
+}
+
+export const deleteFile = async (filePath: string) => {
+  try {
+    if (!isSupabaseConfigured()) {
+      throw new Error("Supabase is not properly configured")
+    }
+
+    const { error } = await supabase.storage.from("receipts").remove([filePath])
+
+    if (error) throw error
+
+    return { error: null }
+  } catch (error) {
+    console.error("File deletion failed:", error)
+    return { error: error as Error }
+  }
+}
+
+export const getFileUrl = (filePath: string) => {
+  if (!isSupabaseConfigured()) {
+    return ""
+  }
+
+  const { data } = supabase.storage.from("receipts").getPublicUrl(filePath)
+  return data.publicUrl
+}
+
+// Validate file before upload
+export const validateFile = (file: File) => {
+  const maxSize = 10 * 1024 * 1024 // 10MB
+  const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "application/pdf"]
+
+  if (file.size > maxSize) {
+    return { valid: false, error: "File size must be less than 10MB" }
+  }
+
+  if (!allowedTypes.includes(file.type)) {
+    return { valid: false, error: "Only JPG, PNG, and PDF files are allowed" }
+  }
+
+  return { valid: true, error: null }
+}
