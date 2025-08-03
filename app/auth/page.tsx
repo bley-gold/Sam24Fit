@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react" // Import useEffect
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,11 +13,13 @@ import { useToast } from "@/hooks/use-toast"
 import { LoadingSpinner } from "@/components/loading-spinner"
 import { signIn, signUp, type SignUpData, type SignInData } from "@/lib/auth"
 import { Dumbbell, Shield, Upload, Users, User, MapPin, Heart, ArrowLeft, AlertCircle } from "lucide-react"
+import { useAuthContext } from "@/components/auth-provider" // Import useAuthContext
 
 export default function AuthPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const { user, loading: authLoading } = useAuthContext() // Get user and authLoading from context
 
   const [loginData, setLoginData] = useState<SignInData>({ email: "", password: "" })
   const [signupData, setSignupData] = useState<Omit<SignUpData, "profilePicture"> & { profilePicture: File | null }>({
@@ -33,6 +35,13 @@ export default function AuthPage() {
     profilePicture: null,
   })
   const [ageError, setAgeError] = useState("")
+
+  // Effect to redirect if user is already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push("/dashboard")
+    }
+  }, [user, authLoading, router])
 
   const calculateAge = (birthDate: string) => {
     const today = new Date()
@@ -83,7 +92,7 @@ export default function AuthPage() {
           title: "Welcome back!",
           description: "You have successfully logged in.",
         })
-        router.push("/dashboard")
+        // The useEffect above will handle the redirect
       }
     } catch (error) {
       toast({
@@ -139,7 +148,7 @@ export default function AuthPage() {
           title: "Registration Successful!",
           description: "Welcome to Sam24Fit! Please check your email to verify your account.",
         })
-        router.push("/dashboard")
+        // The useEffect above will handle the redirect
       }
     } catch (error) {
       toast({
@@ -152,10 +161,11 @@ export default function AuthPage() {
     }
   }
 
-  if (loading) {
+  // Show loading spinner if authentication state is still being determined
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
-        <LoadingSpinner size="lg" text="Processing..." />
+        <LoadingSpinner size="lg" text="Checking authentication status..." />
       </div>
     )
   }
