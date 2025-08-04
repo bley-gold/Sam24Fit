@@ -9,9 +9,12 @@ ALTER TABLE admin_logs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can insert own profile" ON users;
 DROP POLICY IF EXISTS "Users can view own profile" ON users;
 DROP POLICY IF EXISTS "Users can update own profile" ON users;
-DROP POLICY IF EXISTS "Users can view own profile or if admin" ON users; -- New policy name
-DROP POLICY IF EXISTS "Users can update own profile or if admin" ON users; -- New policy name
+DROP POLICY IF EXISTS "Users can view own profile or if admin" ON users; -- Old combined policy
+DROP POLICY IF EXISTS "Users can update own profile or if admin" ON users; -- Old combined policy
 DROP POLICY IF EXISTS "Admins can delete users" ON users;
+DROP POLICY IF EXISTS "Admins can view all profiles" ON users;
+DROP POLICY IF EXISTS "Admins can update all profiles" ON users;
+
 
 -- New policies for 'users' table:
 
@@ -19,17 +22,26 @@ DROP POLICY IF EXISTS "Admins can delete users" ON users;
 CREATE POLICY "Users can insert own profile" ON users
 FOR INSERT WITH CHECK (auth.uid() = id);
 
--- Policy 2: Users can view their own profile OR if they are admin
-CREATE POLICY "Users can view own profile or if admin" ON users
-FOR SELECT USING (auth.uid() = id OR public.is_admin_rls());
+-- Policy 2: Users can view their own profile (using JWT sub for potentially better recursion handling)
+CREATE POLICY "Users can view own profile" ON users
+FOR SELECT USING (auth.jwt() ->> 'sub' = id::text);
 
--- Policy 3: Users can update their own profile OR if they are admin
-CREATE POLICY "Users can update own profile or if admin" ON users
-FOR UPDATE USING (auth.uid() = id OR public.is_admin_rls());
+-- Policy 3: Admins can view all profiles
+CREATE POLICY "Admins can view all profiles" ON users
+FOR SELECT USING (public.is_admin_rls());
 
--- Policy 4: Admins can delete users
+-- Policy 4: Users can update their own profile
+CREATE POLICY "Users can update own profile" ON users
+FOR UPDATE USING (auth.uid() = id);
+
+-- Policy 5: Admins can update all profiles
+CREATE POLICY "Admins can update all profiles" ON users
+FOR UPDATE USING (public.is_admin_rls());
+
+-- Policy 6: Admins can delete users
 CREATE POLICY "Admins can delete users" ON users
 FOR DELETE USING (public.is_admin_rls());
+
 
 -- Drop existing policies on receipts to avoid conflicts
 DROP POLICY IF EXISTS "Users can view own receipts" ON receipts;

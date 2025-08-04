@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from "./supabase"
-import { uploadFile, validateFile } from "./storage"
+import { uploadFile, validateFile } from "./storage" // We will no longer use uploadFile for profile pictures here
 import { createUserProfile } from "@/app/actions/user-actions"
 import { getUserProfileById } from "@/app/actions/profile-actions"
 import type { User } from "./supabase"
@@ -14,7 +14,7 @@ export interface SignUpData {
   streetAddress: string
   emergencyContactName: string
   emergencyContactNumber: string
-  profilePicture?: File
+  profilePicture?: File // Still accept File on client side
 }
 
 export interface SignInData {
@@ -30,13 +30,14 @@ export const signUp = async (data: SignUpData) => {
     }
 
     // 1. Create auth user (this is still client-side)
+    console.log("Client: Attempting to sign up user via auth.signUp...")
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
     })
 
     if (authError) {
-      console.error("Auth signup error:", authError)
+      console.error("Client: Auth signup error:", authError)
       throw authError
     }
     if (!authData.user) {
@@ -44,33 +45,44 @@ export const signUp = async (data: SignUpData) => {
     }
 
     const userId = authData.user.id // Get the user ID directly from the auth signup response
-    console.log("Auth user created with ID:", userId)
+    console.log("Client: Auth user created with ID:", userId)
 
-    // 2. Upload profile picture if provided (still client-side)
-    let profilePictureUrl: string | null = null
+    // 2. Prepare profile picture data for server action
+    let profilePictureData: { base64: string; name: string; type: string } | null = null
     if (data.profilePicture) {
-      const validation = validateFile(data.profilePicture)
+      const validation = validateFile(data.profilePicture) // Still validate on client
       if (!validation.valid) {
-        console.error("Profile picture validation failed:", validation.error)
+        console.error("Client: Profile picture validation failed:", validation.error)
         throw new Error(validation.error || "Invalid file")
       }
 
-      console.log("Attempting to upload profile picture for user:", userId)
-      const uploadResult = await uploadFile(data.profilePicture, userId)
-      if (uploadResult.error) {
-        console.warn("Profile picture upload failed:", uploadResult.error.message)
-        // Continue without profile picture rather than failing completely
-      } else {
-        profilePictureUrl = uploadResult.publicUrl
-        console.log("Profile picture uploaded successfully. URL:", profilePictureUrl)
+      console.log("Client: Reading profile picture as Base64...")
+      const reader = new FileReader()
+      const fileReadPromise = new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => {
+          if (typeof reader.result === "string") {
+            resolve(reader.result)
+          } else {
+            reject(new Error("Failed to read file as string"))
+          }
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(data.profilePicture as Blob) // Ensure it's treated as Blob
+      })
+      const base64String = await fileReadPromise
+      profilePictureData = {
+        base64: base64String,
+        name: data.profilePicture.name,
+        type: data.profilePicture.type,
       }
+      console.log("Client: Profile picture read as Base64 successfully.")
     } else {
-      console.log("No profile picture provided for signup.")
+      console.log("Client: No profile picture provided for signup.")
     }
 
     // 3. Create user profile in public.users table using the Server Action
-    // This bypasses client-side RLS for the insert operation.
-    console.log("Calling createUserProfile server action...")
+    // This server action will also handle the profile picture upload using the service role key.
+    console.log("Client: Calling createUserProfile server action...")
     const { success, message } = await createUserProfile(
       userId,
       data.email,
@@ -81,25 +93,25 @@ export const signUp = async (data: SignUpData) => {
       data.streetAddress,
       data.emergencyContactName,
       data.emergencyContactNumber,
-      profilePictureUrl,
+      profilePictureData, // Pass Base64 data to server action
     )
 
     if (!success) {
-      console.error("createUserProfile server action failed:", message)
+      console.error("Client: createUserProfile server action failed:", message)
       throw new Error(message || "Failed to create user profile via server action.")
     }
-    console.log("User profile created successfully via server action.")
+    console.log("Client: User profile created successfully via server action.")
 
     // After successful profile creation, ensure the session is properly set on the client
     const {
       data: { session },
       error: sessionError,
     } = await supabase.auth.getSession()
-    if (sessionError) console.error("Error getting session after profile creation:", sessionError)
+    if (sessionError) console.error("Client: Error getting session after profile creation:", sessionError)
 
     return { user: authData.user, error: null } // Return the user from the initial auth signup
   } catch (error) {
-    console.error("Sign up error:", error)
+    console.error("Client: Sign up error:", error)
     return { user: null, error: error as Error }
   }
 }
@@ -189,7 +201,7 @@ export const uploadReceipt = async (file: File, amount: number, description?: st
 
     // Upload file
     console.log("Attempting to upload receipt file for user:", user.id)
-    const uploadResult = await uploadFile(file, user.id)
+    const uploadResult = await uploadFile(file, user.id) // This still uses client-side uploadFile
     if (uploadResult.error) {
       console.error("Receipt file upload failed:", uploadResult.error.message)
       throw uploadResult.error
