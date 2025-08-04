@@ -79,7 +79,7 @@ Required environment variables:
     5.  `scripts/04_create_rls_policies.sql`
     6.  `scripts/05_seed_data.sql` (Optional - requires real user ID)
     7.  `scripts/06_create_functions.sql`
-    8.  `scripts/07_storage_policies.sql`
+    8.  `scripts/07_storage_policies.sql` **(UPDATED!)**
     *   **Important:** For `scripts/05_seed_data.sql`, you should **skip this script** for initial setup, or **replace `'some-user-id-from-supabase-auth'` with an actual user ID** from a user you've signed up via the app.
 3.  Set up storage bucket for receipts manually
 4.  Configure Row Level Security policies

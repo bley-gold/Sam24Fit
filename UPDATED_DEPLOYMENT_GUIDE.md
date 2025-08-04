@@ -6,14 +6,14 @@
 Run these SQL scripts in your Supabase SQL Editor **in order**:
 
 1. ✅ `scripts/01_create_tables.sql` - Creates all database tables
-2. ✅ `scripts/02_create_indexes.sql` - Adds performance indexes  
+2. ✅ `scripts/02_create_indexes.sql` - Adds performance indexes
 3. ✅ `scripts/03_create_triggers.sql` - Sets up automated triggers
 4. ✅ **NEW: `scripts/09_create_rls_helper_functions.sql` - Creates RLS helper functions (IMPORTANT!)**
 5. ✅ `scripts/04_create_rls_policies.sql` - Configures security policies **(UPDATED!)**
 6. ⚠️ `scripts/05_seed_data.sql` - Adds demo data **(OPTIONAL - REQUIRES REAL USER ID)**
    *   **Important:** This script contains placeholder user IDs. You should **skip this script** for initial setup, or **replace `'some-user-id-from-supabase-auth'` with an actual user ID** from a user you've signed up via the app.
 7. ✅ `scripts/06_create_functions.sql` - Creates utility functions
-8. ✅ `scripts/07_storage_policies.sql` - Sets up file storage policies
+8. ✅ `scripts/07_storage_policies.sql` - Sets up file storage policies **(UPDATED!)**
 
 ### 2. ⚠️ Storage Setup (MANUAL REQUIRED)
 **Skip script 08** - Follow these manual steps instead:

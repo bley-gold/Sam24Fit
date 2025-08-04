@@ -17,29 +17,24 @@
 -- Create policies for the receipts bucket
 CREATE POLICY "Give users authenticated access to own folder" ON storage.objects
 FOR ALL USING (
-  bucket_id = 'receipts' 
-  AND auth.role() = 'authenticated' 
+  bucket_id = 'receipts'
+  AND auth.role() = 'authenticated'
   AND (storage.foldername(name))[1] = auth.uid()::text
 );
 
 CREATE POLICY "Give users authenticated access to own folder for insert" ON storage.objects
 FOR INSERT WITH CHECK (
-  bucket_id = 'receipts' 
-  AND auth.role() = 'authenticated' 
+  bucket_id = 'receipts'
+  AND auth.role() = 'authenticated'
   AND (storage.foldername(name))[1] = auth.uid()::text
 );
 
 CREATE POLICY "Allow public read access to receipts" ON storage.objects
 FOR SELECT USING (bucket_id = 'receipts');
 
--- Admin access policy
+-- Admin access policy - UPDATED to use is_admin_rls()
 CREATE POLICY "Give admins full access to receipts" ON storage.objects
 FOR ALL USING (
-  bucket_id = 'receipts' 
-  AND EXISTS (
-    SELECT 1 FROM auth.users 
-    JOIN public.users ON auth.users.id = public.users.id 
-    WHERE auth.users.id = auth.uid() 
-    AND public.users.role = 'admin'
-  )
+  bucket_id = 'receipts'
+  AND public.is_admin_rls() -- Use the helper function to avoid recursion
 );
