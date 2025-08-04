@@ -33,6 +33,8 @@ export async function createUserProfile(
       },
     })
 
+    console.log("createUserProfile Server Action: Received profilePictureUrl:", profilePictureUrl) // Log the URL
+
     const { error: profileError } = await supabaseAdmin.from("users").insert({
       id: userId,
       email: email,

@@ -1,7 +1,7 @@
 import { supabase, isSupabaseConfigured } from "./supabase"
 import { uploadFile, validateFile } from "./storage"
 import { createUserProfile } from "@/app/actions/user-actions"
-import { getUserProfileById } from "@/app/actions/profile-actions" // Import the new server action
+import { getUserProfileById } from "@/app/actions/profile-actions"
 import type { User } from "./supabase"
 
 export interface SignUpData {
@@ -35,30 +35,42 @@ export const signUp = async (data: SignUpData) => {
       password: data.password,
     })
 
-    if (authError) throw authError
-    if (!authData.user) throw new Error("Failed to create user in auth.users")
+    if (authError) {
+      console.error("Auth signup error:", authError)
+      throw authError
+    }
+    if (!authData.user) {
+      throw new Error("Failed to create user in auth.users")
+    }
 
     const userId = authData.user.id // Get the user ID directly from the auth signup response
+    console.log("Auth user created with ID:", userId)
 
     // 2. Upload profile picture if provided (still client-side)
-    let profilePictureUrl = null
+    let profilePictureUrl: string | null = null
     if (data.profilePicture) {
       const validation = validateFile(data.profilePicture)
       if (!validation.valid) {
+        console.error("Profile picture validation failed:", validation.error)
         throw new Error(validation.error || "Invalid file")
       }
 
+      console.log("Attempting to upload profile picture for user:", userId)
       const uploadResult = await uploadFile(data.profilePicture, userId)
       if (uploadResult.error) {
-        console.warn("Profile picture upload failed:", uploadResult.error)
+        console.warn("Profile picture upload failed:", uploadResult.error.message)
         // Continue without profile picture rather than failing completely
       } else {
         profilePictureUrl = uploadResult.publicUrl
+        console.log("Profile picture uploaded successfully. URL:", profilePictureUrl)
       }
+    } else {
+      console.log("No profile picture provided for signup.")
     }
 
     // 3. Create user profile in public.users table using the Server Action
     // This bypasses client-side RLS for the insert operation.
+    console.log("Calling createUserProfile server action...")
     const { success, message } = await createUserProfile(
       userId,
       data.email,
@@ -73,11 +85,12 @@ export const signUp = async (data: SignUpData) => {
     )
 
     if (!success) {
+      console.error("createUserProfile server action failed:", message)
       throw new Error(message || "Failed to create user profile via server action.")
     }
+    console.log("User profile created successfully via server action.")
 
     // After successful profile creation, ensure the session is properly set on the client
-    // This might be redundant with the initial auth.signUp, but good for robustness.
     const {
       data: { session },
       error: sessionError,
@@ -169,14 +182,22 @@ export const uploadReceipt = async (file: File, amount: number, description?: st
     // Validate file
     const validation = validateFile(file)
     if (!validation.valid) {
+      console.error("Receipt file validation failed:", validation.error)
       throw new Error(validation.error || "Invalid file")
     }
+    console.log("Receipt file validated successfully.")
 
     // Upload file
+    console.log("Attempting to upload receipt file for user:", user.id)
     const uploadResult = await uploadFile(file, user.id)
-    if (uploadResult.error) throw uploadResult.error
+    if (uploadResult.error) {
+      console.error("Receipt file upload failed:", uploadResult.error.message)
+      throw uploadResult.error
+    }
+    console.log("Receipt file uploaded successfully. URL:", uploadResult.publicUrl)
 
     // Create receipt record
+    console.log("Attempting to insert receipt record into database.")
     const { data: receiptData, error: receiptError } = await supabase
       .from("receipts")
       .insert({
@@ -190,7 +211,11 @@ export const uploadReceipt = async (file: File, amount: number, description?: st
       .select()
       .single()
 
-    if (receiptError) throw receiptError
+    if (receiptError) {
+      console.error("Receipt database insert failed:", receiptError.message)
+      throw receiptError
+    }
+    console.log("Receipt record inserted successfully:", receiptData)
 
     return { receipt: receiptData, error: null }
   } catch (error) {

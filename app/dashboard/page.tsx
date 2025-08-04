@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image" // Import Image component
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -13,14 +14,14 @@ import { useToast } from "@/hooks/use-toast"
 import { Dumbbell, Upload, FileText, LogOut, User, Calendar, CreditCard } from "lucide-react"
 
 export default function Dashboard() {
-  const { user, loading } = useAuthContext()
+  const { user, loading: authLoading } = useAuthContext() // Renamed loading to authLoading
   const router = useRouter()
   const { toast } = useToast()
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [loadingReceipts, setLoadingReceipts] = useState(true)
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!authLoading && !user) {
       router.push("/auth")
       return
     }
@@ -28,7 +29,7 @@ export default function Dashboard() {
     if (user) {
       fetchReceipts()
     }
-  }, [user, loading, router])
+  }, [user, authLoading, router])
 
   const fetchReceipts = async () => {
     try {
@@ -80,7 +81,8 @@ export default function Dashboard() {
     }
   }
 
-  if (loading) {
+  if (authLoading) {
+    // Use authLoading here
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
         <LoadingSpinner size="lg" text="Loading dashboard..." />
@@ -89,7 +91,7 @@ export default function Dashboard() {
   }
 
   if (!user) {
-    return null
+    return null // Should be redirected by useEffect
   }
 
   return (
@@ -130,6 +132,17 @@ export default function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {user.profile_picture_url && (
+                <div className="flex justify-center mb-4">
+                  <Image
+                    src={user.profile_picture_url || "/placeholder.svg"}
+                    alt="Profile Picture"
+                    width={96}
+                    height={96}
+                    className="rounded-full object-cover border-2 border-orange-500"
+                  />
+                </div>
+              )}
               <div>
                 <label className="text-sm font-medium text-gray-500">Name</label>
                 <p className="text-gray-900">{user.full_name}</p>

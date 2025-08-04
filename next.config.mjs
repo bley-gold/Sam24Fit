@@ -2,19 +2,19 @@
 const nextConfig = {
   // Optimize for production
   swcMinify: true,
-  
+
   // Image optimization for Vercel
   images: {
-    domains: ['cybjdyouocdxrcedtjkq.supabase.co'],
+    domains: ['cybjdyouocdxrcedtjkq.supabase.co'], // Ensure this matches your Supabase URL
     formats: ['image/webp', 'image/avif'],
   },
-  
+
   // Environment variables
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   },
-  
+
   // Redirects
   async redirects() {
     return [
@@ -25,7 +25,7 @@ const nextConfig = {
       },
     ]
   },
-  
+
   // Headers for security
   async headers() {
     return [
@@ -52,12 +52,12 @@ const nextConfig = {
       },
     ]
   },
-  
+
   // Experimental features
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },
-  
+
   // ESLint and TypeScript configurations
   eslint: {
     ignoreDuringBuilds: true,

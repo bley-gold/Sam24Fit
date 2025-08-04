@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react" // Import useEffect
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,12 +13,12 @@ import { useToast } from "@/hooks/use-toast"
 import { LoadingSpinner } from "@/components/loading-spinner"
 import { signIn, signUp, type SignUpData, type SignInData } from "@/lib/auth"
 import { Dumbbell, Shield, Upload, Users, User, MapPin, Heart, ArrowLeft, AlertCircle } from "lucide-react"
-import { useAuthContext } from "@/components/auth-provider" // Import useAuthContext
+import { useAuthContext } from "@/components/auth-provider"
 
 export default function AuthPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const [loading, setLoading] = useState(false)
+  const [formSubmitting, setFormSubmitting] = useState(false) // Renamed 'loading' to 'formSubmitting'
   const { user, loading: authLoading } = useAuthContext() // Get user and authLoading from context
 
   const [loginData, setLoginData] = useState<SignInData>({ email: "", password: "" })
@@ -73,7 +73,7 @@ export default function AuthPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    setFormSubmitting(true) // Use formSubmitting
 
     try {
       const { user, error } = await signIn(loginData)
@@ -101,7 +101,7 @@ export default function AuthPage() {
         variant: "destructive",
       })
     } finally {
-      setLoading(false)
+      setFormSubmitting(false) // Use formSubmitting
     }
   }
 
@@ -126,7 +126,7 @@ export default function AuthPage() {
       return
     }
 
-    setLoading(true)
+    setFormSubmitting(true) // Use formSubmitting
 
     try {
       const { user, error } = await signUp({
@@ -157,15 +157,16 @@ export default function AuthPage() {
         variant: "destructive",
       })
     } finally {
-      setLoading(false)
+      setFormSubmitting(false) // Use formSubmitting
     }
   }
 
   // Show loading spinner if authentication state is still being determined
   if (authLoading) {
+    // Use authLoading here
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
-        <LoadingSpinner size="lg" text="Checking authentication status..." />
+        <LoadingSpinner size="lg" text="Loading..." /> {/* Changed text to be generic */}
       </div>
     )
   }
@@ -254,9 +255,9 @@ export default function AuthPage() {
                   <Button
                     type="submit"
                     className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 shadow-lg"
-                    disabled={loading}
+                    disabled={formSubmitting} // Use formSubmitting
                   >
-                    {loading ? <LoadingSpinner size="sm" /> : "Login"}
+                    {formSubmitting ? <LoadingSpinner size="sm" /> : "Login"}
                   </Button>
                 </form>
                 {/* Removed demo account display */}
@@ -466,9 +467,9 @@ export default function AuthPage() {
                   <Button
                     type="submit"
                     className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 mt-6 shadow-lg"
-                    disabled={!!ageError || loading}
+                    disabled={!!ageError || formSubmitting} // Use formSubmitting
                   >
-                    {loading ? (
+                    {formSubmitting ? ( // Use formSubmitting
                       <LoadingSpinner size="sm" />
                     ) : (
                       <>
