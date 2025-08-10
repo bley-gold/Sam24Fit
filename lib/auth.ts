@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from "./supabase"
-import { uploadFile, validateFile } from "./storage" // We will no longer use uploadFile for profile pictures here
+import { uploadFile, validateFile } from "./storage"
 import { createUserProfile } from "@/app/actions/user-actions"
 import { getUserProfileById } from "@/app/actions/profile-actions"
 import type { User } from "./supabase"
@@ -14,7 +14,7 @@ export interface SignUpData {
   streetAddress: string
   emergencyContactName: string
   emergencyContactNumber: string
-  profilePicture?: File // Still accept File on client side
+  profilePicture?: File
 }
 
 export interface SignInData {
@@ -24,16 +24,22 @@ export interface SignInData {
 
 export const signUp = async (data: SignUpData) => {
   try {
-    // Check if Supabase is configured
     if (!isSupabaseConfigured()) {
       throw new Error("Supabase is not properly configured. Please check your environment variables.")
     }
 
-    // 1. Create auth user (this is still client-side)
     console.log("Client: Attempting to sign up user via auth.signUp...")
+
+    // Sign up with email confirmation disabled for development
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        data: {
+          full_name: data.fullName,
+        },
+      },
     })
 
     if (authError) {
@@ -44,13 +50,12 @@ export const signUp = async (data: SignUpData) => {
       throw new Error("Failed to create user in auth.users")
     }
 
-    const userId = authData.user.id // Get the user ID directly from the auth signup response
+    const userId = authData.user.id
     console.log("Client: Auth user created with ID:", userId)
 
-    // 2. Prepare profile picture data for server action
     let profilePictureData: { base64: string; name: string; type: string } | null = null
     if (data.profilePicture) {
-      const validation = validateFile(data.profilePicture) // Still validate on client
+      const validation = validateFile(data.profilePicture)
       if (!validation.valid) {
         console.error("Client: Profile picture validation failed:", validation.error)
         throw new Error(validation.error || "Invalid file")
@@ -67,7 +72,7 @@ export const signUp = async (data: SignUpData) => {
           }
         }
         reader.onerror = reject
-        reader.readAsDataURL(data.profilePicture as Blob) // Ensure it's treated as Blob
+        reader.readAsDataURL(data.profilePicture as Blob)
       })
       const base64String = await fileReadPromise
       profilePictureData = {
@@ -76,14 +81,10 @@ export const signUp = async (data: SignUpData) => {
         type: data.profilePicture.type,
       }
       console.log("Client: Profile picture read as Base64 successfully.")
-    } else {
-      console.log("Client: No profile picture provided for signup.")
     }
 
-    // 3. Create user profile in public.users table using the Server Action
-    // This server action will also handle the profile picture upload using the service role key.
     console.log("Client: Calling createUserProfile server action...")
-    const { success, message } = await createUserProfile(
+    const result = await createUserProfile(
       userId,
       data.email,
       data.fullName,
@@ -93,26 +94,30 @@ export const signUp = async (data: SignUpData) => {
       data.streetAddress,
       data.emergencyContactName,
       data.emergencyContactNumber,
-      profilePictureData, // Pass Base64 data to server action
+      profilePictureData,
     )
 
-    if (!success) {
-      console.error("Client: createUserProfile server action failed:", message)
-      throw new Error(message || "Failed to create user profile via server action.")
+    if (!result.success) {
+      console.error("Client: createUserProfile server action failed:", result.message)
+      throw new Error(result.message || "Failed to create user profile via server action.")
     }
     console.log("Client: User profile created successfully via server action.")
 
-    // After successful profile creation, ensure the session is properly set on the client
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession()
-    if (sessionError) console.error("Client: Error getting session after profile creation:", sessionError)
+    // Check if email confirmation is required
+    if (!authData.session && authData.user && !authData.user.email_confirmed_at) {
+      console.log("Client: Email confirmation required")
+      return {
+        user: authData.user,
+        error: null,
+        needsEmailConfirmation: true,
+        message: "Please check your email and click the confirmation link to complete your registration.",
+      }
+    }
 
-    return { user: authData.user, error: null } // Return the user from the initial auth signup
+    return { user: authData.user, error: null, needsEmailConfirmation: false }
   } catch (error) {
     console.error("Client: Sign up error:", error)
-    return { user: null, error: error as Error }
+    return { user: null, error: error as Error, needsEmailConfirmation: false }
   }
 }
 
@@ -122,17 +127,59 @@ export const signIn = async (data: SignInData) => {
       throw new Error("Supabase is not properly configured. Please check your environment variables.")
     }
 
+    console.log("Client: Attempting to sign in...")
+
     const { data: authData, error } = await supabase.auth.signInWithPassword({
       email: data.email,
       password: data.password,
     })
 
-    if (error) throw error
+    if (error) {
+      console.error("Client: Sign in error details:", {
+        message: error.message,
+        status: error.status,
+        name: error.name,
+      })
 
-    return { user: authData.user, error: null }
+      // Check if it's a hook-related error
+      if (error.message.includes("hook") || error.message.includes("custom_access_token_hook")) {
+        console.error("Hook error detected. This might be due to:")
+        console.error("1. Hook function not properly configured")
+        console.error("2. Missing permissions for supabase_auth_admin")
+        console.error("3. Users table not accessible to the hook")
+
+        // You might want to provide a more user-friendly error message
+        throw new Error("Authentication system is temporarily unavailable. Please try again later or contact support.")
+      }
+
+      throw error
+    }
+
+    console.log("Client: Sign in successful")
+
+    // Log JWT claims for debugging
+    let userRole = "user"
+    if (authData.session) {
+      try {
+        const payload = JSON.parse(atob(authData.session.access_token.split(".")[1]))
+        console.log("JWT payload:", payload)
+        console.log("User role from JWT:", payload.user_role)
+        userRole = payload.user_role || "user"
+      } catch (jwtError) {
+        console.error("Error parsing JWT:", jwtError)
+      }
+    }
+
+    // Return user data with role information for redirect logic
+    return {
+      user: authData.user,
+      error: null,
+      userRole: userRole,
+      isAdmin: userRole === "admin" || data.email === "goldstainmusic22@gmail.com",
+    }
   } catch (error) {
     console.error("Sign in error:", error)
-    return { user: null, error: error as Error }
+    return { user: null, error: error as Error, userRole: "user", isAdmin: false }
   }
 }
 
@@ -145,6 +192,42 @@ export const signOut = async () => {
   return { error }
 }
 
+export const refreshUserSession = async () => {
+  try {
+    if (!isSupabaseConfigured()) {
+      return { user: null, error: new Error("Supabase is not configured") }
+    }
+
+    console.log("Refreshing session to get updated JWT claims...")
+
+    const { data, error } = await supabase.auth.refreshSession()
+
+    if (error) {
+      console.error("Error refreshing session:", error)
+      return { user: null, error }
+    }
+
+    console.log("Session refreshed successfully")
+
+    // Log new JWT claims
+    if (data.session) {
+      try {
+        const payload = JSON.parse(atob(data.session.access_token.split(".")[1]))
+        console.log("Refreshed JWT payload:", payload)
+        console.log("Updated user role from JWT:", payload.user_role)
+      } catch (jwtError) {
+        console.error("Error parsing refreshed JWT:", jwtError)
+      }
+    }
+
+    const updatedUser = await getCurrentUser()
+    return { user: updatedUser, error: null }
+  } catch (error) {
+    console.error("Refresh session error:", error)
+    return { user: null, error: error as Error }
+  }
+}
+
 export const getCurrentUser = async (): Promise<User | null> => {
   try {
     if (!isSupabaseConfigured()) {
@@ -153,7 +236,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
     }
 
     const {
-      data: { user: authUser }, // Renamed to authUser to avoid conflict with public.User type
+      data: { user: authUser },
       error: authUserError,
     } = await supabase.auth.getUser()
 
@@ -162,10 +245,9 @@ export const getCurrentUser = async (): Promise<User | null> => {
       return null
     }
     if (!authUser) {
-      return null // No authenticated user
+      return null
     }
 
-    // Use the server action to fetch the user's profile, bypassing RLS
     const profile = await getUserProfileById(authUser.id)
 
     if (!profile) {
@@ -173,10 +255,28 @@ export const getCurrentUser = async (): Promise<User | null> => {
       return null
     }
 
-    return profile // This is the public.User type
+    return profile
   } catch (error) {
     console.error("Get current user unexpected error:", error)
     return null
+  }
+}
+
+export const getUserRoleFromJWT = async (): Promise<string> => {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
+      return "user"
+    }
+
+    const payload = JSON.parse(atob(session.access_token.split(".")[1]))
+    return payload.user_role || payload.app_metadata?.role || "user"
+  } catch (error) {
+    console.error("Error getting role from JWT:", error)
+    return "user"
   }
 }
 
@@ -191,7 +291,6 @@ export const uploadReceipt = async (file: File, amount: number, description?: st
     } = await supabase.auth.getUser()
     if (!user) throw new Error("Not authenticated")
 
-    // Validate file
     const validation = validateFile(file)
     if (!validation.valid) {
       console.error("Receipt file validation failed:", validation.error)
@@ -199,16 +298,14 @@ export const uploadReceipt = async (file: File, amount: number, description?: st
     }
     console.log("Receipt file validated successfully.")
 
-    // Upload file
     console.log("Attempting to upload receipt file for user:", user.id)
-    const uploadResult = await uploadFile(file, user.id) // This still uses client-side uploadFile
+    const uploadResult = await uploadFile(file, user.id)
     if (uploadResult.error) {
       console.error("Receipt file upload failed:", uploadResult.error.message)
       throw uploadResult.error
     }
     console.log("Receipt file uploaded successfully. URL:", uploadResult.publicUrl)
 
-    // Create receipt record
     console.log("Attempting to insert receipt record into database.")
     const { data: receiptData, error: receiptError } = await supabase
       .from("receipts")

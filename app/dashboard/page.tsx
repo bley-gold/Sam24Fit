@@ -2,34 +2,56 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image" // Import Image component
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { LoadingSpinner } from "@/components/loading-spinner"
+import { ProfilePictureUpload } from "@/components/profile-picture-upload"
 import { useAuthContext } from "@/components/auth-provider"
-import { signOut } from "@/lib/auth"
+import { signOut, getUserRoleFromJWT } from "@/lib/auth"
 import { supabase, type Receipt } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
-import { Dumbbell, Upload, FileText, LogOut, User, Calendar, CreditCard } from "lucide-react"
+import { Dumbbell, Upload, FileText, LogOut, User, Calendar, CreditCard, Shield, Trash2 } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { deleteReceipt } from "@/app/actions/receipt-actions"
 
 export default function Dashboard() {
-  const { user, loading: authLoading } = useAuthContext() // Renamed loading to authLoading
+  const { user, loading: authLoading, refreshUser, refreshSession } = useAuthContext()
   const router = useRouter()
   const { toast } = useToast()
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [loadingReceipts, setLoadingReceipts] = useState(true)
+  const [jwtRole, setJwtRole] = useState<string>("")
+  const [receiptToDelete, setReceiptToDelete] = useState<Receipt | null>(null)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
+    console.log("DashboardPage useEffect: authLoading =", authLoading, ", user =", user)
     if (!authLoading && !user) {
+      console.log("DashboardPage: User not authenticated, redirecting to auth.")
       router.push("/auth")
       return
     }
 
     if (user) {
+      console.log("DashboardPage: User authenticated, fetching receipts.")
       fetchReceipts()
+      checkJWTRole()
     }
   }, [user, authLoading, router])
+
+  const checkJWTRole = async () => {
+    const role = await getUserRoleFromJWT()
+    setJwtRole(role)
+    console.log("JWT Role:", role, "Database Role:", user?.role)
+
+    // If JWT role doesn't match database role, show warning
+    if (user && role !== user.role) {
+      console.warn("JWT role mismatch! JWT:", role, "Database:", user.role)
+    }
+  }
 
   const fetchReceipts = async () => {
     try {
@@ -81,8 +103,91 @@ export default function Dashboard() {
     }
   }
 
+  const handleRefreshRole = async () => {
+    try {
+      setLoadingReceipts(true)
+
+      // Refresh the session to get updated JWT claims
+      const { user: refreshedUser, error } = await refreshSession()
+
+      if (error) {
+        await refreshUser()
+      }
+
+      // Check JWT role again
+      await checkJWTRole()
+
+      toast({
+        title: "Profile Refreshed",
+        description: "Your role and profile information have been updated.",
+      })
+
+      await fetchReceipts()
+    } catch (error) {
+      toast({
+        title: "Refresh Failed",
+        description: "Failed to refresh profile. Please try logging out and back in.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingReceipts(false)
+    }
+  }
+
+  const handleProfileUpdate = async () => {
+    // Refresh the current user data
+    await refreshUser()
+  }
+
+  const handleDeleteReceipt = async (receipt: Receipt) => {
+    setReceiptToDelete(receipt)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const confirmDeleteReceipt = async () => {
+    if (!receiptToDelete || !user) return
+
+    setIsDeleting(true)
+    try {
+      const { success, message } = await deleteReceipt(receiptToDelete.id, user.id)
+
+      if (success) {
+        toast({
+          title: "Receipt Deleted",
+          description: "Receipt has been successfully deleted.",
+        })
+        // Remove the receipt from local state
+        setReceipts((prev) => prev.filter((r) => r.id !== receiptToDelete.id))
+      } else {
+        toast({
+          title: "Delete Failed",
+          description: message || "Failed to delete receipt.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Delete Failed",
+        description: "An unexpected error occurred while deleting the receipt.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeleting(false)
+      setIsDeleteDialogOpen(false)
+      setReceiptToDelete(null)
+    }
+  }
+
+  // Function to determine effective role (database role takes precedence if JWT is wrong)
+  const getEffectiveRole = () => {
+    return user?.role || "user"
+  }
+
+  const isAdmin = () => {
+    return getEffectiveRole() === "admin"
+  }
+
   if (authLoading) {
-    // Use authLoading here
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
         <LoadingSpinner size="lg" text="Loading dashboard..." />
@@ -91,8 +196,11 @@ export default function Dashboard() {
   }
 
   if (!user) {
-    return null // Should be redirected by useEffect
+    return null
   }
+
+  const effectiveRole = getEffectiveRole()
+  const roleMatch = user.role === jwtRole
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
@@ -106,6 +214,22 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600">Welcome, {user.full_name}</span>
+              {isAdmin() && (
+                <Badge className="bg-red-100 text-red-800">
+                  <Shield className="h-3 w-3 mr-1" />
+                  Admin
+                </Badge>
+              )}
+              {jwtRole === "admin" && <Badge className="bg-blue-100 text-blue-800">JWT: Admin</Badge>}
+              {!roleMatch && <Badge className="bg-yellow-100 text-yellow-800">Role Mismatch</Badge>}
+              <Button variant="ghost" size="sm" onClick={handleRefreshRole}>
+                Refresh Role
+              </Button>
+              {isAdmin() && (
+                <Button variant="outline" size="sm" onClick={() => router.push("/admin")}>
+                  Admin Panel
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
@@ -120,6 +244,38 @@ export default function Dashboard() {
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h2>
           <p className="text-gray-600">Manage your gym payments and receipts</p>
+
+          {/* Role Status Debug Info */}
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <p className="text-sm text-blue-800">
+              <strong>Database Role:</strong> {user.role} |<strong> JWT Role:</strong> {jwtRole || "Loading..."} |
+              <strong> Effective Role:</strong> {effectiveRole} |<strong> Match:</strong> {roleMatch ? "✅" : "❌"}
+            </p>
+            {!roleMatch && (
+              <p className="text-sm text-yellow-800 mt-1">
+                ⚠️ JWT role doesn't match database role. This may indicate the auth hook isn't working properly.
+              </p>
+            )}
+          </div>
+
+          {/* Special message for admin users with JWT issues */}
+          {user.role === "admin" && jwtRole !== "admin" && (
+            <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+              <h3 className="text-sm font-medium text-yellow-800 mb-2">Admin Access Notice</h3>
+              <p className="text-sm text-yellow-700 mb-3">
+                You have admin privileges in the database, but your JWT token doesn't reflect this. You can still access
+                admin features, but some functionality may be limited.
+              </p>
+              <div className="flex space-x-2">
+                <Button size="sm" onClick={handleRefreshRole}>
+                  Refresh Session
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => router.push("/admin")}>
+                  Go to Admin Panel
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -132,17 +288,18 @@ export default function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {user.profile_picture_url && (
-                <div className="flex justify-center mb-4">
+              <div className="flex justify-center mb-4">
+                <div className="relative">
                   <Image
-                    src={user.profile_picture_url || "/placeholder.svg"}
+                    src={user.profile_picture_url || "/placeholder.svg?height=96&width=96&query=user profile"}
                     alt="Profile Picture"
                     width={96}
                     height={96}
                     className="rounded-full object-cover border-2 border-orange-500"
                   />
+                  <ProfilePictureUpload user={user} onProfileUpdate={handleProfileUpdate} isAdmin={isAdmin()} />
                 </div>
-              )}
+              </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">Name</label>
                 <p className="text-gray-900">{user.full_name}</p>
@@ -150,6 +307,19 @@ export default function Dashboard() {
               <div>
                 <label className="text-sm font-medium text-gray-500">Email</label>
                 <p className="text-gray-900">{user.email}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Role</label>
+                <div className="flex items-center space-x-2">
+                  <Badge
+                    className={effectiveRole === "admin" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"}
+                  >
+                    {effectiveRole}
+                  </Badge>
+                  {jwtRole && jwtRole !== user.role && (
+                    <Badge className="bg-yellow-100 text-yellow-800">JWT: {jwtRole}</Badge>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">Member Since</label>
@@ -188,6 +358,18 @@ export default function Dashboard() {
                     <span>Payment History</span>
                   </div>
                 </Button>
+                {isAdmin() && (
+                  <Button
+                    variant="outline"
+                    className="h-20 bg-red-50 border-red-200 hover:bg-red-100"
+                    onClick={() => router.push("/admin")}
+                  >
+                    <div className="text-center">
+                      <Shield className="h-6 w-6 mx-auto mb-2 text-red-600" />
+                      <span className="text-red-600">Admin Panel</span>
+                    </div>
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -236,6 +418,14 @@ export default function Dashboard() {
                       <Badge className={getStatusColor(receipt.status)}>
                         {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
                       </Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDeleteReceipt(receipt)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -244,6 +434,45 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </main>
+      {/* Delete Receipt Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Receipt</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-gray-600 mb-4">
+              Are you sure you want to delete the receipt "{receiptToDelete?.filename}"? This action cannot be undone.
+            </p>
+            {receiptToDelete?.status === "verified" && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
+                <p className="text-sm text-yellow-800">
+                  <strong>Warning:</strong> This receipt has been verified and deleting it will also remove the
+                  associated payment record.
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteReceipt} disabled={isDeleting}>
+              {isDeleting ? (
+                <>
+                  <LoadingSpinner size="sm" className="mr-2" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Receipt
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

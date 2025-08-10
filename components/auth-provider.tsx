@@ -1,17 +1,22 @@
 "use client"
 
-import { createContext, useContext, type ReactNode } from "react"
+import { createContext, useContext, useEffect, type ReactNode } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import type { User } from "@/lib/supabase"
+import { useRouter } from "next/navigation"
 
 interface AuthContextType {
   user: User | null
   loading: boolean
+  refreshUser: () => Promise<User | null>
+  refreshSession: () => Promise<{ user: User | null; error: Error | null }>
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
+  refreshUser: async () => null,
+  refreshSession: async () => ({ user: null, error: null }),
 })
 
 export const useAuthContext = () => {
@@ -27,7 +32,18 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const { user, loading } = useAuth()
+  const { user, loading, refreshUser, refreshSession } = useAuth()
+  const router = useRouter()
 
-  return <AuthContext.Provider value={{ user, loading }}>{children}</AuthContext.Provider>
+  useEffect(() => {
+    if (user && user.role === "admin") {
+      router.push("/admin")
+    }
+  }, [user, router])
+
+  return (
+    <AuthContext.Provider value={{ user, loading, refreshUser, refreshSession }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }

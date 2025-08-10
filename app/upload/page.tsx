@@ -13,7 +13,7 @@ import { LoadingSpinner } from "@/components/loading-spinner"
 import { useAuthContext } from "@/components/auth-provider"
 import { uploadReceipt } from "@/lib/auth"
 import { useToast } from "@/hooks/use-toast"
-import { Dumbbell, Upload, ArrowLeft, FileText, CheckCircle } from "lucide-react"
+import { Dumbbell, Upload, ArrowLeft, FileText, CheckCircle, User } from 'lucide-react'
 
 export default function UploadPage() {
   const { user, loading } = useAuthContext()
@@ -29,8 +29,20 @@ export default function UploadPage() {
   useEffect(() => {
     if (!loading && !user) {
       router.push("/auth")
+      return
     }
-  }, [user, loading, router])
+
+    // Check if user has profile picture
+    if (user && !user.profile_picture_url) {
+      toast({
+        title: "Profile Picture Required",
+        description: "Please upload a profile picture before uploading receipts.",
+        variant: "destructive",
+      })
+      router.push("/dashboard")
+      return
+    }
+  }, [user, loading, router, toast])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -116,6 +128,22 @@ export default function UploadPage() {
 
   if (!user) {
     return null
+  }
+
+  // Redirect if no profile picture
+  if (!user.profile_picture_url) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
+        <Card className="max-w-md w-full text-center p-8">
+          <User className="h-16 w-16 text-orange-600 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Profile Picture Required</h2>
+          <p className="text-gray-600 mb-6">Please upload a profile picture before you can upload receipts.</p>
+          <Button onClick={() => router.push("/dashboard")} className="bg-orange-600 hover:bg-orange-700">
+            Go to Dashboard
+          </Button>
+        </Card>
+      </div>
+    )
   }
 
   if (uploadSuccess) {

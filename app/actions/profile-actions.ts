@@ -1,7 +1,7 @@
 "use server"
 
 import { createClient } from "@supabase/supabase-js"
-import type { User } from "@/lib/supabase" // Import the User type from your existing types
+import type { User } from "@/lib/supabase"
 
 /**
  * Fetches a user's profile from the public.users table using the Supabase Service Role Key.
@@ -48,5 +48,48 @@ export async function getUserProfileById(userId: string): Promise<User | null> {
   } catch (error) {
     console.error("Server Action: getUserProfileById unexpected error:", error)
     return null
+  }
+}
+
+/**
+ * Updates a user's profile picture URL in the database
+ */
+export async function updateUserProfilePicture(
+  userId: string,
+  profilePictureUrl: string,
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error("Supabase URL or Service Role Key is not configured for server actions.")
+      return { success: false, message: "Server configuration error" }
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+
+    const { error } = await supabaseAdmin
+      .from("users")
+      .update({
+        profile_picture_url: profilePictureUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+
+    if (error) {
+      console.error("Server Action: Error updating profile picture:", error)
+      return { success: false, message: error.message }
+    }
+
+    return { success: true, message: "Profile picture updated successfully" }
+  } catch (error) {
+    console.error("Server Action: updateUserProfilePicture unexpected error:", error)
+    return { success: false, message: "An unexpected error occurred" }
   }
 }

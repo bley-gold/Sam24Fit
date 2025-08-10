@@ -1,10 +1,7 @@
 "use server"
 
-import { createClient } from "@supabase/supabase-js" // Import createClient here
+import { createClient } from "@supabase/supabase-js"
 
-// This action creates the user profile in the public.users table
-// It uses the service_role key to bypass RLS for this specific insert,
-// ensuring the profile is created reliably after auth.signUp.
 export async function createUserProfile(
   userId: string,
   email: string,
@@ -15,15 +12,15 @@ export async function createUserProfile(
   streetAddress: string,
   emergencyContactName: string,
   emergencyContactNumber: string,
-  profilePictureData: { base64: string; name: string; type: string } | null, // Changed to accept Base64 data
-) {
+  profilePictureData: { base64: string; name: string; type: string } | null,
+): Promise<{ success: boolean; message: string }> {
   try {
-    // Initialize supabaseAdmin client here, ensuring it's only done on the server
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     if (!supabaseUrl || !serviceRoleKey) {
-      throw new Error("Supabase URL or Service Role Key is not configured for server actions.")
+      console.error("Server Action: Supabase URL or Service Role Key is not configured.")
+      return { success: false, message: "Server configuration error" }
     }
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
@@ -33,63 +30,75 @@ export async function createUserProfile(
       },
     })
 
+    console.log("Server Action: Creating user profile for:", userId)
+
     let profilePictureUrl: string | null = null
+
+    // Handle profile picture upload if provided
     if (profilePictureData) {
-      // Decode Base64 string
-      const base64WithoutPrefix = profilePictureData.base64.split(",")[1]
-      const fileBuffer = Buffer.from(base64WithoutPrefix, "base64")
+      try {
+        console.log("Server Action: Processing profile picture upload...")
 
-      const fileExt = profilePictureData.name.split(".").pop()
-      const fileName = `${userId}/${Date.now()}-profile.${fileExt}` // Unique filename for profile picture
+        // Convert base64 to buffer
+        const base64Data = profilePictureData.base64.split(",")[1]
+        const buffer = Buffer.from(base64Data, "base64")
 
-      console.log("Server Action: Attempting to upload profile picture via service role...")
-      const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-        .from("receipts") // Using the 'receipts' bucket, ensure it's public and policies allow admin writes
-        .upload(fileName, fileBuffer, {
-          contentType: profilePictureData.type,
-          upsert: false,
-        })
+        // Create unique filename
+        const fileExt = profilePictureData.name.split(".").pop()
+        const fileName = `${userId}/profile-${Date.now()}.${fileExt}`
 
-      if (uploadError) {
-        console.error("Server Action: Profile picture upload failed with service role:", uploadError)
-        // Decide whether to throw or proceed without profile picture
-        // For now, we'll throw to ensure the user knows something went wrong.
-        throw new Error(`Failed to upload profile picture: ${uploadError.message}`)
+        // Upload to profile-pictures bucket
+        const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+          .from("profile-pictures")
+          .upload(fileName, buffer, {
+            contentType: profilePictureData.type,
+            cacheControl: "3600",
+            upsert: false,
+          })
+
+        if (uploadError) {
+          console.error("Server Action: Profile picture upload error:", uploadError)
+          return { success: false, message: `Profile picture upload failed: ${uploadError.message}` }
+        }
+
+        // Get public URL
+        const { data: urlData } = supabaseAdmin.storage.from("profile-pictures").getPublicUrl(fileName)
+
+        profilePictureUrl = urlData.publicUrl
+        console.log("Server Action: Profile picture uploaded successfully:", profilePictureUrl)
+      } catch (error) {
+        console.error("Server Action: Error processing profile picture:", error)
+        return { success: false, message: "Failed to process profile picture" }
       }
-      console.log("Server Action: Profile picture uploaded. Path:", uploadData.path)
-
-      const { data: urlData } = supabaseAdmin.storage.from("receipts").getPublicUrl(uploadData.path)
-      profilePictureUrl = urlData.publicUrl
-      console.log("Server Action: Profile picture public URL:", profilePictureUrl)
-    } else {
-      console.log("Server Action: No profile picture data provided.")
     }
 
-    console.log("Server Action: Attempting to insert user profile via service role...")
-    const { error: profileError } = await supabaseAdmin.from("users").insert({
+    // Insert user profile into database
+    const { error: insertError } = await supabaseAdmin.from("users").insert({
       id: userId,
-      email: email,
+      email,
       full_name: fullName,
-      phone: phone,
+      phone,
       date_of_birth: dateOfBirth,
-      gender: gender,
+      gender,
       street_address: streetAddress,
       emergency_contact_name: emergencyContactName,
       emergency_contact_number: emergencyContactNumber,
       profile_picture_url: profilePictureUrl,
       role: "user",
       membership_status: "active",
-      joining_fee_paid: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     })
 
-    if (profileError) {
-      console.error("Server Action: Error creating user profile with service role:", profileError)
-      throw new Error(`Failed to create user profile: ${profileError.message}`)
+    if (insertError) {
+      console.error("Server Action: Error inserting user profile:", insertError)
+      return { success: false, message: `Failed to create user profile: ${insertError.message}` }
     }
 
-    return { success: true, message: "User profile created successfully." }
+    console.log("Server Action: User profile created successfully for:", userId)
+    return { success: true, message: "User profile created successfully" }
   } catch (error) {
     console.error("Server Action: createUserProfile unexpected error:", error)
-    return { success: false, message: (error as Error).message }
+    return { success: false, message: "An unexpected error occurred while creating user profile" }
   }
 }

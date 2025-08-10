@@ -1,112 +1,182 @@
-# Sam24Fit Gym Site
+# Sam24Fit Payment Gateway
 
-A modern gym management and payment tracking system built with Next.js, Supabase, and Tailwind CSS.
+This is a gym payment gateway web application built with Next.js, Supabase, and Tailwind CSS. It allows users to manage their gym payments, upload receipts, and view their membership status.
 
 ## Features
 
-- 🏋️ Modern gym landing page
-- 👤 User authentication and registration
-- 📄 Receipt upload and management
-- 💳 Payment tracking
-- 👨‍💼 Admin dashboard
-- 📱 Fully responsive design
-- 🔒 Secure with Row Level Security (RLS)
+- User authentication (Sign up, Sign in, Sign out)
+- User profile management with profile picture upload
+- Receipt upload and tracking
+- Membership status display
+- Admin dashboard (future expansion)
+- Responsive design
 
-## Tech Stack
+## Technologies Used
 
-- **Frontend**: Next.js 14, React, TypeScript
-- **Styling**: Tailwind CSS, Radix UI
-- **Backend**: Supabase (PostgreSQL, Auth, Storage)
-- **Deployment**: Vercel
+- **Next.js 14+**: React framework for building full-stack web applications.
+- **React**: JavaScript library for building user interfaces.
+- **Supabase**: Open-source Firebase alternative for database, authentication, and storage.
+- **Tailwind CSS**: Utility-first CSS framework for rapid UI development.
+- **shadcn/ui**: Reusable UI components built with Radix UI and Tailwind CSS.
+- **Lucide React**: Beautifully simple and customizable open-source icons.
 
-## Quick Start
+## Getting Started
 
-1.  **Clone the repository**
-    \`\`\`bash
-    git clone https://github.com/yourusername/sam24fit-gym-site.git
-    cd sam24fit-gym-site
-    \`\`\`
+Follow these steps to set up and run the project locally.
 
-2.  **Install dependencies**
-    \`\`\`bash
-    npm install
-    \`\`\`
+### Prerequisites
 
-3.  **Set up environment variables**
-    \`\`\`bash
-    cp .env.example .env.local
-    # Fill in your Supabase credentials
-    \`\`\`
+- Node.js (v18.x or higher)
+- npm or yarn
+- Git
+- A Supabase project
 
-4.  **Run development server**
-    \`\`\`bash
-    npm run dev
-    \`\`\`
+### 1. Clone the Repository
 
-5.  **Open [http://localhost:3000](http://localhost:3000)**
+\`\`\`bash
+git clone https://github.com/your-username/sam24fit-payment-app.git
+cd sam24fit-payment-app
+\`\`\`
+
+### 2. Install Dependencies
+
+\`\`\`bash
+npm install
+# or
+yarn install
+\`\`\`
+
+### 3. Set up Supabase
+
+#### a. Create a Supabase Project
+If you don't have one, create a new project on [Supabase](https://supabase.com/).
+
+#### b. Get Your Supabase Credentials
+Navigate to your Supabase project settings:
+- **Project Settings > API**: Copy your `Project URL` and `anon public` key.
+- **Project Settings > API**: Copy your `service_role` key (this is a secret key, keep it secure).
+
+#### c. Configure Environment Variables
+Create a `.env.local` file in the root of your project and add your Supabase credentials:
+
+\`\`\`env
+NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
+
+# For local development, this can be localhost
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+\`\`\`
+**Replace `YOUR_SUPABASE_URL`, `YOUR_SUPABASE_ANON_KEY`, and `YOUR_SUPABASE_SERVICE_ROLE_KEY` with your actual keys.**
+
+#### d. Run SQL Scripts
+Go to your Supabase Dashboard, navigate to **SQL Editor**, and run the SQL scripts located in the `scripts/` directory of this project. **Run them in the following order:**
+
+1.  `01_create_tables.sql`
+2.  `02_create_indexes.sql`
+3.  `03_create_triggers.sql`
+4.  `09_create_rls_helper_functions.sql` (Crucial for RLS and server actions)
+5.  `04_create_rls_policies.sql` (Updated to use the RLS helper function)
+6.  `06_create_functions.sql`
+7.  `07_storage_policies.sql` (Updated to use the RLS helper function)
+8.  `05_seed_data.sql` (Optional: Only run this if you want to populate with demo data. **Remember to replace `some-user-id-from-supabase-auth` with an actual user ID from your `auth.users` table if you use it.**)
+
+#### e. Create Storage Bucket
+In your Supabase Dashboard, go to **Storage**.
+- Click **"Create Bucket"**.
+- Name it `receipts` (must be exactly this, lowercase).
+- Set it to **Public**.
+- Set a file size limit (e.g., 10MB).
+- You can leave allowed MIME types empty or specify `image/jpeg, image/png, application/pdf`.
+
+#### f. Configure Authentication Settings
+In your Supabase Dashboard, go to **Authentication > Settings**.
+- Set **Site URL** to `http://localhost:3000`.
+- Add `http://localhost:3000/auth` and `http://localhost:3000/dashboard` to **Redirect URLs**.
+
+### 4. Run the Development Server
+
+\`\`\`bash
+npm run dev
+# or
+yarn dev
+\`\`\`
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### 5. Test Environment Variables
+
+On the login/signup page (`/auth`), click the "Test Environment Variables" button. Check your terminal where the development server is running for the output. It should show that `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are present.
+
+### 6. Sign Up and Log In
+
+- Navigate to the `/auth` page.
+- Try signing up a new user, ensuring you upload a profile picture.
+- After successful signup (and email verification if enabled in Supabase Auth settings), try logging in. You should be redirected to the dashboard.
 
 ## Deployment
 
-### Vercel Deployment (Recommended)
+For deployment to Vercel, refer to the `UPDATED_DEPLOYMENT_GUIDE.md` file for detailed instructions on setting up environment variables and other configurations.
 
-1.  Push to GitHub
-2.  Connect repository to Vercel
-3.  Set environment variables in Vercel dashboard
-4.  Deploy automatically!
+## Project Structure
 
-**Vercel Benefits:**
-- ⚡ Edge Functions for fast API responses
-- 🌍 Global CDN for worldwide performance
-- 📊 Built-in Analytics and monitoring
-- 🔄 Automatic deployments on git push
-- 🛡️ DDoS protection and security headers
-
-### Environment Variables
-
-Required environment variables:
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-
-## Database Setup
-
-1.  Create a new Supabase project
-2.  Run the SQL scripts in the `scripts/` folder in order:
-    1.  `scripts/01_create_tables.sql`
-    2.  `scripts/02_create_indexes.sql`
-    3.  `scripts/03_create_triggers.sql`
-    4.  **`scripts/09_create_rls_helper_functions.sql` (NEW!)**
-    5.  `scripts/04_create_rls_policies.sql`
-    6.  `scripts/05_seed_data.sql` (Optional - requires real user ID)
-    7.  `scripts/06_create_functions.sql`
-    8.  `scripts/07_storage_policies.sql` **(UPDATED!)**
-    *   **Important:** For `scripts/05_seed_data.sql`, you should **skip this script** for initial setup, or **replace `'some-user-id-from-supabase-auth'` with an actual user ID** from a user you've signed up via the app.
-3.  Set up storage bucket for receipts manually
-4.  Configure Row Level Security policies
-
-## Demo Accounts
-
-**Important:** Create your first user (and admin) via the app's signup form.
-To make a user an admin, go to your Supabase Dashboard -> Table Editor -> `public.users` table, find the user's row, and change their `role` column to `admin`.
-
-## Performance
-
-- ✅ **Lighthouse Score**: 95+ on all metrics
-- ✅ **Core Web Vitals**: Optimized for speed
-- ✅ **Mobile First**: Responsive design
-- ✅ **SEO Optimized**: Meta tags and structured data
-
-## Contributing
-
-1.  Fork the repository
-2.  Create a feature branch
-3.  Make your changes
-4.  Submit a pull request
-
-## License
-
-This project is licensed under the MIT License.
-
-## Support
-
-For support, email info@sam24fit.com or create an issue on GitHub.
+\`\`\`
+.
+├── app/
+│   ├── actions/
+│   │   ├── profile-actions.ts  # Server actions for fetching user profiles (bypasses RLS)
+│   │   ├── test-env-action.ts  # Server action to test environment variables
+│   │   └── user-actions.ts     # Server action for creating user profiles (handles profile picture upload)
+│   ├── admin/
+│   │   └── page.tsx            # Admin dashboard page
+│   ├── auth/
+│   │   └── page.tsx            # Login and Signup page
+│   ├── dashboard/
+│   │   └── page.tsx            # User dashboard page
+│   ├── upload/
+│   │   └── page.tsx            # Receipt upload page
+│   ├── globals.css             # Global CSS styles
+│   └── layout.tsx              # Root layout for the application
+├── components/
+│   ├── ui/                     # shadcn/ui components
+│   │   ├── ...                 # (e.g., button.tsx, card.tsx, input.tsx, etc.)
+│   │   ├── auth-provider.tsx   # React Context provider for authentication state
+│   │   ├── loading-spinner.tsx # Custom loading spinner component
+│   │   ├── membership-form.tsx # Form for membership details
+│   │   ├── toaster.tsx         # shadcn/ui Toaster component
+│   │   └── toast.tsx           # shadcn/ui Toast component
+│   ├── gym-registration.tsx    # Main registration component
+│   └── search-form.tsx         # Search form component
+├── hooks/
+│   ├── useAuth.ts              # Custom hook for authentication state
+│   └── use-toast.ts            # shadcn/ui useToast hook
+├── lib/
+│   ├── auth.ts                 # Authentication functions (sign up, sign in, sign out, get current user)
+│   ├── constants.ts            # Application constants
+│   ├── storage.ts              # Supabase Storage utility functions
+│   └── supabase.ts             # Supabase client initialization and types
+├── public/                     # Static assets
+│   └── placeholder.svg
+├── scripts/                    # SQL scripts for Supabase database setup
+│   ├── 01_create_tables.sql
+│   ├── 02_create_indexes.sql
+│   ├── 03_create_triggers.sql
+│   ├── 04_create_rls_policies.sql
+│   ├── 05_seed_data.sql
+│   ├── 06_create_functions.sql
+│   ├── 07_storage_policies.sql
+│   ├── 08_create_storage_bucket.sql (Deprecated, manual creation recommended)
+│   ├── 08_create_storage_bucket_fixed.sql (Deprecated, manual creation recommended)
+│   ├── 09_create_rls_helper_functions.sql
+│   ├── fix_password_hash_nullable.sql
+│   └── update-receipts-bucket-settings.js
+├── .env.example                 # Example environment variables
+├── .env.local                   # Local environment variables (ignored by Git)
+├── .env.vercel                  # Vercel environment variables (for deployment)
+├── BUILD_FIX_GUIDE.md           # Guide for build issues
+├── DEPLOYMENT_GUIDE.md          # Old deployment guide
+├── next.config.mjs              # Next.js configuration
+├── package.json                 # Project dependencies and scripts
+├── STORAGE_SETUP_GUIDE.md       # Old storage setup guide
+├── tsconfig.json                # TypeScript configuration
+└── UPDATED_DEPLOYMENT_GUIDE.md  # Updated deployment guide for Vercel

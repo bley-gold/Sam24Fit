@@ -12,14 +12,31 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { LoadingSpinner } from "@/components/loading-spinner"
 import { signIn, signUp, type SignUpData, type SignInData } from "@/lib/auth"
-import { Dumbbell, Shield, Upload, Users, User, MapPin, Heart, ArrowLeft, AlertCircle } from "lucide-react"
+import {
+  Dumbbell,
+  Shield,
+  Upload,
+  Users,
+  User,
+  MapPin,
+  Heart,
+  ArrowLeft,
+  AlertCircle,
+  Mail,
+  CheckCircle,
+  Settings,
+} from "lucide-react"
 import { useAuthContext } from "@/components/auth-provider"
+import { testEnvironmentVariables } from "@/app/actions/test-env-action"
 
 export default function AuthPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const [formSubmitting, setFormSubmitting] = useState(false) // Renamed 'loading' to 'formSubmitting'
-  const { user, loading: authLoading } = useAuthContext() // Get user and authLoading from context
+  const [formSubmitting, setFormSubmitting] = useState(false)
+  const { user, loading: authLoading } = useAuthContext()
+  const [testEnvLoading, setTestEnvLoading] = useState(false)
+  const [showEmailConfirmation, setShowEmailConfirmation] = useState(false)
+  const [confirmationEmail, setConfirmationEmail] = useState("")
 
   const [loginData, setLoginData] = useState<SignInData>({ email: "", password: "" })
   const [signupData, setSignupData] = useState<Omit<SignUpData, "profilePicture"> & { profilePicture: File | null }>({
@@ -38,8 +55,18 @@ export default function AuthPage() {
 
   // Effect to redirect if user is already logged in
   useEffect(() => {
+    console.log("AuthPage useEffect: authLoading =", authLoading, ", user =", user)
     if (!authLoading && user) {
-      router.push("/dashboard")
+      console.log("AuthPage: User logged in, checking role for redirect")
+
+      // Check if user is admin and redirect accordingly
+      if (user.role === "admin" || user.email === "goldstainmusic22@gmail.com") {
+        console.log("AuthPage: Admin user detected, redirecting to admin dashboard")
+        router.push("/admin")
+      } else {
+        console.log("AuthPage: Regular user, redirecting to user dashboard")
+        router.push("/dashboard")
+      }
     }
   }, [user, authLoading, router])
 
@@ -73,10 +100,10 @@ export default function AuthPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setFormSubmitting(true) // Use formSubmitting
+    setFormSubmitting(true)
 
     try {
-      const { user, error } = await signIn(loginData)
+      const { user, error, userRole, isAdmin } = await signIn(loginData)
 
       if (error) {
         toast({
@@ -88,11 +115,20 @@ export default function AuthPage() {
       }
 
       if (user) {
+        console.log("AuthPage: Login successful for user:", user.email)
         toast({
           title: "Welcome back!",
           description: "You have successfully logged in.",
         })
-        // The useEffect above will handle the redirect
+
+        // Redirect based on user role
+        if (isAdmin) {
+          console.log("AuthPage: Admin user detected, redirecting to admin dashboard")
+          router.push("/admin")
+        } else {
+          console.log("AuthPage: Regular user, redirecting to user dashboard")
+          router.push("/dashboard")
+        }
       }
     } catch (error) {
       toast({
@@ -101,7 +137,7 @@ export default function AuthPage() {
         variant: "destructive",
       })
     } finally {
-      setFormSubmitting(false) // Use formSubmitting
+      setFormSubmitting(false)
     }
   }
 
@@ -126,10 +162,10 @@ export default function AuthPage() {
       return
     }
 
-    setFormSubmitting(true) // Use formSubmitting
+    setFormSubmitting(true)
 
     try {
-      const { user, error } = await signUp({
+      const { user, error, needsEmailConfirmation, message } = await signUp({
         ...signupData,
         profilePicture: signupData.profilePicture,
       })
@@ -144,11 +180,22 @@ export default function AuthPage() {
       }
 
       if (user) {
-        toast({
-          title: "Registration Successful!",
-          description: "Welcome to Sam24Fit! Please check your email to verify your account.",
-        })
-        // The useEffect above will handle the redirect
+        console.log("AuthPage: Signup successful for user:", user.email)
+
+        if (needsEmailConfirmation) {
+          setConfirmationEmail(user.email || "")
+          setShowEmailConfirmation(true)
+          toast({
+            title: "Registration Successful!",
+            description: message || "Please check your email to verify your account.",
+          })
+        } else {
+          toast({
+            title: "Registration Successful!",
+            description: message || "Welcome to Sam24Fit! You can now access your account.",
+          })
+          // The useEffect above will handle the redirect if user is already logged in
+        }
       }
     } catch (error) {
       toast({
@@ -157,16 +204,110 @@ export default function AuthPage() {
         variant: "destructive",
       })
     } finally {
-      setFormSubmitting(false) // Use formSubmitting
+      setFormSubmitting(false)
     }
+  }
+
+  const handleTestEnv = async () => {
+    setTestEnvLoading(true)
+    const result = await testEnvironmentVariables()
+    toast({
+      title: "Environment Test Result",
+      description: result.message,
+      variant: result.success ? "default" : "destructive",
+    })
+    setTestEnvLoading(false)
   }
 
   // Show loading spinner if authentication state is still being determined
   if (authLoading) {
-    // Use authLoading here
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
-        <LoadingSpinner size="lg" text="Loading..." /> {/* Changed text to be generic */}
+        <LoadingSpinner size="lg" text="Loading..." />
+      </div>
+    )
+  }
+
+  // Show email confirmation screen
+  if (showEmailConfirmation) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
+        {/* Header */}
+        <header className="bg-white/95 backdrop-blur-sm shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+              <div className="flex items-center space-x-2">
+                <div className="bg-gradient-to-r from-orange-600 to-red-600 p-2 rounded-lg">
+                  <Dumbbell className="h-6 w-6 text-white" />
+                </div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+                  Sam24Fit
+                </h1>
+              </div>
+              <Button
+                variant="outline"
+                className="hover:bg-orange-50 bg-transparent"
+                onClick={() => setShowEmailConfirmation(false)}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Login
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Email Confirmation Content */}
+        <main className="max-w-md mx-auto pt-16 px-4">
+          <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                <Mail className="h-8 w-8 text-green-600" />
+              </div>
+              <CardTitle className="text-2xl">Check Your Email</CardTitle>
+              <CardDescription className="text-lg">
+                We've sent a confirmation link to your email address
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center space-y-4">
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm text-blue-800 font-medium">{confirmationEmail}</p>
+              </div>
+
+              <div className="space-y-3 text-sm text-gray-600">
+                <div className="flex items-start space-x-3">
+                  <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                  <p>Click the confirmation link in your email to activate your account</p>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                  <p>Once confirmed, you can log in with your credentials</p>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                  <p>Check your spam folder if you don't see the email</p>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t">
+                <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200 mb-4">
+                  <div className="flex items-start space-x-2">
+                    <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-left">
+                      <p className="text-sm text-yellow-800 font-medium">Email Not Arriving?</p>
+                      <p className="text-xs text-yellow-700 mt-1">
+                        If you don't receive the email within 5 minutes, it might be a configuration issue. Contact
+                        support or try signing up again.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <Button variant="outline" onClick={() => setShowEmailConfirmation(false)} className="w-full">
+                  Back to Login
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
       </div>
     )
   }
@@ -255,12 +396,35 @@ export default function AuthPage() {
                   <Button
                     type="submit"
                     className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 shadow-lg"
-                    disabled={formSubmitting} // Use formSubmitting
+                    disabled={formSubmitting}
                   >
                     {formSubmitting ? <LoadingSpinner size="sm" /> : "Login"}
                   </Button>
                 </form>
-                {/* Removed demo account display */}
+
+                <div className="mt-4 space-y-2">
+                  <Button
+                    type="button"
+                    onClick={handleTestEnv}
+                    className="w-full bg-gray-200 text-gray-800 hover:bg-gray-300"
+                    disabled={testEnvLoading}
+                  >
+                    {testEnvLoading ? <LoadingSpinner size="sm" /> : "Test Environment Variables"}
+                  </Button>
+
+                  <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-start space-x-2">
+                      <Settings className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-left">
+                        <p className="text-sm text-blue-800 font-medium">Email Issues?</p>
+                        <p className="text-xs text-blue-700 mt-1">
+                          If you're not receiving confirmation emails, you can disable email confirmation in your
+                          Supabase dashboard: Authentication → Settings → Uncheck "Enable email confirmations"
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </TabsContent>
 
               <TabsContent value="signup">
@@ -467,9 +631,9 @@ export default function AuthPage() {
                   <Button
                     type="submit"
                     className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 mt-6 shadow-lg"
-                    disabled={!!ageError || formSubmitting} // Use formSubmitting
+                    disabled={!!ageError || formSubmitting}
                   >
-                    {formSubmitting ? ( // Use formSubmitting
+                    {formSubmitting ? (
                       <LoadingSpinner size="sm" />
                     ) : (
                       <>

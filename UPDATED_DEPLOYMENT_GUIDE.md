@@ -1,188 +1,84 @@
-# 🚀 Sam24Fit Deployment Guide - Updated
+# Updated Deployment Guide for Vercel
 
-## 📋 Pre-Deployment Checklist
+This guide provides detailed steps to deploy your Sam24Fit application to Vercel, ensuring all Supabase integrations and environment variables are correctly configured.
 
-### 1. Supabase Database Setup ✅
-Run these SQL scripts in your Supabase SQL Editor **in order**:
+## Prerequisites
 
-1. ✅ `scripts/01_create_tables.sql` - Creates all database tables
-2. ✅ `scripts/02_create_indexes.sql` - Adds performance indexes
-3. ✅ `scripts/03_create_triggers.sql` - Sets up automated triggers
-4. ✅ **NEW: `scripts/09_create_rls_helper_functions.sql` - Creates RLS helper functions (IMPORTANT!)**
-5. ✅ `scripts/04_create_rls_policies.sql` - Configures security policies **(UPDATED!)**
-6. ⚠️ `scripts/05_seed_data.sql` - Adds demo data **(OPTIONAL - REQUIRES REAL USER ID)**
-   *   **Important:** This script contains placeholder user IDs. You should **skip this script** for initial setup, or **replace `'some-user-id-from-supabase-auth'` with an actual user ID** from a user you've signed up via the app.
-7. ✅ `scripts/06_create_functions.sql` - Creates utility functions
-8. ✅ `scripts/07_storage_policies.sql` - Sets up file storage policies **(UPDATED!)**
+- A Vercel account.
+- Your Sam24Fit project connected to a Git repository (GitHub, GitLab, or Bitbucket).
+- Your Supabase project is fully set up as per the `README.md` and the comprehensive setup guide.
 
-### 2. ⚠️ Storage Setup (MANUAL REQUIRED)
-**Skip script 08** - Follow these manual steps instead:
+## Step 1: Connect Your Project to Vercel
 
-#### Create Storage Bucket:
-1. Go to Supabase Dashboard → **Storage**
-2. Click **"Create Bucket"**
-3. Name: `receipts`
-4. Public: ✅ **Yes** (important!)
-5. Click **"Create Bucket"**
+1.  Go to your [Vercel Dashboard](https://vercel.com/dashboard).
+2.  Click "Add New..." -> "Project".
+3.  Select your Git repository (e.g., from GitHub).
+4.  Click "Import".
 
-#### Verify Settings:
-- Bucket name: `receipts`
-- Public access: ✅ Enabled
-- File size limit: 10MB
+## Step 2: Configure Project Settings in Vercel
 
-### 3. Authentication Settings
-1. Go to Supabase Dashboard → **Authentication** → **Settings**
-2. Set **Site URL** to: `https://your-vercel-domain.vercel.app`
-3. Add **Redirect URLs**:
-   - `https://your-vercel-domain.vercel.app/auth`
-   - `https://your-vercel-domain.vercel.app/dashboard`
+After importing, Vercel will prompt you to configure your project.
 
-## 🌐 Vercel Deployment Steps
+### A. Build & Output Settings
 
-### Step 1: Push to GitHub
-\`\`\`bash
-git init
-git add .
-git commit -m "Sam24Fit - Production Ready for Vercel"
-git branch -M main
-git remote add origin https://github.com/yourusername/sam24fit-gym-site.git
-git push -u origin main
-\`\`\`
+-   **Framework Preset**: Next.js
+-   **Root Directory**: Leave as default (usually empty, or `/` if your project is at the root of the repo).
+-   **Build Command**: `next build` (default for Next.js)
+-   **Output Directory**: `build` (default for Next.js)
 
-### Step 2: Deploy on Vercel
-1. Go to [vercel.com](https://vercel.com)
-2. Click **"New Project"**
-3. **Import Git Repository** - Choose your GitHub repo
-4. **Framework Preset**: Next.js (auto-detected)
-5. **Root Directory**: `./` (default)
-6. Click **"Deploy"**
+### B. Environment Variables (CRITICAL)
 
-### Step 3: Environment Variables
-After deployment, add these in Vercel Dashboard → Project Settings → Environment Variables:
+This is the most important step for Supabase integration. You **must** add the following environment variables. Ensure they are available for **Production**, **Preview**, and **Development** environments.
 
-**Production Environment Variables:**
-\`\`\`
-NEXT_PUBLIC_SUPABASE_URL=https://cybjdyouocdxrcedtjkq.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN5YmpkeW91b2NkeHJjZWR0amtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM5NDk5MzYsImV4cCI6MjA2OTUyNTkzNn0.r9IKLpAOd74eeoyXRk5kDgAxVA4Pd-E0qL1TtR053eA
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN5YmpkeW91b2NkeHJjZWR0amtxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImiYXQiOjE3NTM5NDk5MzYsImV4cCI6MjA2OTUyNTkzNn0.vvDIsj14Ii6xKyNS0EpWRTjGdhZtEBwwwoXuUctTlxA
-\`\`\`
+1.  **`NEXT_PUBLIC_SUPABASE_URL`**:
+    *   **Value**: Your Supabase Project URL (found in Supabase Dashboard -> Project Settings -> API).
+    *   **Example**: `https://abcdefghijk.supabase.co`
 
-**Important**: Set environment for **Production**, **Preview**, and **Development**
+2.  **`NEXT_PUBLIC_SUPABASE_ANON_KEY`**:
+    *   **Value**: Your Supabase `anon public` key (found in Supabase Dashboard -> Project Settings -> API).
+    *   **Example**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiY2RlZmdoaWprIiwicm9sZSI6ImFub24iLCJpYXQiOjEyMzQ1Njc4OTAsImV4cCI6MTIzNDU2Nzg5MH0.xyzABC123`
 
-### Step 4: Update Supabase URLs
-1. Copy your Vercel URL (e.g., `https://sam24fit-gym-site.vercel.app`)
-2. Go back to Supabase → Authentication → Settings
-3. Update **Site URL** with your actual Vercel URL
-4. Update **Redirect URLs** with your actual domain
+3.  **`SUPABASE_SERVICE_ROLE_KEY`**:
+    *   **Value**: Your Supabase `service_role` key (found in Supabase Dashboard -> Project Settings -> API). **This is a secret key and should NOT be exposed on the client-side.**
+    *   **Example**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFhYmMiLCJyZWYiOiJhYmNkZWZnaGlqayIsInJvbGUiOiJzZXJ2aWNlX3JvbGUiLCJpYXQiOjEyMzQ1Njc4OTAsImV4cCI6MTIzNDU2Nzg5MH0.DEF456GHI`
 
-### Step 5: Redeploy
-1. Go to Vercel Dashboard → Deployments
-2. Click **"Redeploy"** to apply environment variables
+4.  **`NEXT_PUBLIC_SITE_URL`**:
+    *   **Value**: The public URL of your Vercel deployment.
+    *   **For Production**: Use your custom domain if you have one (e.g., `https://www.sam24fit.com`). If not, use the Vercel default domain (e.g., `https://your-project-name.vercel.app`).
+    *   **For Preview/Development**: You can use the Vercel default preview URLs or `http://localhost:3000` if you're testing locally against a deployed backend.
 
-## ✅ Vercel-Specific Benefits
+    **Important**: For `NEXT_PUBLIC_SITE_URL`, ensure it matches the **Site URL** you configured in your Supabase Authentication settings.
 
-### **🚀 Performance**
-- **Edge Functions** - Lightning fast API responses
-- **Global CDN** - Worldwide content delivery
-- **Image Optimization** - Automatic WebP/AVIF conversion
-- **Smart Caching** - Intelligent static generation
+### C. Root Directory (if applicable)
 
-### **🔧 Developer Experience**
-- **Preview Deployments** - Every PR gets a preview URL
-- **Instant Rollbacks** - One-click rollback to previous versions
-- **Real-time Logs** - Live function logs and analytics
-- **Custom Domains** - Easy custom domain setup
+If your Next.js project is not in the root of your Git repository (e.g., it's in a `frontend/` folder), you'll need to set the **Root Directory** accordingly.
 
-### **📊 Analytics & Monitoring**
-- **Web Vitals** - Core web vitals monitoring
-- **Function Metrics** - API performance tracking
-- **Error Tracking** - Automatic error reporting
+### D. Deploy
 
-## 🧪 Testing Checklist
+Once all settings, especially environment variables, are correctly entered, click "Deploy".
 
-After deployment, test these features:
+## Step 3: Verify Deployment
 
-### ✅ Core Functionality
-- [ ] Landing page loads correctly
-- [ ] **User registration works (Sign up new users via the app)**
-- [ ] Login/logout functionality
-- [ ] File upload works
-- [ ] Admin dashboard accessible
+After a successful deployment:
 
-### ✅ Performance
-- [ ] Page load times < 3 seconds
-- [ ] Images load quickly
-- [ ] Mobile responsiveness
-- [ ] PWA features work
+1.  **Visit your deployed application URL.**
+2.  **Navigate to the `/auth` page.**
+3.  **Click the "Test Environment Variables" button.**
+    *   Check the Vercel deployment logs (in your Vercel Dashboard, go to your project -> Deployments -> select the latest deployment -> Logs tab).
+    *   You should see the `console.log` output from `test-env-action.ts` confirming that `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are present.
+4.  **Attempt to sign up a new user** (with a profile picture).
+5.  **Attempt to log in with the new user.**
 
-### ✅ Security
-- [ ] HTTPS enabled (automatic with Vercel)
-- [ ] Environment variables secure
-- [ ] File uploads work securely
-- [ ] Authentication flows properly
+If everything is configured correctly, you should experience smooth authentication, profile picture uploads, and redirection to the dashboard.
 
-## 🎯 Post-Deployment Steps
+## Troubleshooting Deployment Issues
 
-### 1. **Custom Domain** (Optional)
-1. Go to Vercel Dashboard → Project Settings → Domains
-2. Add your custom domain
-3. Update DNS records as instructed
-4. Update Supabase redirect URLs
+-   **"Supabase URL or Service Role Key is not configured for server actions"**: Double-check that `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are correctly set in Vercel environment variables for all relevant environments (Production, Preview, Development).
+-   **Image not showing**:
+    -   Ensure your `receipts` storage bucket in Supabase is set to **Public**.
+    -   Verify that the `domains` array in `next.config.mjs` includes your Supabase project URL (e.g., `cybjdyouocdxrcedtjkq.supabase.co`).
+    -   Check the browser console for any CORS errors related to image loading.
+-   **Redirect issues**: Ensure your **Site URL** and **Redirect URLs** in Supabase Authentication settings match your deployed Vercel URLs.
+-   **RLS errors**: Re-verify that all RLS policies and the `is_admin_rls()` helper function are correctly applied in your Supabase SQL Editor.
 
-### 2. **Analytics Setup**
-1. Enable Vercel Analytics in project settings
-2. Monitor Web Vitals and performance
-3. Set up error tracking
-
-### 3. **Monitoring**
-1. Set up uptime monitoring
-2. Configure alerts for downtime
-3. Monitor function execution times
-
-## 🔧 Troubleshooting
-
-### **Build Failures:**
-- Check environment variables are set for all environments
-- Verify Supabase project is active
-- Check build logs in Vercel dashboard
-
-### **Authentication Issues:**
-- Ensure Site URL matches your Vercel domain exactly
-- Check redirect URLs include your domain
-- Verify environment variables are correct
-
-### **File Upload Issues:**
-- Confirm `receipts` bucket exists and is public
-- Check CORS settings in Supabase
-- Verify storage policies are set up
-
-### **Performance Issues:**
-- Use Vercel Analytics to identify bottlenecks
-- Check function execution times
-- Optimize images and assets
-
-## 🎉 Success!
-
-Your Sam24Fit gym site is now live on Vercel!
-
-**Important:**
-- **Create your first user (and admin) via the app's signup form.**
-- To make a user an admin, go to your Supabase Dashboard -> Table Editor -> `public.users` table, find the user's row, and change their `role` column to `admin`.
-
-**Vercel Features You Get:**
-- ⚡ **Edge Functions** for fast API responses
-- 🌍 **Global CDN** for worldwide performance
-- 📊 **Built-in Analytics** for monitoring
-- 🔄 **Automatic deployments** on git push
-- 🛡️ **DDoS protection** and security headers
-- 📱 **Perfect Lighthouse scores** out of the box
-
-## 🚀 Next Steps
-
-1. **Monitor Performance** - Use Vercel Analytics
-2. **Set Up Alerts** - Configure uptime monitoring
-3. **Custom Domain** - Add your own domain
-4. **SEO Optimization** - Submit to search engines
-5. **User Feedback** - Collect and iterate
-
-Your gym management system is now production-ready on Vercel! 🏋️‍♂️
+If you encounter persistent issues, check the Vercel deployment logs for more detailed error messages.
