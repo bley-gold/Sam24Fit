@@ -12,7 +12,22 @@ import { useAuthContext } from "@/components/auth-provider"
 import { signOut, getUserRoleFromJWT } from "@/lib/auth"
 import { supabase, type Receipt } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
-import { Dumbbell, Upload, FileText, LogOut, User, Calendar, CreditCard, Shield, Trash2 } from "lucide-react"
+import {
+  Dumbbell,
+  Upload,
+  FileText,
+  LogOut,
+  User,
+  Calendar,
+  CreditCard,
+  Shield,
+  Trash2,
+  Eye,
+  Bell,
+  CheckCircle,
+  XCircle,
+  X,
+} from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { deleteReceipt } from "@/app/actions/receipt-actions"
 
@@ -26,6 +41,42 @@ export default function Dashboard() {
   const [receiptToDelete, setReceiptToDelete] = useState<Receipt | null>(null)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [receiptToPreview, setReceiptToPreview] = useState<Receipt | null>(null)
+  const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false)
+  const [recentStatusChanges, setRecentStatusChanges] = useState<Receipt[]>([])
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+
+  const getDismissedNotifications = (): string[] => {
+    if (typeof window === "undefined" || !user?.id) return []
+    const key = `dismissed_notifications_${user.id}`
+    try {
+      const dismissed = localStorage.getItem(key)
+      return dismissed ? JSON.parse(dismissed) : []
+    } catch (error) {
+      console.error("Error reading dismissed notifications:", error)
+      return []
+    }
+  }
+
+  const saveDismissedNotifications = (dismissedIds: string[]) => {
+    if (typeof window === "undefined" || !user?.id) return
+    const key = `dismissed_notifications_${user.id}`
+    try {
+      localStorage.setItem(key, JSON.stringify(dismissedIds))
+    } catch (error) {
+      console.error("Error saving dismissed notifications:", error)
+    }
+  }
+
+  const clearDismissedNotifications = () => {
+    if (typeof window === "undefined") return
+    try {
+      const keys = Object.keys(localStorage).filter((key) => key.startsWith("dismissed_notifications_"))
+      keys.forEach((key) => localStorage.removeItem(key))
+    } catch (error) {
+      console.error("Error clearing dismissed notifications:", error)
+    }
+  }
 
   useEffect(() => {
     console.log("DashboardPage useEffect: authLoading =", authLoading, ", user =", user)
@@ -47,7 +98,6 @@ export default function Dashboard() {
     setJwtRole(role)
     console.log("JWT Role:", role, "Database Role:", user?.role)
 
-    // If JWT role doesn't match database role, show warning
     if (user && role !== user.role) {
       console.warn("JWT role mismatch! JWT:", role, "Database:", user.role)
     }
@@ -62,6 +112,22 @@ export default function Dashboard() {
         .order("created_at", { ascending: false })
 
       if (error) throw error
+
+      const sevenDaysAgo = new Date()
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+      const recentChanges = (data || []).filter((receipt) => {
+        const updatedAt = new Date(receipt.updated_at || receipt.created_at)
+        return (receipt.status === "verified" || receipt.status === "rejected") && updatedAt > sevenDaysAgo
+      })
+
+      let filteredChanges = recentChanges
+      if (user?.id) {
+        const dismissedIds = getDismissedNotifications()
+        filteredChanges = recentChanges.filter((receipt) => !dismissedIds.includes(receipt.id))
+      }
+
+      setRecentStatusChanges(filteredChanges)
       setReceipts(data || [])
     } catch (error) {
       console.error("Error fetching receipts:", error)
@@ -77,6 +143,7 @@ export default function Dashboard() {
 
   const handleLogout = async () => {
     try {
+      clearDismissedNotifications()
       await signOut()
       toast({
         title: "Logged out",
@@ -103,45 +170,18 @@ export default function Dashboard() {
     }
   }
 
-  const handleRefreshRole = async () => {
-    try {
-      setLoadingReceipts(true)
-
-      // Refresh the session to get updated JWT claims
-      const { user: refreshedUser, error } = await refreshSession()
-
-      if (error) {
-        await refreshUser()
-      }
-
-      // Check JWT role again
-      await checkJWTRole()
-
-      toast({
-        title: "Profile Refreshed",
-        description: "Your role and profile information have been updated.",
-      })
-
-      await fetchReceipts()
-    } catch (error) {
-      toast({
-        title: "Refresh Failed",
-        description: "Failed to refresh profile. Please try logging out and back in.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoadingReceipts(false)
-    }
-  }
-
   const handleProfileUpdate = async () => {
-    // Refresh the current user data
     await refreshUser()
   }
 
   const handleDeleteReceipt = async (receipt: Receipt) => {
     setReceiptToDelete(receipt)
     setIsDeleteDialogOpen(true)
+  }
+
+  const handlePreviewReceipt = async (receipt: Receipt) => {
+    setReceiptToPreview(receipt)
+    setIsPreviewDialogOpen(true)
   }
 
   const confirmDeleteReceipt = async () => {
@@ -156,7 +196,6 @@ export default function Dashboard() {
           title: "Receipt Deleted",
           description: "Receipt has been successfully deleted.",
         })
-        // Remove the receipt from local state
         setReceipts((prev) => prev.filter((r) => r.id !== receiptToDelete.id))
       } else {
         toast({
@@ -178,13 +217,179 @@ export default function Dashboard() {
     }
   }
 
-  // Function to determine effective role (database role takes precedence if JWT is wrong)
+  const dismissNotification = (receiptId: string) => {
+    if (user?.id) {
+      const currentDismissed = getDismissedNotifications()
+      const updatedDismissed = [...currentDismissed, receiptId]
+      saveDismissedNotifications(updatedDismissed)
+    }
+
+    setRecentStatusChanges((prev) => prev.filter((receipt) => receipt.id !== receiptId))
+  }
+
   const getEffectiveRole = () => {
     return user?.role || "user"
   }
 
   const isAdmin = () => {
     return getEffectiveRole() === "admin"
+  }
+
+  const getFileType = (filename: string) => {
+    const extension = filename.toLowerCase().split(".").pop()
+    if (["jpg", "jpeg", "png", "gif", "webp"].includes(extension || "")) {
+      return "image"
+    } else if (extension === "pdf") {
+      return "pdf"
+    }
+    return "unknown"
+  }
+
+  const calculateStreakData = () => {
+    const months = []
+    const now = new Date()
+
+    for (let i = 23; i >= 0; i--) {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, "0")}`
+
+      // Check payment activity for this month
+      const monthPayments = receipts.filter((receipt) => {
+        if (receipt.status !== "verified") return false
+        const receiptDate = new Date(receipt.upload_date)
+        const receiptMonthKey = `${receiptDate.getFullYear()}-${String(receiptDate.getMonth() + 1).padStart(2, "0")}`
+        return receiptMonthKey === monthKey
+      }).length
+
+      // Determine intensity level (0-4)
+      let intensity = 0
+      if (monthPayments > 0) intensity = 1
+      if (monthPayments > 1) intensity = 2
+      if (monthPayments > 2) intensity = 3
+      if (monthPayments > 3) intensity = 4
+
+      months.push({
+        date: monthDate,
+        paymentCount: monthPayments,
+        intensity,
+        monthKey,
+        monthName: monthDate.toLocaleDateString("en-US", { month: "short" }),
+        year: monthDate.getFullYear(),
+      })
+    }
+
+    return months
+  }
+
+  const getIntensityColor = (intensity: number) => {
+    switch (intensity) {
+      case 0:
+        return "bg-gray-100 border-gray-200"
+      case 1:
+        return "bg-green-200 border-green-300"
+      case 2:
+        return "bg-green-300 border-green-400"
+      case 3:
+        return "bg-green-500 border-green-600"
+      case 4:
+        return "bg-green-700 border-green-800"
+      default:
+        return "bg-gray-100 border-gray-200"
+    }
+  }
+
+  const StreakGraphic = () => {
+    const streakData = calculateStreakData()
+    const currentStreak = calculateCurrentStreak()
+
+    // Split data into two years (12 months each)
+    const previousYearData = streakData.slice(0, 12)
+    const currentYearData = streakData.slice(12, 24)
+
+    const previousYear = previousYearData[0]?.year
+    const currentYear = currentYearData[0]?.year
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900">Gym Payment Activity</h3>
+          <div className="text-xs text-gray-600">
+            Current streak: <span className="font-semibold text-orange-600">{currentStreak} months</span>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {/* Month labels */}
+          <div className="flex">
+            <div className="w-12 mr-3"></div> {/* Space for year labels */}
+            <div className="grid grid-cols-12 gap-1 flex-1 text-xs text-gray-600 text-center">
+              {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((month) => (
+                <div key={month} className="text-[10px]">
+                  {month}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Previous Year Row */}
+          <div className="flex items-center">
+            <div className="w-12 mr-3 text-xs text-gray-600 text-right font-medium">{previousYear}</div>
+            <div className="grid grid-cols-12 gap-1 flex-1">
+              {previousYearData.map((month, index) => (
+                <div
+                  key={`prev-${index}`}
+                  className={`w-4 h-4 rounded-sm border ${getIntensityColor(month.intensity)}`}
+                  title={`${month.monthName} ${month.year}: ${month.paymentCount} payment${month.paymentCount !== 1 ? "s" : ""}`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Current Year Row */}
+          <div className="flex items-center">
+            <div className="w-12 mr-3 text-xs text-gray-600 text-right font-medium">{currentYear}</div>
+            <div className="grid grid-cols-12 gap-1 flex-1">
+              {currentYearData.map((month, index) => (
+                <div
+                  key={`curr-${index}`}
+                  className={`w-4 h-4 rounded-sm border ${getIntensityColor(month.intensity)}`}
+                  title={`${month.monthName} ${month.year}: ${month.paymentCount} payment${month.paymentCount !== 1 ? "s" : ""}`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="flex items-center justify-between text-xs text-gray-500 pt-2">
+            <span>Less</span>
+            <div className="flex items-center space-x-1">
+              <div className="w-3 h-3 rounded-sm bg-gray-100 border border-gray-200"></div>
+              <div className="w-3 h-3 rounded-sm bg-green-200 border border-green-300"></div>
+              <div className="w-3 h-3 rounded-sm bg-green-300 border border-green-400"></div>
+              <div className="w-3 h-3 rounded-sm bg-green-500 border border-green-600"></div>
+              <div className="w-3 h-3 rounded-sm bg-green-700 border border-green-800"></div>
+            </div>
+            <span>More</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const calculateCurrentStreak = () => {
+    const streakData = calculateStreakData()
+    let streak = 0
+
+    // Count from the most recent month backwards
+    for (let i = streakData.length - 1; i >= 0; i--) {
+      if (streakData[i].paymentCount > 0) {
+        streak++
+      } else {
+        break
+      }
+    }
+
+    return streak
   }
 
   if (authLoading) {
@@ -204,7 +409,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
-      {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
@@ -220,11 +424,69 @@ export default function Dashboard() {
                   Admin
                 </Badge>
               )}
-              {jwtRole === "admin" && <Badge className="bg-blue-100 text-blue-800">JWT: Admin</Badge>}
-              {!roleMatch && <Badge className="bg-yellow-100 text-yellow-800">Role Mismatch</Badge>}
-              <Button variant="ghost" size="sm" onClick={handleRefreshRole}>
-                Refresh Role
-              </Button>
+              <div className="relative">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                  className="relative"
+                >
+                  <Bell className="h-4 w-4" />
+                  {recentStatusChanges.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {recentStatusChanges.length}
+                    </span>
+                  )}
+                </Button>
+
+                {isNotificationOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-lg shadow-lg border z-50">
+                    <div className="p-4 border-b">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-gray-900">Notifications</h3>
+                        <Button variant="ghost" size="sm" onClick={() => setIsNotificationOpen(false)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      {recentStatusChanges.length === 0 ? (
+                        <div className="p-4 text-center text-gray-500">No recent notifications</div>
+                      ) : (
+                        <div className="space-y-1">
+                          {recentStatusChanges.map((receipt) => (
+                            <div key={receipt.id} className="flex items-center justify-between p-3 hover:bg-gray-50">
+                              <div className="flex items-center space-x-3 flex-1">
+                                {receipt.status === "verified" ? (
+                                  <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                                ) : (
+                                  <XCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-900">
+                                    Receipt {receipt.status === "verified" ? "Approved" : "Rejected"}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {receipt.filename} - R{receipt.amount.toFixed(2)}
+                                  </p>
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => dismissNotification(receipt.id)}
+                                className="flex-shrink-0 h-6 w-6 p-0"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
               {isAdmin() && (
                 <Button variant="outline" size="sm" onClick={() => router.push("/admin")}>
                   Admin Panel
@@ -240,25 +502,10 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-4xl mx-auto py-8 px-4">
-        {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h2>
           <p className="text-gray-600">Manage your gym payments and receipts</p>
 
-          {/* Role Status Debug Info */}
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-sm text-blue-800">
-              <strong>Database Role:</strong> {user.role} |<strong> JWT Role:</strong> {jwtRole || "Loading..."} |
-              <strong> Effective Role:</strong> {effectiveRole} |<strong> Match:</strong> {roleMatch ? "✅" : "❌"}
-            </p>
-            {!roleMatch && (
-              <p className="text-sm text-yellow-800 mt-1">
-                ⚠️ JWT role doesn't match database role. This may indicate the auth hook isn't working properly.
-              </p>
-            )}
-          </div>
-
-          {/* Special message for admin users with JWT issues */}
           {user.role === "admin" && jwtRole !== "admin" && (
             <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
               <h3 className="text-sm font-medium text-yellow-800 mb-2">Admin Access Notice</h3>
@@ -267,10 +514,7 @@ export default function Dashboard() {
                 admin features, but some functionality may be limited.
               </p>
               <div className="flex space-x-2">
-                <Button size="sm" onClick={handleRefreshRole}>
-                  Refresh Session
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => router.push("/admin")}>
+                <Button size="sm" onClick={() => router.push("/admin")}>
                   Go to Admin Panel
                 </Button>
               </div>
@@ -279,7 +523,6 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Account Info */}
           <Card className="lg:col-span-1">
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -316,9 +559,6 @@ export default function Dashboard() {
                   >
                     {effectiveRole}
                   </Badge>
-                  {jwtRole && jwtRole !== user.role && (
-                    <Badge className="bg-yellow-100 text-yellow-800">JWT: {jwtRole}</Badge>
-                  )}
                 </div>
               </div>
               <div>
@@ -338,7 +578,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Quick Actions */}
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
@@ -371,18 +610,20 @@ export default function Dashboard() {
                   </Button>
                 )}
               </div>
+              <div className="mt-6 pt-6 border-t">
+                <StreakGraphic />
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Recent Receipts */}
         <Card className="mt-6">
           <CardHeader>
             <CardTitle className="flex items-center">
               <FileText className="h-5 w-5 mr-2" />
               Recent Receipts
             </CardTitle>
-            <CardDescription>Your uploaded payment receipts and their status</CardDescription>
+            <CardDescription>Your uploaded payment receipts</CardDescription>
           </CardHeader>
           <CardContent>
             {loadingReceipts ? (
@@ -421,6 +662,14 @@ export default function Dashboard() {
                       <Button
                         size="sm"
                         variant="outline"
+                        onClick={() => handlePreviewReceipt(receipt)}
+                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => handleDeleteReceipt(receipt)}
                         className="text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
@@ -434,7 +683,76 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </main>
-      {/* Delete Receipt Confirmation Dialog */}
+
+      <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Receipt Preview</DialogTitle>
+          </DialogHeader>
+          {receiptToPreview && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <label className="font-medium text-gray-500">Filename:</label>
+                  <p className="text-gray-900">{receiptToPreview.filename}</p>
+                </div>
+                <div>
+                  <label className="font-medium text-gray-500">Amount:</label>
+                  <p className="text-gray-900">R{receiptToPreview.amount.toFixed(2)}</p>
+                </div>
+                <div>
+                  <label className="font-medium text-gray-500">Upload Date:</label>
+                  <p className="text-gray-900">{new Date(receiptToPreview.upload_date).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <label className="font-medium text-gray-500">Status:</label>
+                  <Badge className={getStatusColor(receiptToPreview.status)}>
+                    {receiptToPreview.status.charAt(0).toUpperCase() + receiptToPreview.status.slice(1)}
+                  </Badge>
+                </div>
+                {receiptToPreview.description && (
+                  <div className="col-span-2">
+                    <label className="font-medium text-gray-500">Description:</label>
+                    <p className="text-gray-900">{receiptToPreview.description}</p>
+                  </div>
+                )}
+              </div>
+              <div className="border rounded-lg overflow-hidden">
+                {getFileType(receiptToPreview.filename) === "image" ? (
+                  <Image
+                    src={receiptToPreview.file_url || "/placeholder.svg"}
+                    alt={`Receipt: ${receiptToPreview.filename}`}
+                    width={800}
+                    height={600}
+                    className="w-full h-auto object-contain"
+                    unoptimized
+                  />
+                ) : getFileType(receiptToPreview.filename) === "pdf" ? (
+                  <div className="w-full h-[600px]">
+                    <iframe
+                      src={receiptToPreview.file_url}
+                      className="w-full h-full border-0"
+                      title={`Receipt: ${receiptToPreview.filename}`}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-64 bg-gray-50">
+                    <FileText className="h-16 w-16 text-gray-400 mb-4" />
+                    <p className="text-gray-600 mb-4">Preview not available for this file type</p>
+                    <Button
+                      onClick={() => window.open(receiptToPreview.file_url, "_blank")}
+                      className="bg-orange-600 hover:bg-orange-700"
+                    >
+                      Open File
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>

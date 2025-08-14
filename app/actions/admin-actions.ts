@@ -134,7 +134,7 @@ export async function getAdminStats(): Promise<{
   }
 }
 
-export async function getAllReceiptsForAdmin(): Promise<Receipt[] | null> {
+export async function getReceiptsByMonth(): Promise<{ [key: string]: Receipt[] } | null> {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -147,11 +147,10 @@ export async function getAllReceiptsForAdmin(): Promise<Receipt[] | null> {
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
-        persistSession: false,
       },
     })
 
-    console.log("Server Action: Fetching all receipts for admin with service role...")
+    console.log("Server Action: Fetching receipts grouped by month...")
     const { data: receipts, error } = await supabaseAdmin
       .from("receipts")
       .select(`
@@ -166,141 +165,28 @@ export async function getAllReceiptsForAdmin(): Promise<Receipt[] | null> {
       .order("upload_date", { ascending: false })
 
     if (error) {
-      console.error(
-        "Server Action: Error fetching all receipts for admin with service role:",
-        error.message,
-        error.details,
-        error.hint,
-        error.code,
-      )
+      console.error("Server Action: Error fetching receipts by month:", error.message)
       return null
     }
 
-    console.log(`Server Action: Successfully fetched ${receipts?.length || 0} receipts for admin.`)
-    return receipts
-  } catch (error) {
-    console.error("Server Action: getAllReceiptsForAdmin unexpected error:", error)
-    return null
-  }
-}
+    // Group receipts by month
+    const receiptsByMonth: { [key: string]: Receipt[] } = {}
 
-export async function updateReceiptStatusAdmin(
-  receiptId: string,
-  newStatus: "verified" | "rejected",
-  adminId: string,
-): Promise<{ success: boolean; message: string }> {
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    receipts?.forEach((receipt) => {
+      const uploadDate = new Date(receipt.upload_date)
+      const monthKey = `${uploadDate.getFullYear()}-${String(uploadDate.getMonth() + 1).padStart(2, "0")}`
 
-    if (!supabaseUrl || !serviceRoleKey) {
-      console.error("Server Action: Supabase URL or Service Role Key is not configured.")
-      return { success: false, message: "Server configuration error" }
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-
-    console.log(`Server Action: Updating receipt ${receiptId} status to ${newStatus} by admin ${adminId}`)
-
-    // First get the receipt to check its current status and get user_id
-    const { data: receipt, error: fetchError } = await supabaseAdmin
-      .from("receipts")
-      .select("*")
-      .eq("id", receiptId)
-      .single()
-
-    if (fetchError) {
-      console.error("Server Action: Error fetching receipt:", fetchError.message)
-      return { success: false, message: fetchError.message }
-    }
-
-    const updateData: any = {
-      status: newStatus,
-      verified_by: adminId,
-      updated_at: new Date().toISOString(),
-    }
-
-    if (newStatus === "verified") {
-      updateData.verified_date = new Date().toISOString()
-    }
-
-    const { error: updateError } = await supabaseAdmin.from("receipts").update(updateData).eq("id", receiptId)
-
-    if (updateError) {
-      console.error("Server Action: Error updating receipt status:", updateError.message)
-      return { success: false, message: updateError.message }
-    }
-
-    // If verified, create a payment record
-    if (newStatus === "verified" && receipt) {
-      const { error: paymentError } = await supabaseAdmin.from("payments").insert({
-        user_id: receipt.user_id,
-        amount: receipt.amount || 0,
-        payment_date: new Date().toISOString(),
-        status: "verified",
-        receipt_id: receipt.id,
-      })
-
-      if (paymentError) {
-        console.error("Server Action: Error creating payment record:", paymentError.message)
-        return { success: false, message: "Receipt updated but failed to create payment record" }
+      if (!receiptsByMonth[monthKey]) {
+        receiptsByMonth[monthKey] = []
       }
 
-      // Update user's last_payment_date
-      const { error: userUpdateError } = await supabaseAdmin
-        .from("users")
-        .update({ last_payment_date: new Date().toISOString() })
-        .eq("id", receipt.user_id)
-
-      if (userUpdateError) {
-        console.error("Server Action: Error updating user last payment date:", userUpdateError.message)
-      }
-    }
-
-    console.log(`Server Action: Successfully updated receipt ${receiptId} status to ${newStatus}`)
-    return { success: true, message: "Receipt status updated successfully" }
-  } catch (error) {
-    console.error("Server Action: updateReceiptStatusAdmin unexpected error:", error)
-    return { success: false, message: "An unexpected error occurred" }
-  }
-}
-
-export async function getMonthlyRevenue(): Promise<
-  { month_year: string; revenue: number; payment_count: number }[] | null
-> {
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!supabaseUrl || !serviceRoleKey) {
-      console.error("Server Action: Supabase URL or Service Role Key is not configured.")
-      return null
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
+      receiptsByMonth[monthKey].push(receipt)
     })
 
-    console.log("Server Action: Fetching monthly revenue...")
-    const { data: monthlyRevenue, error } = await supabaseAdmin.rpc("get_monthly_revenue")
-
-    if (error) {
-      console.error("Server Action: Error fetching monthly revenue:", error.message)
-      return null
-    }
-
-    console.log(`Server Action: Successfully fetched monthly revenue data for ${monthlyRevenue?.length || 0} months.`)
-    return monthlyRevenue
+    console.log(`Server Action: Successfully grouped ${receipts?.length || 0} receipts by month.`)
+    return receiptsByMonth
   } catch (error) {
-    console.error("Server Action: getMonthlyRevenue unexpected error:", error)
+    console.error("Server Action: getReceiptsByMonth unexpected error:", error)
     return null
   }
 }
@@ -473,6 +359,191 @@ export async function updateUserMembershipStatus(
   }
 }
 
+export async function getAllReceiptsForAdmin(): Promise<Receipt[] | null> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error("Server Action: Supabase URL or Service Role Key is not configured.")
+      return null
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+
+    console.log("Server Action: Fetching all receipts for admin with service role...")
+    const { data: receipts, error } = await supabaseAdmin
+      .from("receipts")
+      .select(`
+        *,
+        users!receipts_user_id_fkey (
+          id,
+          full_name,
+          email,
+          profile_picture_url
+        )
+      `)
+      .order("upload_date", { ascending: false })
+
+    if (error) {
+      console.error(
+        "Server Action: Error fetching all receipts for admin with service role:",
+        error.message,
+        error.details,
+        error.hint,
+        error.code,
+      )
+      return null
+    }
+
+    console.log(`Server Action: Successfully fetched ${receipts?.length || 0} receipts for admin.`)
+    return receipts
+  } catch (error) {
+    console.error("Server Action: getAllReceiptsForAdmin unexpected error:", error)
+    return null
+  }
+}
+
+export async function updateReceiptStatusAdmin(
+  receiptId: string,
+  newStatus: "verified" | "rejected",
+  adminId: string,
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error("Server Action: Supabase URL or Service Role Key is not configured.")
+      return { success: false, message: "Server configuration error" }
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+
+    console.log(`Server Action: Updating receipt ${receiptId} status to ${newStatus} by admin ${adminId}`)
+
+    // First get the receipt to check its current status and get user_id
+    const { data: receipt, error: fetchError } = await supabaseAdmin
+      .from("receipts")
+      .select("*")
+      .eq("id", receiptId)
+      .single()
+
+    if (fetchError) {
+      console.error("Server Action: Error fetching receipt:", fetchError.message)
+      return { success: false, message: fetchError.message }
+    }
+
+    const updateData: any = {
+      status: newStatus,
+      verified_by: adminId,
+      updated_at: new Date().toISOString(),
+    }
+
+    if (newStatus === "verified") {
+      updateData.verified_date = new Date().toISOString()
+    }
+
+    const { error: updateError } = await supabaseAdmin.from("receipts").update(updateData).eq("id", receiptId)
+
+    if (updateError) {
+      console.error("Server Action: Error updating receipt status:", updateError.message)
+      return { success: false, message: updateError.message }
+    }
+
+    // If verified, create a payment record using safe function
+    if (newStatus === "verified" && receipt) {
+      const { data: paymentId, error: paymentError } = await supabaseAdmin.rpc("create_payment_record", {
+        p_user_id: receipt.user_id,
+        p_amount: receipt.amount || 0,
+        p_receipt_id: receipt.id,
+        p_payment_type: "membership",
+      })
+
+      if (paymentError) {
+        console.error("Server Action: Error creating payment record:", paymentError.message)
+        return { success: false, message: "Receipt updated but failed to create payment record" }
+      }
+
+      const isAdminFeePayment = receipt.description?.toLowerCase().includes("admin fee")
+
+      if (isAdminFeePayment) {
+        console.log(`Server Action: Receipt contains admin fee, updating joining_fee_paid for user ${receipt.user_id}`)
+
+        const { error: joiningFeeError } = await supabaseAdmin
+          .from("users")
+          .update({
+            joining_fee_paid: true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", receipt.user_id)
+
+        if (joiningFeeError) {
+          console.error("Server Action: Error updating joining_fee_paid:", joiningFeeError.message)
+          // Don't fail the entire operation, just log the error
+        } else {
+          console.log(`Server Action: Successfully updated joining_fee_paid for user ${receipt.user_id}`)
+        }
+      }
+
+      console.log(
+        `Server Action: Successfully created payment record and updated last payment date for user ${receipt.user_id}`,
+      )
+    }
+
+    console.log(`Server Action: Successfully updated receipt ${receiptId} status to ${newStatus}`)
+    return { success: true, message: "Receipt status updated successfully" }
+  } catch (error) {
+    console.error("Server Action: updateReceiptStatusAdmin unexpected error:", error)
+    return { success: false, message: "An unexpected error occurred" }
+  }
+}
+
+export async function getMonthlyRevenue(): Promise<
+  { month_year: string; revenue: number; payment_count: number }[] | null
+> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error("Server Action: Supabase URL or Service Role Key is not configured.")
+      return null
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+
+    console.log("Server Action: Fetching monthly revenue...")
+    const { data: monthlyRevenue, error } = await supabaseAdmin.rpc("get_monthly_revenue")
+
+    if (error) {
+      console.error("Server Action: Error fetching monthly revenue:", error.message)
+      return null
+    }
+
+    console.log(`Server Action: Successfully fetched monthly revenue data for ${monthlyRevenue?.length || 0} months.`)
+    return monthlyRevenue
+  } catch (error) {
+    console.error("Server Action: getMonthlyRevenue unexpected error:", error)
+    return null
+  }
+}
+
 export async function cleanupOldReceipts(): Promise<{ success: boolean; message: string; deletedCount?: number }> {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -505,63 +576,5 @@ export async function cleanupOldReceipts(): Promise<{ success: boolean; message:
   } catch (error) {
     console.error("Server Action: cleanupOldReceipts unexpected error:", error)
     return { success: false, message: "An unexpected error occurred during cleanup" }
-  }
-}
-
-export async function getReceiptsByMonth(): Promise<{ [key: string]: Receipt[] } | null> {
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!supabaseUrl || !serviceRoleKey) {
-      console.error("Server Action: Supabase URL or Service Role Key is not configured.")
-      return null
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-
-    console.log("Server Action: Fetching receipts grouped by month...")
-    const { data: receipts, error } = await supabaseAdmin
-      .from("receipts")
-      .select(`
-        *,
-        users!receipts_user_id_fkey (
-          id,
-          full_name,
-          email,
-          profile_picture_url
-        )
-      `)
-      .order("upload_date", { ascending: false })
-
-    if (error) {
-      console.error("Server Action: Error fetching receipts by month:", error.message)
-      return null
-    }
-
-    // Group receipts by month
-    const receiptsByMonth: { [key: string]: Receipt[] } = {}
-
-    receipts?.forEach((receipt) => {
-      const uploadDate = new Date(receipt.upload_date)
-      const monthKey = `${uploadDate.getFullYear()}-${String(uploadDate.getMonth() + 1).padStart(2, "0")}`
-
-      if (!receiptsByMonth[monthKey]) {
-        receiptsByMonth[monthKey] = []
-      }
-
-      receiptsByMonth[monthKey].push(receipt)
-    })
-
-    console.log(`Server Action: Successfully grouped ${receipts?.length || 0} receipts by month.`)
-    return receiptsByMonth
-  } catch (error) {
-    console.error("Server Action: getReceiptsByMonth unexpected error:", error)
-    return null
   }
 }

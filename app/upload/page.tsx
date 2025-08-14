@@ -6,14 +6,16 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { LoadingSpinner } from "@/components/loading-spinner"
 import { useAuthContext } from "@/components/auth-provider"
 import { uploadReceipt } from "@/lib/auth"
 import { useToast } from "@/hooks/use-toast"
-import { Dumbbell, Upload, ArrowLeft, FileText, CheckCircle, User } from 'lucide-react'
+import { Dumbbell, Upload, ArrowLeft, FileText, CheckCircle, User } from "lucide-react"
+
+type PaymentType = "membership" | "admin" | "both"
 
 export default function UploadPage() {
   const { user, loading } = useAuthContext()
@@ -21,10 +23,37 @@ export default function UploadPage() {
   const { toast } = useToast()
 
   const [file, setFile] = useState<File | null>(null)
-  const [amount, setAmount] = useState("")
-  const [description, setDescription] = useState("")
+  const [paymentType, setPaymentType] = useState<PaymentType>("membership")
+  const [description, setDescription] = useState("Gym membership fee")
   const [isUploading, setIsUploading] = useState(false)
   const [uploadSuccess, setUploadSuccess] = useState(false)
+
+  useEffect(() => {
+    switch (paymentType) {
+      case "membership":
+        setDescription("Gym membership fee")
+        break
+      case "admin":
+        setDescription("Admin fee")
+        break
+      case "both":
+        setDescription("Gym membership fee & admin fee")
+        break
+    }
+  }, [paymentType])
+
+  const getAmount = (type: PaymentType): number => {
+    switch (type) {
+      case "membership":
+        return 120
+      case "admin":
+        return 50
+      case "both":
+        return 170
+      default:
+        return 120
+    }
+  }
 
   useEffect(() => {
     if (!loading && !user) {
@@ -75,12 +104,14 @@ export default function UploadPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!file || !amount) return
+    if (!file) return
 
     setIsUploading(true)
 
     try {
-      const { receipt, error } = await uploadReceipt(file, Number.parseFloat(amount), description || undefined)
+      const amount = getAmount(paymentType)
+      const isAdminFee = paymentType === "admin" || paymentType === "both"
+      const { receipt, error } = await uploadReceipt(file, amount, description, isAdminFee)
 
       if (error) {
         toast({
@@ -102,8 +133,8 @@ export default function UploadPage() {
         setTimeout(() => {
           setUploadSuccess(false)
           setFile(null)
-          setAmount("")
-          setDescription("")
+          setPaymentType("membership")
+          setDescription("Gym membership fee")
           router.push("/dashboard")
         }, 2000)
       }
@@ -224,42 +255,58 @@ export default function UploadPage() {
                 </div>
               </div>
 
-              {/* Amount */}
-              <div className="space-y-2">
-                <Label htmlFor="amount">Payment Amount *</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">R</span>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    className="pl-8"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    required
-                  />
-                </div>
+              <div className="space-y-3">
+                <Label>Payment Type *</Label>
+                <RadioGroup value={paymentType} onValueChange={(value) => setPaymentType(value as PaymentType)}>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50">
+                      <RadioGroupItem value="membership" id="membership" />
+                      <Label htmlFor="membership" className="flex-1 cursor-pointer">
+                        <div className="text-center">
+                          <div className="font-medium">Membership</div>
+                          <div className="font-semibold text-orange-600">R120</div>
+                        </div>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50">
+                      <RadioGroupItem value="admin" id="admin" />
+                      <Label htmlFor="admin" className="flex-1 cursor-pointer">
+                        <div className="text-center">
+                          <div className="font-medium">Admin Fee</div>
+                          <div className="font-semibold text-orange-600">R50</div>
+                        </div>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50">
+                      <RadioGroupItem value="both" id="both" />
+                      <Label htmlFor="both" className="flex-1 cursor-pointer">
+                        <div className="text-center">
+                          <div className="font-medium">Both</div>
+                          <div className="font-semibold text-orange-600">R170</div>
+                        </div>
+                      </Label>
+                    </div>
+                  </div>
+                </RadioGroup>
               </div>
 
-              {/* Description */}
               <div className="space-y-2">
-                <Label htmlFor="description">Description (Optional)</Label>
+                <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
-                  placeholder="Monthly membership fee, personal training session, etc."
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
+                  readOnly
+                  className="bg-gray-50 cursor-not-allowed"
+                  rows={2}
                 />
+                <p className="text-xs text-gray-500">Description is automatically set based on payment type</p>
               </div>
 
               {/* Submit Button */}
               <Button
                 type="submit"
                 className="w-full bg-orange-600 hover:bg-orange-700"
-                disabled={!file || !amount || isUploading}
+                disabled={!file || isUploading}
               >
                 {isUploading ? (
                   <>
@@ -269,7 +316,7 @@ export default function UploadPage() {
                 ) : (
                   <>
                     <Upload className="h-4 w-4 mr-2" />
-                    Upload Receipt
+                    Upload Receipt - R{getAmount(paymentType)}
                   </>
                 )}
               </Button>

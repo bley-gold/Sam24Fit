@@ -30,12 +30,17 @@ export const signUp = async (data: SignUpData) => {
 
     console.log("Client: Attempting to sign up user via auth.signUp...")
 
-    // Sign up with email confirmation disabled for development
+    const redirectUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/auth/callback`
+        : `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/callback`
+
+    // Try to sign up without email confirmation first (for development)
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: redirectUrl,
         data: {
           full_name: data.fullName,
         },
@@ -44,14 +49,25 @@ export const signUp = async (data: SignUpData) => {
 
     if (authError) {
       console.error("Client: Auth signup error:", authError)
+
+      // Check if it's an email confirmation issue
+      if (authError.message.includes("email") || authError.message.includes("confirmation")) {
+        throw new Error(
+          "Email confirmation is required but not properly configured. Please contact support or try again later.",
+        )
+      }
+
       throw authError
     }
+
     if (!authData.user) {
       throw new Error("Failed to create user in auth.users")
     }
 
     const userId = authData.user.id
     console.log("Client: Auth user created with ID:", userId)
+    console.log("Client: User email confirmed:", authData.user.email_confirmed_at ? "Yes" : "No")
+    console.log("Client: Session exists:", authData.session ? "Yes" : "No")
 
     let profilePictureData: { base64: string; name: string; type: string } | null = null
     if (data.profilePicture) {
@@ -103,18 +119,35 @@ export const signUp = async (data: SignUpData) => {
     }
     console.log("Client: User profile created successfully via server action.")
 
+    // Check if we have a session (email confirmation not required or already confirmed)
+    if (authData.session) {
+      console.log("Client: User has active session, signup complete")
+      return {
+        user: authData.user,
+        error: null,
+        needsEmailConfirmation: false,
+        message: "Registration successful! You can now access your account.",
+      }
+    }
+
     // Check if email confirmation is required
-    if (!authData.session && authData.user && !authData.user.email_confirmed_at) {
+    if (!authData.user.email_confirmed_at) {
       console.log("Client: Email confirmation required")
       return {
         user: authData.user,
         error: null,
         needsEmailConfirmation: true,
-        message: "Please check your email and click the confirmation link to complete your registration.",
+        message:
+          "Please check your email and click the confirmation link to complete your registration. If you don't receive an email, check your spam folder or contact support.",
       }
     }
 
-    return { user: authData.user, error: null, needsEmailConfirmation: false }
+    return {
+      user: authData.user,
+      error: null,
+      needsEmailConfirmation: false,
+      message: "Registration successful!",
+    }
   } catch (error) {
     console.error("Client: Sign up error:", error)
     return { user: null, error: error as Error, needsEmailConfirmation: false }
@@ -141,6 +174,15 @@ export const signIn = async (data: SignInData) => {
         name: error.name,
       })
 
+      // Check for specific error types
+      if (error.message.includes("Email not confirmed")) {
+        throw new Error("Please check your email and click the confirmation link before signing in.")
+      }
+
+      if (error.message.includes("Invalid login credentials")) {
+        throw new Error("Invalid email or password. Please check your credentials and try again.")
+      }
+
       // Check if it's a hook-related error
       if (error.message.includes("hook") || error.message.includes("custom_access_token_hook")) {
         console.error("Hook error detected. This might be due to:")
@@ -148,7 +190,6 @@ export const signIn = async (data: SignInData) => {
         console.error("2. Missing permissions for supabase_auth_admin")
         console.error("3. Users table not accessible to the hook")
 
-        // You might want to provide a more user-friendly error message
         throw new Error("Authentication system is temporarily unavailable. Please try again later or contact support.")
       }
 
@@ -175,7 +216,7 @@ export const signIn = async (data: SignInData) => {
       user: authData.user,
       error: null,
       userRole: userRole,
-      isAdmin: userRole === "admin" || data.email === "goldstainmusic22@gmail.com",
+      isAdmin: userRole === "admin",
     }
   } catch (error) {
     console.error("Sign in error:", error)
@@ -235,26 +276,46 @@ export const getCurrentUser = async (): Promise<User | null> => {
       return null
     }
 
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("getCurrentUser timeout")), 5000)
+    })
+
+    const getUserPromise = supabase.auth.getUser()
+
     const {
       data: { user: authUser },
       error: authUserError,
-    } = await supabase.auth.getUser()
+    } = await Promise.race([getUserPromise, timeoutPromise])
 
     if (authUserError) {
       console.error("Error fetching auth user:", authUserError)
       return null
     }
     if (!authUser) {
+      console.log("No authenticated user found")
       return null
     }
 
-    const profile = await getUserProfileById(authUser.id)
+    console.log("Auth user found:", authUser.email)
+
+    // Try to get profile with timeout
+    const profilePromise = getUserProfileById(authUser.id)
+    const profileTimeoutPromise = new Promise<null>((resolve) => {
+      setTimeout(() => {
+        console.warn("Profile fetch timeout, returning null")
+        resolve(null)
+      }, 3000)
+    })
+
+    const profile = await Promise.race([profilePromise, profileTimeoutPromise])
 
     if (!profile) {
       console.warn(`User profile for ${authUser.id} not found in public.users via server action.`)
       return null
     }
 
+    console.log("User profile found:", profile.email)
     return profile
   } catch (error) {
     console.error("Get current user unexpected error:", error)
@@ -280,7 +341,7 @@ export const getUserRoleFromJWT = async (): Promise<string> => {
   }
 }
 
-export const uploadReceipt = async (file: File, amount: number, description?: string) => {
+export const uploadReceipt = async (file: File, amount: number, description?: string, isAdminFee?: boolean) => {
   try {
     if (!isSupabaseConfigured()) {
       throw new Error("Supabase is not properly configured. Please check your environment variables.")

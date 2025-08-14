@@ -578,56 +578,136 @@ export default function AdminPage() {
         </Card>
 
         {/* Monthly Revenue Chart - Fixed responsiveness */}
-        <Card className="mb-8">
+<Card className="mb-8">
+  <CardHeader>
+    <CardTitle className="flex items-center">
+      <BarChart className="h-5 w-5 mr-2" />
+      Monthly Revenue
+    </CardTitle>
+    <CardDescription>Revenue from approved receipts per month</CardDescription>
+  </CardHeader>
+  <CardContent className="pb-6">
+    {loadingData ? (
+      <div className="text-center py-8">
+        <LoadingSpinner size="md" text="Loading chart data..." />
+      </div>
+    ) : monthlyRevenueData.length === 0 ? (
+      <div className="text-center py-8">
+        <BarChart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <p className="text-gray-500">No monthly revenue data available.</p>
+      </div>
+    ) : (
+      <div className="w-full overflow-x-auto">
+        <div className="min-w-[800px] h-[550px]"> {/* bigger chart container */}
+          <ChartContainer config={monthlyRevenueChartConfig}>
+            <ResponsiveContainer width="100%" height="100%">
+              <RechartsBarChart
+                data={monthlyRevenueData}
+                margin={{ top: 30, right: 20, left: 50, bottom: 110 }} // more padding
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="month_year"
+                  tickFormatter={formatMonthYearChart}
+                  angle={-45}
+                  textAnchor="end"
+                  height={100}
+                  interval={0}
+                  fontSize={14} // slightly bigger labels
+                />
+                <YAxis
+                  tickFormatter={(value) => `R${value}`}
+                  width={70}
+                  fontSize={14} // slightly bigger labels
+                />
+                <ChartTooltip
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
+                          <p className="font-medium">{formatMonthYear(label)}</p>
+                          <p className="text-orange-600">
+                            Revenue: R{payload[0].value?.toLocaleString()}
+                          </p>
+                          <p className="text-gray-600">
+                            Payments: {payload[0].payload?.payment_count || 0}
+                          </p>
+                        </div>
+                      )
+                    }
+                    return null
+                  }}
+                />
+                <Bar
+                  dataKey="revenue"
+                  fill="#ea580c"
+                  radius={[4, 4, 0, 0]}
+                  name="Revenue"
+                />
+              </RechartsBarChart>
+            </ResponsiveContainer>
+          </ChartContainer>
+        </div>
+      </div>
+    )}
+  </CardContent>
+</Card>
+
+
+        {/* Paid vs Unpaid Members Overview - Fixed responsiveness */}
+<Card className="mb-8">
+  <CardHeader>
+    <CardTitle className="flex items-center">
+      <CircleDollarSign className="h-5 w-5 mr-2" />
+      Current Month Membership Status
+    </CardTitle>
+    <CardDescription className="flex items-center gap-2">
+      <Info className="h-4 w-4 text-blue-500" />
+      <span>
+        <strong>Unpaid Members:</strong> Active members who haven't submitted an approved receipt for the
+        current month's membership fee
+      </span>
+    </CardDescription>
+  </CardHeader>
+  <CardContent>
+    {loadingData ? (
+      <div className="text-center py-8">
+        <LoadingSpinner size="md" text="Loading membership status..." />
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Pie Chart */}
+        <Card className="bg-white border-0 shadow-sm">
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <BarChart className="h-5 w-5 mr-2" />
-              Monthly Revenue
-            </CardTitle>
-            <CardDescription>Revenue from approved receipts per month</CardDescription>
+            <CardTitle>Paid vs. Unpaid Members</CardTitle>
           </CardHeader>
-          <CardContent className="pb-6">
-            {loadingData ? (
+          <CardContent className="flex items-center justify-center">
+            {paidMembers.length === 0 && unpaidMembers.length === 0 ? (
               <div className="text-center py-8">
-                <LoadingSpinner size="md" text="Loading chart data..." />
-              </div>
-            ) : monthlyRevenueData.length === 0 ? (
-              <div className="text-center py-8">
-                <BarChart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No monthly revenue data available.</p>
+                <PieChart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">No membership data for current month.</p>
               </div>
             ) : (
-              <div className="w-full h-[400px]">
-                <ChartContainer config={monthlyRevenueChartConfig}>
+              <div className="w-full h-[400px]"> {/* bigger chart */}
+                <ChartContainer config={paidUnpaidChartConfig}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <RechartsBarChart data={monthlyRevenueData} margin={{ top: 20, right: 30, left: 60, bottom: 80 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis
-                        dataKey="month_year"
-                        tickFormatter={formatMonthYearChart}
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                        interval={0}
-                        fontSize={12}
-                      />
-                      <YAxis tickFormatter={(value) => `R${value}`} width={60} fontSize={12} />
-                      <ChartTooltip
-                        content={({ active, payload, label }) => {
-                          if (active && payload && payload.length) {
-                            return (
-                              <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
-                                <p className="font-medium">{formatMonthYear(label)}</p>
-                                <p className="text-orange-600">Revenue: R{payload[0].value?.toLocaleString()}</p>
-                                <p className="text-gray-600">Payments: {payload[0].payload?.payment_count || 0}</p>
-                              </div>
-                            )
-                          }
-                          return null
-                        }}
-                      />
-                      <Bar dataKey="revenue" fill="#ea580c" radius={[4, 4, 0, 0]} name="Revenue" />
-                    </RechartsBarChart>
+                    <PieChart>
+                      <ChartTooltip cursor={false} content={<ChartTooltipContent nameKey="name" hideLabel />} />
+                      <Pie
+                        data={paidUnpaidChartData}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius="35%"
+                        outerRadius="65%"
+                        paddingAngle={5}
+                        cornerRadius={5}
+                      >
+                        {paidUnpaidChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <ChartLegend content={<ChartLegendContent nameKey="name" />} />
+                    </PieChart>
                   </ResponsiveContainer>
                 </ChartContainer>
               </div>
@@ -635,143 +715,79 @@ export default function AdminPage() {
           </CardContent>
         </Card>
 
-        {/* Paid vs Unpaid Members Overview - Fixed responsiveness */}
-        <Card className="mb-8">
+        {/* Paid Members List */}
+        <Card className="bg-white border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center">
-              <CircleDollarSign className="h-5 w-5 mr-2" />
-              Current Month Membership Status
+              <Check className="h-5 w-5 mr-2 text-green-600" />
+              Paid Members ({paidMembers.length})
             </CardTitle>
-            <CardDescription className="flex items-center gap-2">
-              <Info className="h-4 w-4 text-blue-500" />
-              <span>
-                <strong>Unpaid Members:</strong> Active members who haven't submitted an approved receipt for the
-                current month's membership fee
-              </span>
-            </CardDescription>
           </CardHeader>
-          <CardContent>
-            {loadingData ? (
-              <div className="text-center py-8">
-                <LoadingSpinner size="md" text="Loading membership status..." />
-              </div>
+          <CardContent className="max-h-80 overflow-y-auto"> {/* scroll if too many */}
+            {paidMembers.length === 0 ? (
+              <p className="text-gray-500 text-sm">No members have paid for the current month yet.</p>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Pie Chart */}
-                <Card className="bg-white border-0 shadow-sm">
-                  <CardHeader>
-                    <CardTitle>Paid vs. Unpaid Members</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex items-center justify-center">
-                    {paidMembers.length === 0 && unpaidMembers.length === 0 ? (
-                      <div className="text-center py-8">
-                        <PieChart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-500">No membership data for current month.</p>
-                      </div>
-                    ) : (
-                      <div className="w-full h-[280px]">
-                        <ChartContainer config={paidUnpaidChartConfig}>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <ChartTooltip cursor={false} content={<ChartTooltipContent nameKey="name" hideLabel />} />
-                              <Pie
-                                data={paidUnpaidChartData}
-                                dataKey="value"
-                                nameKey="name"
-                                innerRadius="35%"
-                                outerRadius="65%"
-                                paddingAngle={5}
-                                cornerRadius={5}
-                              >
-                                {paidUnpaidChartData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={entry.fill} />
-                                ))}
-                              </Pie>
-                              <ChartLegend content={<ChartLegendContent nameKey="name" />} />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </ChartContainer>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Paid Members List */}
-                <Card className="bg-white border-0 shadow-sm">
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Check className="h-5 w-5 mr-2 text-green-600" />
-                      Paid Members ({paidMembers.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="max-h-80 overflow-y-auto">
-                    {paidMembers.length === 0 ? (
-                      <p className="text-gray-500 text-sm">No members have paid for the current month yet.</p>
-                    ) : (
-                      <ul className="space-y-3">
-                        {paidMembers.map((member) => (
-                          <li key={member.id} className="flex items-center space-x-3">
-                            <Image
-                              src={
-                                member.profile_picture_url || "/placeholder.svg?height=32&width=32&query=user profile"
-                              }
-                              alt={`${member.full_name}'s profile`}
-                              width={32}
-                              height={32}
-                              className="rounded-full object-cover"
-                            />
-                            <div className="flex-1">
-                              <p className="font-medium text-gray-900">{member.full_name}</p>
-                              <p className="text-sm text-gray-600">R{member.paid_amount.toFixed(2)}</p>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Unpaid Members List */}
-                <Card className="lg:col-span-2 bg-white border-0 shadow-sm">
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <X className="h-5 w-5 mr-2 text-red-600" />
-                      Unpaid Members ({unpaidMembers.length})
-                    </CardTitle>
-                    <CardDescription>
-                      Active members who haven't submitted approved receipts for this month's membership fee
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="max-h-80 overflow-y-auto">
-                    {unpaidMembers.length === 0 ? (
-                      <p className="text-gray-500 text-sm">All active members have paid for the current month!</p>
-                    ) : (
-                      <ul className="space-y-3">
-                        {unpaidMembers.map((member) => (
-                          <li key={member.id} className="flex items-center space-x-3">
-                            <Image
-                              src={
-                                member.profile_picture_url || "/placeholder.svg?height=32&width=32&query=user profile"
-                              }
-                              alt={`${member.full_name}'s profile`}
-                              width={32}
-                              height={32}
-                              className="rounded-full object-cover"
-                            />
-                            <div className="flex-1">
-                              <p className="font-medium text-gray-900">{member.full_name}</p>
-                              <p className="text-sm text-gray-600">{member.email}</p>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
+              <ul className="space-y-3">
+                {paidMembers.map((member) => (
+                  <li key={member.id} className="flex items-center space-x-3">
+                    <Image
+                      src={member.profile_picture_url || "/placeholder.svg?height=32&width=32&query=user profile"}
+                      alt={`${member.full_name}'s profile`}
+                      width={32}
+                      height={32}
+                      className="rounded-full object-cover"
+                    />
+                    <div className="flex-1 truncate"> {/* truncates long names */}
+                      <p className="font-medium text-gray-900 truncate">{member.full_name}</p>
+                      <p className="text-sm text-gray-600 truncate">R{member.paid_amount.toFixed(2)}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </CardContent>
         </Card>
+
+        {/* Unpaid Members List */}
+        <Card className="lg:col-span-2 bg-white border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <X className="h-5 w-5 mr-2 text-red-600" />
+              Unpaid Members ({unpaidMembers.length})
+            </CardTitle>
+            <CardDescription>
+              Active members who haven't submitted approved receipts for this month's membership fee
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="max-h-80 overflow-y-auto"> {/* scroll if too many */}
+            {unpaidMembers.length === 0 ? (
+              <p className="text-gray-500 text-sm">All active members have paid for the current month!</p>
+            ) : (
+              <ul className="space-y-3">
+                {unpaidMembers.map((member) => (
+                  <li key={member.id} className="flex items-center space-x-3">
+                    <Image
+                      src={member.profile_picture_url || "/placeholder.svg?height=32&width=32&query=user profile"}
+                      alt={`${member.full_name}'s profile`}
+                      width={32}
+                      height={32}
+                      className="rounded-full object-cover"
+                    />
+                    <div className="flex-1 truncate"> {/* truncates long names */}
+                      <p className="font-medium text-gray-900 truncate">{member.full_name}</p>
+                      <p className="text-sm text-gray-600 truncate">{member.email}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    )}
+  </CardContent>
+</Card>
+
 
         {/* Inactive Members for Deactivation */}
         <Card className="mb-8">
@@ -881,194 +897,171 @@ export default function AdminPage() {
         </Card>
 
         {/* User Management with Search */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Users2 className="h-5 w-5 mr-2" />
-              User Management
-            </CardTitle>
-            <CardDescription>View and manage all registered gym members</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* Search Input */}
-            <div className="mb-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  type="text"
-                  placeholder="Search members by name, email, phone, or emergency contact..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 w-full max-w-md"
-                />
-              </div>
-              {searchTerm && (
-                <p className="text-sm text-gray-600 mt-2">
-                  Showing {filteredUsers.length} of {allUsers.length} members
-                </p>
-              )}
-            </div>
+<Card className="mb-8">
+  <CardHeader>
+    <CardTitle className="flex items-center">
+      <Users2 className="h-5 w-5 mr-2" />
+      User Management
+    </CardTitle>
+    <CardDescription>View and manage all registered gym members</CardDescription>
+  </CardHeader>
 
-            {loadingData ? (
-              <div className="text-center py-8">
-                <LoadingSpinner size="md" text="Loading users..." />
-              </div>
-            ) : filteredUsers.length === 0 ? (
-              <div className="text-center py-8">
-                {searchTerm ? (
-                  <>
-                    <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500">No members found matching "{searchTerm}"</p>
-                  </>
-                ) : (
-                  <>
-                    <Users2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500">No users registered yet.</p>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Profile
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Name
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Email
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Phone
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        DOB
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Gender
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Address
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Emergency Contact
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Emergency Phone
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Role
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Membership
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Joined
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredUsers.map((member) => (
-                      <tr key={member.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex-shrink-0 h-10 w-10">
-                            <Image
-                              className="h-10 w-10 rounded-full object-cover"
-                              src={
-                                member.profile_picture_url || "/placeholder.svg?height=40&width=40&query=user profile"
-                              }
-                              alt={`${member.full_name}'s profile picture`}
-                              width={40}
-                              height={40}
-                            />
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {member.full_name}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.email}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.phone}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(member.date_of_birth).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.gender}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.street_address}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {member.emergency_contact_name}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {member.emergency_contact_number}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge
-                            className={
-                              member.role === "admin" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"
-                            }
-                          >
-                            {member.role}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge
-                            className={
-                              member.membership_status === "active"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
-                            }
-                          >
-                            {member.membership_status}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(member.created_at).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+  <CardContent>
+    {/* Search + PDF Button */}
+    <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="relative w-full sm:w-auto flex-1">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+        <Input
+          type="text"
+          placeholder="Search members by name, email, phone, or emergency contact..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10 pr-4 py-2 w-full"
+        />
+      </div>
+
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={async () => {
+          if (typeof window === "undefined") return; // client-only
+          const { default: jsPDF } = await import("jspdf");
+          const autoTable = (await import("jspdf-autotable")).default;
+
+          const doc = new jsPDF();
+          doc.text("User List", 14, 10);
+
+          // Include all original columns
+          const tableData = filteredUsers.map((u) => [
+            u.full_name,
+            u.email,
+            u.phone,
+            new Date(u.date_of_birth).toLocaleDateString(),
+            u.gender,
+            u.street_address,
+            u.emergency_contact_name,
+            u.emergency_contact_number,
+            u.role,
+            u.membership_status,
+            new Date(u.created_at).toLocaleDateString(),
+          ]);
+
+          autoTable(doc, {
+            head: [[
+              "Full Name", "Email", "Phone", "DOB", "Gender",
+              "Address", "Emergency Contact", "Emergency Phone",
+              "Role", "Membership", "Joined"
+            ]],
+            body: tableData,
+            startY: 20,
+            styles: { fontSize: 8 },
+          });
+
+          doc.save("user_list.pdf");
+        }}
+      >
+        Download PDF
+      </Button>
+    </div>
+
+    {searchTerm && (
+      <p className="text-sm text-gray-600 mb-4">
+        Showing {filteredUsers.length} of {allUsers.length} members
+      </p>
+    )}
+
+    {loadingData ? (
+      <div className="text-center py-8">
+        <LoadingSpinner size="md" text="Loading users..." />
+      </div>
+    ) : filteredUsers.length === 0 ? (
+      <div className="text-center py-8">
+        {searchTerm ? (
+          <>
+            <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500">No members found matching "{searchTerm}"</p>
+          </>
+        ) : (
+          <>
+            <Users2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500">No users registered yet.</p>
+          </>
+        )}
+      </div>
+    ) : (
+      <div className="max-h-[600px] overflow-y-auto border rounded-md">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50 sticky top-0 z-10">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Profile</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">DOB</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gender</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emergency Contact</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emergency Phone</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Membership</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {filteredUsers.slice(0, 10).map((member) => (
+              <tr key={member.id}>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <Image
+                    className="h-10 w-10 rounded-full object-cover"
+                    src={member.profile_picture_url || "/placeholder.svg?height=40&width=40&query=user profile"}
+                    alt={`${member.full_name}'s profile`}
+                    width={40}
+                    height={40}
+                  />
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{member.full_name}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.email}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.phone}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {new Date(member.date_of_birth).toLocaleDateString()}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.gender}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.street_address}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.emergency_contact_name}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.emergency_contact_number}</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <Badge
+                    className={
+                      member.role === "admin"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-gray-100 text-gray-800"
+                    }
+                  >
+                    {member.role}
+                  </Badge>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <Badge
+                    className={
+                      member.membership_status === "active"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }
+                  >
+                    {member.membership_status}
+                  </Badge>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {new Date(member.created_at).toLocaleDateString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </CardContent>
+</Card>
 
         {/* Receipts Management by Month */}
         <Card>

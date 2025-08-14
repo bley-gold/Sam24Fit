@@ -1,74 +1,284 @@
 import { createClient } from "@supabase/supabase-js"
-import type { Database } from "./database.types"
 
-// Get environment variables with fallbacks
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co"
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key"
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-// Helper to check if Supabase is properly configured
-export const isSupabaseConfigured = () => {
-  return supabaseUrl !== "https://placeholder.supabase.co" && supabaseAnonKey !== "placeholder-key"
+export const isSupabaseConfigured = (): boolean => {
+  return !!(supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith("http"))
 }
 
-// Create server-side Supabase client
-export const supabaseServer = (() => {
-  try {
-    if (!isSupabaseConfigured()) {
-      console.warn("Supabase not configured, using placeholder client")
-      return createClient<Database>(supabaseUrl, supabaseAnonKey)
-    }
+export const isSupabaseAdminConfigured = (): boolean => {
+  return !!(supabaseUrl && supabaseServiceKey && supabaseUrl.startsWith("http"))
+}
 
-    // Use service role key if available, otherwise fall back to anon key
-    const keyToUse = supabaseServiceRoleKey || supabaseAnonKey
+// Create supabase client only if environment variables are properly configured
+let supabase: ReturnType<typeof createClient>
 
-    return createClient<Database>(supabaseUrl, keyToUse, {
+try {
+  if (isSupabaseConfigured()) {
+    supabase = createClient(supabaseUrl!, supabaseAnonKey!)
+  } else {
+    throw new Error("Supabase environment variables not configured")
+  }
+} catch (error) {
+  console.warn("Supabase client creation failed:", error)
+  // Create a mock client that provides helpful error messages
+  supabase = {
+    auth: {
+      signUp: () =>
+        Promise.resolve({
+          data: { user: null, session: null },
+          error: new Error(
+            "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
+          ),
+        }),
+      signInWithPassword: () =>
+        Promise.resolve({
+          data: { user: null, session: null },
+          error: new Error(
+            "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
+          ),
+        }),
+      signOut: () =>
+        Promise.resolve({
+          error: new Error(
+            "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
+          ),
+        }),
+      getUser: () =>
+        Promise.resolve({
+          data: { user: null },
+          error: new Error(
+            "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
+          ),
+        }),
+      getSession: () =>
+        Promise.resolve({
+          data: { session: null },
+          error: new Error(
+            "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
+          ),
+        }),
+      refreshSession: () =>
+        Promise.resolve({
+          data: { user: null, session: null },
+          error: new Error(
+            "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
+          ),
+        }),
+      exchangeCodeForSession: () =>
+        Promise.resolve({
+          data: { user: null, session: null },
+          error: new Error(
+            "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
+          ),
+        }),
+      onAuthStateChange: (callback: (event: string, session: any) => void) => {
+        console.warn("Supabase not configured: onAuthStateChange will not work properly")
+        // Return a mock subscription object
+        return {
+          data: {
+            subscription: {
+              unsubscribe: () => {
+                console.warn("Mock subscription unsubscribed")
+              },
+            },
+          },
+        }
+      },
+      // Additional mock auth methods can be added here if needed
+    },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: () =>
+            Promise.resolve({
+              data: null,
+              error: new Error(
+                "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
+              ),
+            }),
+          order: () =>
+            Promise.resolve({
+              data: null,
+              error: new Error(
+                "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
+              ),
+            }),
+        }),
+        order: () =>
+          Promise.resolve({
+            data: null,
+            error: new Error(
+              "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
+            ),
+          }),
+      }),
+      insert: () => ({
+        select: () => ({
+          single: () =>
+            Promise.resolve({
+              data: null,
+              error: new Error(
+                "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
+              ),
+            }),
+        }),
+      }),
+      update: () => ({
+        eq: () =>
+          Promise.resolve({
+            error: new Error(
+              "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
+            ),
+          }),
+      }),
+      delete: () => ({
+        eq: () =>
+          Promise.resolve({
+            error: new Error(
+              "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
+            ),
+          }),
+      }),
+    }),
+    storage: {
+      from: () => ({
+        upload: () =>
+          Promise.resolve({
+            data: null,
+            error: new Error(
+              "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
+            ),
+          }),
+        getPublicUrl: () => ({ data: { publicUrl: "" } }),
+        remove: () =>
+          Promise.resolve({
+            error: new Error(
+              "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
+            ),
+          }),
+      }),
+    },
+    rpc: () =>
+      Promise.resolve({
+        data: null,
+        error: new Error(
+          "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
+        ),
+      }),
+  } as any
+}
+
+let supabaseAdmin: ReturnType<typeof createClient>
+
+try {
+  if (isSupabaseAdminConfigured()) {
+    supabaseAdmin = createClient(supabaseUrl!, supabaseServiceKey!, {
       auth: {
-        persistSession: false,
         autoRefreshToken: false,
-        detectSessionInUrl: false,
+        persistSession: false,
       },
     })
-  } catch (error) {
-    console.error("Failed to create server Supabase client:", error)
-    // Return a placeholder client to prevent app crashes
-    return createClient<Database>("https://placeholder.supabase.co", "placeholder-key")
+  } else {
+    throw new Error("Supabase admin environment variables not configured")
   }
-})()
-
-// Client-side Supabase client (singleton pattern)
-let supabaseClient: ReturnType<typeof createClient<Database>> | undefined
-
-export function getClientSupabaseClient() {
-  if (!supabaseClient) {
-    try {
-      if (!isSupabaseConfigured()) {
-        console.warn("Supabase not configured, using placeholder client")
-      }
-
-      supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true,
-        },
-      })
-    } catch (error) {
-      console.error("Failed to create client Supabase client:", error)
-      // Return a placeholder client to prevent app crashes
-      supabaseClient = createClient<Database>("https://placeholder.supabase.co", "placeholder-key")
-    }
-  }
-  return supabaseClient
+} catch (error) {
+  console.warn("Supabase admin client creation failed:", error)
+  // Create a mock admin client
+  supabaseAdmin = {
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: () =>
+            Promise.resolve({
+              data: null,
+              error: new Error("Please configure SUPABASE_SERVICE_ROLE_KEY in Project Settings for admin operations"),
+            }),
+          order: () =>
+            Promise.resolve({
+              data: null,
+              error: new Error("Please configure SUPABASE_SERVICE_ROLE_KEY in Project Settings for admin operations"),
+            }),
+        }),
+        order: () =>
+          Promise.resolve({
+            data: null,
+            error: new Error("Please configure SUPABASE_SERVICE_ROLE_KEY in Project Settings for admin operations"),
+          }),
+      }),
+      insert: () =>
+        Promise.resolve({
+          data: null,
+          error: new Error("Please configure SUPABASE_SERVICE_ROLE_KEY in Project Settings for admin operations"),
+        }),
+      update: () => ({
+        eq: () =>
+          Promise.resolve({
+            error: new Error("Please configure SUPABASE_SERVICE_ROLE_KEY in Project Settings for admin operations"),
+          }),
+      }),
+      delete: () => ({
+        eq: () =>
+          Promise.resolve({
+            error: new Error("Please configure SUPABASE_SERVICE_ROLE_KEY in Project Settings for admin operations"),
+          }),
+      }),
+    }),
+    rpc: () =>
+      Promise.resolve({
+        data: null,
+        error: new Error("Please configure SUPABASE_SERVICE_ROLE_KEY in Project Settings for admin operations"),
+      }),
+  } as any
 }
 
-// Export the client-side supabase client as the default export for compatibility
-export const supabase = getClientSupabaseClient()
+export { supabase, supabaseAdmin }
 
-// Define types for your tables based on database.types.ts
-export type User = Database["public"]["Tables"]["users"]["Row"]
-export type Receipt = Database["public"]["Tables"]["receipts"]["Row"] & {
-  users?: User // Add the joined user data to the Receipt type
+// Export the createClient function for use in other parts of the app
+export { createClient }
+
+// Types
+export interface User {
+  id: string
+  email: string
+  full_name: string
+  phone: string
+  date_of_birth: string
+  gender: "male" | "female" | "other"
+  street_address: string
+  emergency_contact_name: string
+  emergency_contact_number: string
+  role: "user" | "admin"
+  membership_status: "active" | "inactive" | "suspended"
+  profile_picture_url?: string
+  last_payment_date?: string
+  created_at: string
+  updated_at: string
 }
-export type Membership = Database["public"]["Tables"]["memberships"]["Row"]
-export type Payment = Database["public"]["Tables"]["payments"]["Row"]
+
+export interface Receipt {
+  id: string
+  user_id: string
+  filename: string
+  file_url: string
+  amount?: number
+  description?: string
+  status: "pending" | "verified" | "rejected"
+  upload_date: string
+  verified_date?: string
+  verified_by?: string
+  users?: User
+}
+
+export interface Payment {
+  id: string
+  user_id: string
+  receipt_id: string
+  amount: number
+  payment_date: string
+  created_at: string
+}
+
+export default supabase
