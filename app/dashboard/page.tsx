@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { deleteReceipt } from "@/app/actions/receipt-actions"
+import { createReview, getUserReviews, type Review } from "@/app/actions/review-actions"
 
 export default function Dashboard() {
   const { user, loading: authLoading, refreshUser, refreshSession } = useAuthContext()
@@ -45,6 +46,10 @@ export default function Dashboard() {
   const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false)
   const [recentStatusChanges, setRecentStatusChanges] = useState<Receipt[]>([])
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+  const [userReviews, setUserReviews] = useState<Review[]>([])
+  const [reviewText, setReviewText] = useState("")
+  const [reviewRating, setReviewRating] = useState(5)
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false)
 
   const getDismissedNotifications = (): string[] => {
     if (typeof window === "undefined" || !user?.id) return []
@@ -129,6 +134,13 @@ export default function Dashboard() {
 
       setRecentStatusChanges(filteredChanges)
       setReceipts(data || [])
+
+      if (user?.id) {
+        const reviewsResult = await getUserReviews(user.id)
+        if (reviewsResult.success) {
+          setUserReviews(reviewsResult.data)
+        }
+      }
     } catch (error) {
       console.error("Error fetching receipts:", error)
       toast({
@@ -258,6 +270,7 @@ export default function Dashboard() {
         if (receipt.status !== "verified") return false
         const receiptDate = new Date(receipt.upload_date)
         const receiptMonthKey = `${receiptDate.getFullYear()}-${String(receiptDate.getMonth() + 1).padStart(2, "0")}`
+
         return receiptMonthKey === monthKey
       }).length
 
@@ -390,6 +403,42 @@ export default function Dashboard() {
     }
 
     return streak
+  }
+
+  const handleSubmitReview = async () => {
+    if (!user || !reviewText.trim()) return
+
+    setIsSubmittingReview(true)
+    try {
+      const result = await createReview(user.id, reviewText.trim(), reviewRating)
+
+      if (result.success) {
+        toast({
+          title: "Review Submitted",
+          description: "Thank you for your review! It will be reviewed by our team before being published.",
+        })
+        setReviewText("")
+        setReviewRating(5)
+        const reviewsResult = await getUserReviews(user.id)
+        if (reviewsResult.success) {
+          setUserReviews(reviewsResult.data)
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to submit review.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while submitting your review.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmittingReview(false)
+    }
   }
 
   if (authLoading) {
@@ -609,6 +658,86 @@ export default function Dashboard() {
                     </div>
                   </Button>
                 )}
+              </div>
+              <div className="mt-6 pt-6 border-t">
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-gray-900">Share Your Experience</h3>
+
+                  {userReviews.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-xs text-gray-600 mb-2">Your previous reviews:</p>
+                      <div className="space-y-2">
+                        {userReviews.map((review) => (
+                          <div key={review.id} className="bg-gray-50 rounded-lg p-3">
+                            <div className="flex items-center space-x-2 mb-1">
+                              <div className="flex">
+                                {[...Array(5)].map((_, i) => (
+                                  <span
+                                    key={i}
+                                    className={`text-sm ${i < review.rating ? "text-yellow-400" : "text-gray-300"}`}
+                                  >
+                                    ★
+                                  </span>
+                                ))}
+                              </div>
+                              <Badge
+                                className={
+                                  review.status === "approved"
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-yellow-100 text-yellow-800"
+                                }
+                              >
+                                {review.status === "approved" ? "Approved" : "Pending"}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-gray-700">{review.review_text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs font-medium text-gray-700 mb-1 block">Rating</label>
+                      <div className="flex space-x-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setReviewRating(star)}
+                            className={`text-lg ${
+                              star <= reviewRating ? "text-yellow-400" : "text-gray-300"
+                            } hover:text-yellow-400 transition-colors`}
+                          >
+                            ★
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-gray-700 mb-1 block">Your Review</label>
+                      <textarea
+                        value={reviewText}
+                        onChange={(e) => setReviewText(e.target.value)}
+                        placeholder="Share your experience with Sam24Fit..."
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                        rows={3}
+                        maxLength={500}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">{reviewText.length}/500 characters</p>
+                    </div>
+
+                    <Button
+                      onClick={handleSubmitReview}
+                      disabled={isSubmittingReview || !reviewText.trim()}
+                      className="w-full bg-orange-600 hover:bg-orange-700 text-sm py-2"
+                    >
+                      {isSubmittingReview ? "Submitting..." : "Submit Review"}
+                    </Button>
+                  </div>
+                </div>
               </div>
               <div className="mt-6 pt-6 border-t">
                 <StreakGraphic />

@@ -6,6 +6,14 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Adding line-clamp utility for review text truncation */
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
 }
 
 @layer base {
@@ -86,5 +94,22 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Adding floating animation keyframes for review bubbles */
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@layer components {
+  .animate-float {
+    animation: float 4s ease-in-out infinite;
   }
 }

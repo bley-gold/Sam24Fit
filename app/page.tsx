@@ -16,9 +16,30 @@ import {
   Camera,
   Play,
   CheckCircle,
+  Star,
 } from "lucide-react"
+import Image from "next/image"
+import { getApprovedReviews } from "@/app/actions/review-actions"
+import { useEffect, useState } from "react"
 
 export default function LandingPage() {
+  const [reviews, setReviews] = useState<any[]>([])
+
+  useEffect(() => {
+    const fetchReviews = async () => {
+      console.log("[v0] Fetching reviews...")
+      const { success, data } = await getApprovedReviews()
+      console.log("[v0] Review fetch result:", { success, data, dataLength: data?.length })
+      if (success) {
+        setReviews(data)
+        console.log("[v0] Reviews set in state:", data)
+      } else {
+        console.log("[v0] Failed to fetch reviews")
+      }
+    }
+    fetchReviews()
+  }, [])
+
   const handleGetStarted = () => {
     window.location.href = "/auth"
   }
@@ -258,6 +279,83 @@ export default function LandingPage() {
               <Camera className="mr-2 h-5 w-5" />
               View Full Gallery
             </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Floating Review Bubbles Section */}
+      <section className="py-20 bg-gradient-to-br from-blue-50 to-purple-50 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">What Our Members Say</h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Real experiences from our amazing Sam24Fit community
+            </p>
+          </div>
+
+          <div className="relative h-96">
+            {console.log("[v0] Rendering reviews section, reviews count:", reviews.length)}
+            {reviews.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <p className="text-gray-500 text-lg">No reviews available yet</p>
+              </div>
+            )}
+            {reviews.slice(0, 8).map((review, index) => {
+              const positions = [
+                { top: "10%", left: "5%" },
+                { top: "20%", right: "10%" },
+                { top: "40%", left: "15%" },
+                { top: "60%", right: "20%" },
+                { top: "15%", left: "50%" },
+                { top: "70%", left: "60%" },
+                { top: "30%", right: "5%" },
+                { top: "80%", left: "25%" },
+              ]
+
+              const position = positions[index] || { top: "50%", left: "50%" }
+
+              return (
+                <div
+                  key={review.id}
+                  className="absolute animate-float"
+                  style={{
+                    ...position,
+                    animationDelay: `${index * 0.5}s`,
+                    animationDuration: `${4 + (index % 3)}s`,
+                  }}
+                >
+                  <div className="bg-white rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300 max-w-xs group hover:scale-105">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <Image
+                        src={
+                          review.users?.profile_picture_url || "/placeholder.svg?height=40&width=40&query=user profile"
+                        }
+                        alt={review.users?.full_name || "User"}
+                        width={40}
+                        height={40}
+                        className="rounded-full object-cover"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {review.users?.full_name || "Anonymous"}
+                        </p>
+                        <div className="flex items-center">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`h-3 w-3 ${
+                                i < review.rating ? "text-yellow-400 fill-current" : "text-gray-300"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-600 line-clamp-3">{review.review_text}</p>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       </section>
