@@ -37,6 +37,9 @@ import {
   ChevronDown,
   ChevronUp,
   BrushIcon as Broom,
+  MessageSquare,
+  Star,
+  Sparkles,
 } from "lucide-react"
 import {
   getAllUserProfiles,
@@ -50,6 +53,13 @@ import {
   updateUserMembershipStatus,
   cleanupOldReceipts,
 } from "@/app/actions/admin-actions"
+import {
+  getPendingReviews,
+  updateReviewStatus,
+  getApprovedReviewsForAdmin,
+  toggleReviewFeatured,
+} from "@/app/actions/review-actions"
+import { deleteReceiptAdmin } from "@/app/actions/receipt-actions"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   ChartContainer,
@@ -70,7 +80,6 @@ import {
   Pie,
   Cell,
 } from "recharts"
-import { deleteReceiptAdmin } from "@/app/actions/receipt-actions"
 
 // Define chart config for monthly revenue
 const monthlyRevenueChartConfig = {
@@ -129,6 +138,10 @@ export default function AdminPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
+  const [pendingReviews, setPendingReviews] = useState<any[]>([])
+  const [approvedReviews, setApprovedReviews] = useState<any[]>([])
+  const [loadingReviews, setLoadingReviews] = useState(false)
+
   // Filter users based on search term
   const filteredUsers = useMemo(() => {
     if (!searchTerm.trim()) return allUsers
@@ -168,6 +181,8 @@ export default function AdminPage() {
         paidMembersData,
         unpaidMembersData,
         membersToDeactivateData,
+        pendingReviewsData,
+        approvedReviewsData,
       ] = await Promise.all([
         getAllUserProfiles(),
         getAdminStats(),
@@ -176,6 +191,8 @@ export default function AdminPage() {
         getPaidMembersCurrentMonth(),
         getUnpaidMembersCurrentMonth(),
         getMembersForDeactivation(),
+        getPendingReviews(),
+        getApprovedReviewsForAdmin(),
       ])
 
       if (usersData) setAllUsers(usersData)
@@ -185,6 +202,8 @@ export default function AdminPage() {
       if (paidMembersData) setPaidMembers(paidMembersData)
       if (unpaidMembersData) setUnpaidMembers(unpaidMembersData)
       if (membersToDeactivateData) setMembersForDeactivation(membersToDeactivateData)
+      if (pendingReviewsData.success) setPendingReviews(pendingReviewsData.data)
+      if (approvedReviewsData.success) setApprovedReviews(approvedReviewsData.data)
     } catch (error) {
       console.error("Error loading admin data:", error)
       toast({
@@ -281,6 +300,74 @@ export default function AdminPage() {
       console.error("Error updating membership status:", error)
       toast({ title: "Update Failed", description: "An unexpected error occurred.", variant: "destructive" })
       setMembersForDeactivation(originalMembers) // Revert on error
+    }
+  }
+
+  const handleReviewAction = async (reviewId: string, approve: boolean) => {
+    setLoadingReviews(true)
+    try {
+      const { success, message } = await updateReviewStatus(reviewId, approve)
+      if (success) {
+        toast({
+          title: approve ? "Review Approved" : "Review Rejected",
+          description: approve
+            ? "Review has been approved and will appear on the website."
+            : "Review has been rejected and will not appear on the website.",
+        })
+        // Remove the review from pending list
+        setPendingReviews((prev) => prev.filter((review) => review.id !== reviewId))
+        if (approve) {
+          const approvedReviewsData = await getApprovedReviewsForAdmin()
+          if (approvedReviewsData.success) setApprovedReviews(approvedReviewsData.data)
+        }
+      } else {
+        toast({
+          title: "Action Failed",
+          description: message || "Failed to update review status.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Action Failed",
+        description: "An unexpected error occurred while updating the review.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingReviews(false)
+    }
+  }
+
+  const handleToggleFeatured = async (reviewId: string, featured: boolean) => {
+    setLoadingReviews(true)
+    try {
+      const { success, error } = await toggleReviewFeatured(reviewId, featured)
+      if (success) {
+        toast({
+          title: featured ? "Review Featured" : "Review Unfeatured",
+          description: featured
+            ? "Review is now featured and will appear on the index page."
+            : "Review is no longer featured and will not appear on the index page.",
+        })
+        // Update the approved reviews list
+        setApprovedReviews((prev) =>
+          prev.map((review) => (review.id === reviewId ? { ...review, is_featured: featured } : review)),
+        )
+      } else {
+        toast({
+          title: "Action Failed",
+          description: error || "Failed to update review featured status.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Action Failed",
+        description: "An unexpected error occurred while updating the review.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingReviews(false)
     }
   }
 
@@ -578,216 +665,221 @@ export default function AdminPage() {
         </Card>
 
         {/* Monthly Revenue Chart - Fixed responsiveness */}
-<Card className="mb-8">
-  <CardHeader>
-    <CardTitle className="flex items-center">
-      <BarChart className="h-5 w-5 mr-2" />
-      Monthly Revenue
-    </CardTitle>
-    <CardDescription>Revenue from approved receipts per month</CardDescription>
-  </CardHeader>
-  <CardContent className="pb-6">
-    {loadingData ? (
-      <div className="text-center py-8">
-        <LoadingSpinner size="md" text="Loading chart data..." />
-      </div>
-    ) : monthlyRevenueData.length === 0 ? (
-      <div className="text-center py-8">
-        <BarChart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-500">No monthly revenue data available.</p>
-      </div>
-    ) : (
-      <div className="w-full overflow-x-auto">
-        <div className="min-w-[800px] h-[550px]"> {/* bigger chart container */}
-          <ChartContainer config={monthlyRevenueChartConfig}>
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartsBarChart
-                data={monthlyRevenueData}
-                margin={{ top: 30, right: 20, left: 50, bottom: 110 }} // more padding
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="month_year"
-                  tickFormatter={formatMonthYearChart}
-                  angle={-45}
-                  textAnchor="end"
-                  height={100}
-                  interval={0}
-                  fontSize={14} // slightly bigger labels
-                />
-                <YAxis
-                  tickFormatter={(value) => `R${value}`}
-                  width={70}
-                  fontSize={14} // slightly bigger labels
-                />
-                <ChartTooltip
-                  content={({ active, payload, label }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
-                          <p className="font-medium">{formatMonthYear(label)}</p>
-                          <p className="text-orange-600">
-                            Revenue: R{payload[0].value?.toLocaleString()}
-                          </p>
-                          <p className="text-gray-600">
-                            Payments: {payload[0].payload?.payment_count || 0}
-                          </p>
-                        </div>
-                      )
-                    }
-                    return null
-                  }}
-                />
-                <Bar
-                  dataKey="revenue"
-                  fill="#ea580c"
-                  radius={[4, 4, 0, 0]}
-                  name="Revenue"
-                />
-              </RechartsBarChart>
-            </ResponsiveContainer>
-          </ChartContainer>
-        </div>
-      </div>
-    )}
-  </CardContent>
-</Card>
-
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <BarChart className="h-5 w-5 mr-2" />
+              Monthly Revenue
+            </CardTitle>
+            <CardDescription>Revenue from approved receipts per month</CardDescription>
+          </CardHeader>
+          <CardContent className="pb-6">
+            {loadingData ? (
+              <div className="text-center py-8">
+                <LoadingSpinner size="md" text="Loading chart data..." />
+              </div>
+            ) : monthlyRevenueData.length === 0 ? (
+              <div className="text-center py-8">
+                <BarChart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">No monthly revenue data available.</p>
+              </div>
+            ) : (
+              <div className="w-full overflow-x-auto">
+                <div className="min-w-[800px] h-[550px]">
+                  {" "}
+                  {/* bigger chart container */}
+                  <ChartContainer config={monthlyRevenueChartConfig}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsBarChart
+                        data={monthlyRevenueData}
+                        margin={{ top: 30, right: 20, left: 50, bottom: 110 }} // more padding
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="month_year"
+                          tickFormatter={formatMonthYearChart}
+                          angle={-45}
+                          textAnchor="end"
+                          height={100}
+                          interval={0}
+                          fontSize={14} // slightly bigger labels
+                        />
+                        <YAxis
+                          tickFormatter={(value) => `R${value}`}
+                          width={70}
+                          fontSize={14} // slightly bigger labels
+                        />
+                        <ChartTooltip
+                          content={({ active, payload, label }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
+                                  <p className="font-medium">{formatMonthYear(label)}</p>
+                                  <p className="text-orange-600">Revenue: R{payload[0].value?.toLocaleString()}</p>
+                                  <p className="text-gray-600">Payments: {payload[0].payload?.payment_count || 0}</p>
+                                </div>
+                              )
+                            }
+                            return null
+                          }}
+                        />
+                        <Bar dataKey="revenue" fill="#ea580c" radius={[4, 4, 0, 0]} name="Revenue" />
+                      </RechartsBarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Paid vs Unpaid Members Overview - Fixed responsiveness */}
-<Card className="mb-8">
-  <CardHeader>
-    <CardTitle className="flex items-center">
-      <CircleDollarSign className="h-5 w-5 mr-2" />
-      Current Month Membership Status
-    </CardTitle>
-    <CardDescription className="flex items-center gap-2">
-      <Info className="h-4 w-4 text-blue-500" />
-      <span>
-        <strong>Unpaid Members:</strong> Active members who haven't submitted an approved receipt for the
-        current month's membership fee
-      </span>
-    </CardDescription>
-  </CardHeader>
-  <CardContent>
-    {loadingData ? (
-      <div className="text-center py-8">
-        <LoadingSpinner size="md" text="Loading membership status..." />
-      </div>
-    ) : (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pie Chart */}
-        <Card className="bg-white border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle>Paid vs. Unpaid Members</CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center justify-center">
-            {paidMembers.length === 0 && unpaidMembers.length === 0 ? (
-              <div className="text-center py-8">
-                <PieChart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No membership data for current month.</p>
-              </div>
-            ) : (
-              <div className="w-full h-[400px]"> {/* bigger chart */}
-                <ChartContainer config={paidUnpaidChartConfig}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <ChartTooltip cursor={false} content={<ChartTooltipContent nameKey="name" hideLabel />} />
-                      <Pie
-                        data={paidUnpaidChartData}
-                        dataKey="value"
-                        nameKey="name"
-                        innerRadius="35%"
-                        outerRadius="65%"
-                        paddingAngle={5}
-                        cornerRadius={5}
-                      >
-                        {paidUnpaidChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.fill} />
-                        ))}
-                      </Pie>
-                      <ChartLegend content={<ChartLegendContent nameKey="name" />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Paid Members List */}
-        <Card className="bg-white border-0 shadow-sm">
+        <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center">
-              <Check className="h-5 w-5 mr-2 text-green-600" />
-              Paid Members ({paidMembers.length})
+              <CircleDollarSign className="h-5 w-5 mr-2" />
+              Current Month Membership Status
             </CardTitle>
-          </CardHeader>
-          <CardContent className="max-h-80 overflow-y-auto"> {/* scroll if too many */}
-            {paidMembers.length === 0 ? (
-              <p className="text-gray-500 text-sm">No members have paid for the current month yet.</p>
-            ) : (
-              <ul className="space-y-3">
-                {paidMembers.map((member) => (
-                  <li key={member.id} className="flex items-center space-x-3">
-                    <Image
-                      src={member.profile_picture_url || "/placeholder.svg?height=32&width=32&query=user profile"}
-                      alt={`${member.full_name}'s profile`}
-                      width={32}
-                      height={32}
-                      className="rounded-full object-cover"
-                    />
-                    <div className="flex-1 truncate"> {/* truncates long names */}
-                      <p className="font-medium text-gray-900 truncate">{member.full_name}</p>
-                      <p className="text-sm text-gray-600 truncate">R{member.paid_amount.toFixed(2)}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Unpaid Members List */}
-        <Card className="lg:col-span-2 bg-white border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <X className="h-5 w-5 mr-2 text-red-600" />
-              Unpaid Members ({unpaidMembers.length})
-            </CardTitle>
-            <CardDescription>
-              Active members who haven't submitted approved receipts for this month's membership fee
+            <CardDescription className="flex items-center gap-2">
+              <Info className="h-4 w-4 text-blue-500" />
+              <span>
+                <strong>Unpaid Members:</strong> Active members who haven't submitted an approved receipt for the
+                current month's membership fee
+              </span>
             </CardDescription>
           </CardHeader>
-          <CardContent className="max-h-80 overflow-y-auto"> {/* scroll if too many */}
-            {unpaidMembers.length === 0 ? (
-              <p className="text-gray-500 text-sm">All active members have paid for the current month!</p>
+          <CardContent>
+            {loadingData ? (
+              <div className="text-center py-8">
+                <LoadingSpinner size="md" text="Loading membership status..." />
+              </div>
             ) : (
-              <ul className="space-y-3">
-                {unpaidMembers.map((member) => (
-                  <li key={member.id} className="flex items-center space-x-3">
-                    <Image
-                      src={member.profile_picture_url || "/placeholder.svg?height=32&width=32&query=user profile"}
-                      alt={`${member.full_name}'s profile`}
-                      width={32}
-                      height={32}
-                      className="rounded-full object-cover"
-                    />
-                    <div className="flex-1 truncate"> {/* truncates long names */}
-                      <p className="font-medium text-gray-900 truncate">{member.full_name}</p>
-                      <p className="text-sm text-gray-600 truncate">{member.email}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Pie Chart */}
+                <Card className="bg-white border-0 shadow-sm">
+                  <CardHeader>
+                    <CardTitle>Paid vs. Unpaid Members</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex items-center justify-center">
+                    {paidMembers.length === 0 && unpaidMembers.length === 0 ? (
+                      <div className="text-center py-8">
+                        <PieChart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-500">No membership data for current month.</p>
+                      </div>
+                    ) : (
+                      <div className="w-full h-[400px]">
+                        {" "}
+                        {/* bigger chart */}
+                        <ChartContainer config={paidUnpaidChartConfig}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <ChartTooltip cursor={false} content={<ChartTooltipContent nameKey="name" hideLabel />} />
+                              <Pie
+                                data={paidUnpaidChartData}
+                                dataKey="value"
+                                nameKey="name"
+                                innerRadius="35%"
+                                outerRadius="65%"
+                                paddingAngle={5}
+                                cornerRadius={5}
+                              >
+                                {paidUnpaidChartData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.fill} />
+                                ))}
+                              </Pie>
+                              <ChartLegend content={<ChartLegendContent nameKey="name" />} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </ChartContainer>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Paid Members List */}
+                <Card className="bg-white border-0 shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Check className="h-5 w-5 mr-2 text-green-600" />
+                      Paid Members ({paidMembers.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="max-h-80 overflow-y-auto">
+                    {" "}
+                    {/* scroll if too many */}
+                    {paidMembers.length === 0 ? (
+                      <p className="text-gray-500 text-sm">No members have paid for the current month yet.</p>
+                    ) : (
+                      <ul className="space-y-3">
+                        {paidMembers.map((member) => (
+                          <li key={member.id} className="flex items-center space-x-3">
+                            <Image
+                              src={
+                                member.profile_picture_url || "/placeholder.svg?height=32&width=32&query=user profile"
+                              }
+                              alt={`${member.full_name}'s profile`}
+                              width={32}
+                              height={32}
+                              className="rounded-full object-cover"
+                            />
+                            <div className="flex-1 truncate">
+                              {" "}
+                              {/* truncates long names */}
+                              <p className="font-medium text-gray-900 truncate">{member.full_name}</p>
+                              <p className="text-sm text-gray-600 truncate">R{member.paid_amount.toFixed(2)}</p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Unpaid Members List */}
+                <Card className="lg:col-span-2 bg-white border-0 shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <X className="h-5 w-5 mr-2 text-red-600" />
+                      Unpaid Members ({unpaidMembers.length})
+                    </CardTitle>
+                    <CardDescription>
+                      Active members who haven't submitted approved receipts for this month's membership fee
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="max-h-80 overflow-y-auto">
+                    {" "}
+                    {/* scroll if too many */}
+                    {unpaidMembers.length === 0 ? (
+                      <p className="text-gray-500 text-sm">All active members have paid for the current month!</p>
+                    ) : (
+                      <ul className="space-y-3">
+                        {unpaidMembers.map((member) => (
+                          <li key={member.id} className="flex items-center space-x-3">
+                            <Image
+                              src={
+                                member.profile_picture_url || "/placeholder.svg?height=32&width=32&query=user profile"
+                              }
+                              alt={`${member.full_name}'s profile`}
+                              width={32}
+                              height={32}
+                              className="rounded-full object-cover"
+                            />
+                            <div className="flex-1 truncate">
+                              {" "}
+                              {/* truncates long names */}
+                              <p className="font-medium text-gray-900 truncate">{member.full_name}</p>
+                              <p className="text-sm text-gray-600 truncate">{member.email}</p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             )}
           </CardContent>
         </Card>
-      </div>
-    )}
-  </CardContent>
-</Card>
-
 
         {/* Inactive Members for Deactivation */}
         <Card className="mb-8">
@@ -897,174 +989,192 @@ export default function AdminPage() {
         </Card>
 
         {/* User Management with Search */}
-<Card className="mb-8">
-  <CardHeader>
-    <CardTitle className="flex items-center">
-      <Users2 className="h-5 w-5 mr-2" />
-      User Management
-    </CardTitle>
-    <CardDescription>View and manage all registered gym members</CardDescription>
-  </CardHeader>
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Users2 className="h-5 w-5 mr-2" />
+              User Management
+            </CardTitle>
+            <CardDescription>View and manage all registered gym members</CardDescription>
+          </CardHeader>
 
-  <CardContent>
-    {/* Search + PDF Button */}
-    <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <div className="relative w-full sm:w-auto flex-1">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-        <Input
-          type="text"
-          placeholder="Search members by name, email, phone, or emergency contact..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 pr-4 py-2 w-full"
-        />
-      </div>
+          <CardContent>
+            {/* Search + PDF Button */}
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="relative w-full sm:w-auto flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  type="text"
+                  placeholder="Search members by name, email, phone, or emergency contact..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-4 py-2 w-full"
+                />
+              </div>
 
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={async () => {
-          if (typeof window === "undefined") return; // client-only
-          const { default: jsPDF } = await import("jspdf");
-          const autoTable = (await import("jspdf-autotable")).default;
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  if (typeof window === "undefined") return // client-only
+                  const { default: jsPDF } = await import("jspdf")
+                  const autoTable = (await import("jspdf-autotable")).default
 
-          const doc = new jsPDF();
-          doc.text("User List", 14, 10);
+                  const doc = new jsPDF()
+                  doc.text("User List", 14, 10)
 
-          // Include all original columns
-          const tableData = filteredUsers.map((u) => [
-            u.full_name,
-            u.email,
-            u.phone,
-            new Date(u.date_of_birth).toLocaleDateString(),
-            u.gender,
-            u.street_address,
-            u.emergency_contact_name,
-            u.emergency_contact_number,
-            u.role,
-            u.membership_status,
-            new Date(u.created_at).toLocaleDateString(),
-          ]);
+                  // Include all original columns
+                  const tableData = filteredUsers.map((u) => [
+                    u.full_name,
+                    u.email,
+                    u.phone,
+                    new Date(u.date_of_birth).toLocaleDateString(),
+                    u.gender,
+                    u.street_address,
+                    u.emergency_contact_name,
+                    u.emergency_contact_number,
+                    u.role,
+                    u.membership_status,
+                    new Date(u.created_at).toLocaleDateString(),
+                  ])
 
-          autoTable(doc, {
-            head: [[
-              "Full Name", "Email", "Phone", "DOB", "Gender",
-              "Address", "Emergency Contact", "Emergency Phone",
-              "Role", "Membership", "Joined"
-            ]],
-            body: tableData,
-            startY: 20,
-            styles: { fontSize: 8 },
-          });
+                  autoTable(doc, {
+                    head: [
+                      [
+                        "Full Name",
+                        "Email",
+                        "Phone",
+                        "DOB",
+                        "Gender",
+                        "Address",
+                        "Emergency Contact",
+                        "Emergency Phone",
+                        "Role",
+                        "Membership",
+                        "Joined",
+                      ],
+                    ],
+                    body: tableData,
+                    startY: 20,
+                    styles: { fontSize: 8 },
+                  })
 
-          doc.save("user_list.pdf");
-        }}
-      >
-        Download PDF
-      </Button>
-    </div>
+                  doc.save("user_list.pdf")
+                }}
+              >
+                Download PDF
+              </Button>
+            </div>
 
-    {searchTerm && (
-      <p className="text-sm text-gray-600 mb-4">
-        Showing {filteredUsers.length} of {allUsers.length} members
-      </p>
-    )}
+            {searchTerm && (
+              <p className="text-sm text-gray-600 mb-4">
+                Showing {filteredUsers.length} of {allUsers.length} members
+              </p>
+            )}
 
-    {loadingData ? (
-      <div className="text-center py-8">
-        <LoadingSpinner size="md" text="Loading users..." />
-      </div>
-    ) : filteredUsers.length === 0 ? (
-      <div className="text-center py-8">
-        {searchTerm ? (
-          <>
-            <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">No members found matching "{searchTerm}"</p>
-          </>
-        ) : (
-          <>
-            <Users2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">No users registered yet.</p>
-          </>
-        )}
-      </div>
-    ) : (
-      <div className="max-h-[600px] overflow-y-auto border rounded-md">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50 sticky top-0 z-10">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Profile</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">DOB</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gender</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emergency Contact</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emergency Phone</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Membership</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredUsers.slice(0, 10).map((member) => (
-              <tr key={member.id}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <Image
-                    className="h-10 w-10 rounded-full object-cover"
-                    src={member.profile_picture_url || "/placeholder.svg?height=40&width=40&query=user profile"}
-                    alt={`${member.full_name}'s profile`}
-                    width={40}
-                    height={40}
-                  />
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{member.full_name}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.email}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.phone}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(member.date_of_birth).toLocaleDateString()}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.gender}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.street_address}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.emergency_contact_name}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.emergency_contact_number}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <Badge
-                    className={
-                      member.role === "admin"
-                        ? "bg-red-100 text-red-800"
-                        : "bg-gray-100 text-gray-800"
-                    }
-                  >
-                    {member.role}
-                  </Badge>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <Badge
-                    className={
-                      member.membership_status === "active"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-800"
-                    }
-                  >
-                    {member.membership_status}
-                  </Badge>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(member.created_at).toLocaleDateString()}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    )}
-  </CardContent>
-</Card>
+            {loadingData ? (
+              <div className="text-center py-8">
+                <LoadingSpinner size="md" text="Loading users..." />
+              </div>
+            ) : filteredUsers.length === 0 ? (
+              <div className="text-center py-8">
+                {searchTerm ? (
+                  <>
+                    <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">No members found matching "{searchTerm}"</p>
+                  </>
+                ) : (
+                  <>
+                    <Users2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">No users registered yet.</p>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="max-h-[600px] overflow-y-auto border rounded-md">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50 sticky top-0 z-10">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Profile</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">DOB</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gender</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Emergency Contact
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Emergency Phone
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Membership</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredUsers.slice(0, 10).map((member) => (
+                      <tr key={member.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Image
+                            className="h-10 w-10 rounded-full object-cover"
+                            src={member.profile_picture_url || "/placeholder.svg?height=40&width=40&query=user profile"}
+                            alt={`${member.full_name}'s profile`}
+                            width={40}
+                            height={40}
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {member.full_name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.email}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.phone}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(member.date_of_birth).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.gender}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.street_address}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {member.emergency_contact_name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {member.emergency_contact_number}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Badge
+                            className={
+                              member.role === "admin" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"
+                            }
+                          >
+                            {member.role}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Badge
+                            className={
+                              member.membership_status === "active"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-red-100 text-red-800"
+                            }
+                          >
+                            {member.membership_status}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(member.created_at).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Receipts Management by Month */}
-        <Card>
+        <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center">
@@ -1164,6 +1274,7 @@ export default function AdminPage() {
                                         src={
                                           receipt.users?.profile_picture_url ||
                                           "/placeholder.svg?height=40&width=40&query=user profile" ||
+                                          "/placeholder.svg" ||
                                           "/placeholder.svg"
                                         }
                                         alt={`${receipt.users?.full_name || "User"}'s profile picture`}
@@ -1244,6 +1355,179 @@ export default function AdminPage() {
             )}
           </CardContent>
         </Card>
+
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <MessageSquare className="h-5 w-5 mr-2" />
+              Review Management
+            </CardTitle>
+            <CardDescription>
+              Approve or disapprove user reviews and control which ones are featured on the website
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingData ? (
+              <div className="text-center py-8">
+                <LoadingSpinner size="md" text="Loading reviews..." />
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {/* Pending Reviews Section */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Pending Reviews</h3>
+                  {pendingReviews.length === 0 ? (
+                    <div className="text-center py-8">
+                      <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">No pending reviews to manage</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {pendingReviews.map((review) => (
+                        <div key={review.id} className="bg-white border rounded-lg p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-4">
+                              <Image
+                                src={
+                                  review.users?.profile_picture_url ||
+                                  "/placeholder.svg?height=40&width=40&query=user profile" ||
+                                  "/placeholder.svg"
+                                }
+                                alt={`${review.users?.full_name || "User"}'s profile picture`}
+                                width={40}
+                                height={40}
+                                className="rounded-full object-cover"
+                              />
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <p className="font-medium text-gray-900">
+                                    {review.users?.full_name || "Unknown User"}
+                                  </p>
+                                  <div className="flex items-center">
+                                    {[...Array(5)].map((_, i) => (
+                                      <Star
+                                        key={i}
+                                        className={`h-4 w-4 ${
+                                          i < review.rating ? "text-yellow-400 fill-current" : "text-gray-300"
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                  <span className="text-sm text-gray-500">({review.rating}/5)</span>
+                                </div>
+                                <p className="text-gray-700 mb-2">{review.review_text}</p>
+                                <p className="text-sm text-gray-500">
+                                  Submitted: {new Date(review.created_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex space-x-2">
+                              <Button
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => handleReviewAction(review.id, true)}
+                                disabled={loadingReviews}
+                              >
+                                <Check className="h-4 w-4 mr-1" />
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleReviewAction(review.id, false)}
+                                disabled={loadingReviews}
+                              >
+                                <X className="h-4 w-4 mr-1" />
+                                Reject
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Approved Reviews Section */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Approved Reviews - Feature Control</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Only featured reviews will appear on the index page (maximum 10). Toggle the feature status to
+                    control visibility.
+                  </p>
+                  {approvedReviews.length === 0 ? (
+                    <div className="text-center py-8">
+                      <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">No approved reviews available</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {approvedReviews.map((review) => (
+                        <div key={review.id} className="bg-white border rounded-lg p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-4">
+                              <Image
+                                src={
+                                  review.users?.profile_picture_url ||
+                                  "/placeholder.svg?height=40&width=40&query=user profile" ||
+                                  "/placeholder.svg"
+                                }
+                                alt={`${review.users?.full_name || "User"}'s profile picture`}
+                                width={40}
+                                height={40}
+                                className="rounded-full object-cover"
+                              />
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <p className="font-medium text-gray-900">
+                                    {review.users?.full_name || "Unknown User"}
+                                  </p>
+                                  <div className="flex items-center">
+                                    {[...Array(5)].map((_, i) => (
+                                      <Star
+                                        key={i}
+                                        className={`h-4 w-4 ${
+                                          i < review.rating ? "text-yellow-400 fill-current" : "text-gray-300"
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                  <span className="text-sm text-gray-500">({review.rating}/5)</span>
+                                  {review.is_featured && (
+                                    <Badge className="bg-yellow-100 text-yellow-800">
+                                      <Sparkles className="h-3 w-3 mr-1" />
+                                      Featured
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-gray-700 mb-2">{review.review_text}</p>
+                                <p className="text-sm text-gray-500">
+                                  Approved: {new Date(review.created_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex space-x-2">
+                              <Button
+                                size="sm"
+                                variant={review.is_featured ? "destructive" : "default"}
+                                className={review.is_featured ? "" : "bg-yellow-600 hover:bg-yellow-700"}
+                                onClick={() => handleToggleFeatured(review.id, !review.is_featured)}
+                                disabled={loadingReviews}
+                              >
+                                <Sparkles className="h-4 w-4 mr-1" />
+                                {review.is_featured ? "Unfeature" : "Feature"}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </main>
 
       {/* Delete Receipt Confirmation Dialog */}
@@ -1308,6 +1592,7 @@ export default function AdminPage() {
                     src={
                       selectedReceiptForPreview.file_url ||
                       "/placeholder.svg?height=600&width=800&query=receipt preview" ||
+                      "/placeholder.svg" ||
                       "/placeholder.svg"
                     }
                     alt="Receipt Preview"
@@ -1351,6 +1636,7 @@ export default function AdminPage() {
                 src={
                   selectedUserForProfilePreview.profile_picture_url ||
                   "/placeholder.svg?height=300&width=300&query=user profile large" ||
+                  "/placeholder.svg" ||
                   "/placeholder.svg"
                 }
                 alt={`${selectedUserForProfilePreview.full_name}'s profile picture`}

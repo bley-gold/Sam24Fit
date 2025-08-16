@@ -578,3 +578,63 @@ export async function cleanupOldReceipts(): Promise<{ success: boolean; message:
     return { success: false, message: "An unexpected error occurred during cleanup" }
   }
 }
+
+export async function deleteReceiptAdmin(
+  receiptId: string,
+  adminId: string,
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error("Server Action: Supabase URL or Service Role Key is not configured.")
+      return { success: false, message: "Server configuration error" }
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+
+    console.log(`Server Action: Deleting receipt ${receiptId} by admin ${adminId}`)
+
+    // First get the receipt to check if it's verified (has associated payment)
+    const { data: receipt, error: fetchError } = await supabaseAdmin
+      .from("receipts")
+      .select("*")
+      .eq("id", receiptId)
+      .single()
+
+    if (fetchError) {
+      console.error("Server Action: Error fetching receipt:", fetchError.message)
+      return { success: false, message: fetchError.message }
+    }
+
+    // If receipt is verified, delete associated payment record first
+    if (receipt.status === "verified") {
+      const { error: paymentDeleteError } = await supabaseAdmin.from("payments").delete().eq("receipt_id", receiptId)
+
+      if (paymentDeleteError) {
+        console.error("Server Action: Error deleting payment record:", paymentDeleteError.message)
+        return { success: false, message: "Failed to delete associated payment record" }
+      }
+    }
+
+    // Delete the receipt
+    const { error: deleteError } = await supabaseAdmin.from("receipts").delete().eq("id", receiptId)
+
+    if (deleteError) {
+      console.error("Server Action: Error deleting receipt:", deleteError.message)
+      return { success: false, message: deleteError.message }
+    }
+
+    console.log(`Server Action: Successfully deleted receipt ${receiptId}`)
+    return { success: true, message: "Receipt deleted successfully" }
+  } catch (error) {
+    console.error("Server Action: deleteReceiptAdmin unexpected error:", error)
+    return { success: false, message: "An unexpected error occurred" }
+  }
+}
