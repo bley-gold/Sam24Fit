@@ -37,6 +37,7 @@ export default function AuthPage() {
   const [testEnvLoading, setTestEnvLoading] = useState(false)
   const [showEmailConfirmation, setShowEmailConfirmation] = useState(false)
   const [confirmationEmail, setConfirmationEmail] = useState("")
+  const [forceShowAuth, setForceShowAuth] = useState(false)
 
   const [loginData, setLoginData] = useState<SignInData>({ email: "", password: "" })
   const [signupData, setSignupData] = useState<Omit<SignUpData, "profilePicture"> & { profilePicture: File | null }>({
@@ -50,8 +51,20 @@ export default function AuthPage() {
     emergencyContactName: "",
     emergencyContactNumber: "",
     profilePicture: null,
+    idNumber: "",
   })
   const [ageError, setAgeError] = useState("")
+  const [termsAccepted, setTermsAccepted] = useState(false)
+
+  // Force show auth form after timeout
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      console.log("AuthPage: Forcing auth form to show after timeout")
+      setForceShowAuth(true)
+    }, 8000) // 8 second timeout
+
+    return () => clearTimeout(timeout)
+  }, [])
 
   // Effect to redirect if user is already logged in
   useEffect(() => {
@@ -162,6 +175,15 @@ export default function AuthPage() {
       return
     }
 
+    if (!termsAccepted) {
+      toast({
+        title: "Terms and Conditions Required",
+        description: "You must accept the terms and conditions to proceed.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setFormSubmitting(true)
 
     try {
@@ -219,11 +241,17 @@ export default function AuthPage() {
     setTestEnvLoading(false)
   }
 
-  // Show loading spinner if authentication state is still being determined
-  if (authLoading) {
+  // Show loading spinner only if authentication is loading AND we haven't forced show yet
+  if (authLoading && !forceShowAuth) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
-        <LoadingSpinner size="lg" text="Loading..." />
+        <div className="text-center">
+          <LoadingSpinner size="lg" text="Loading authentication..." />
+          <p className="mt-4 text-gray-600">If this takes too long, there might be a configuration issue.</p>
+          <Button variant="outline" className="mt-4 bg-transparent" onClick={() => setForceShowAuth(true)}>
+            Continue Anyway
+          </Button>
+        </div>
       </div>
     )
   }
@@ -450,6 +478,18 @@ export default function AuthPage() {
                       </div>
 
                       <div className="space-y-2">
+                        <Label htmlFor="idNumber">ID Number / Passport *</Label>
+                        <Input
+                          id="idNumber"
+                          placeholder="Enter your ID number or passport"
+                          value={signupData.idNumber || ""}
+                          onChange={(e) => setSignupData({ ...signupData, idNumber: e.target.value })}
+                          required
+                          className="focus:ring-orange-500 focus:border-orange-500"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
                         <Label htmlFor="signup-email">Email Address *</Label>
                         <Input
                           id="signup-email"
@@ -628,10 +668,68 @@ export default function AuthPage() {
                     </div>
                   </div>
 
+                  {/* Terms and Conditions Section */}
+                  <div className="space-y-4 pt-4 border-t">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                      <CheckCircle className="h-5 w-5 mr-2 text-orange-600" />
+                      Terms and Conditions
+                    </h3>
+
+                    <div className="p-4 bg-gray-50 rounded-lg border max-h-48 overflow-y-auto">
+                      <h4 className="font-semibold text-gray-900 mb-3">MEMBERSHIP AGREEMENT</h4>
+                      <p className="text-sm text-gray-700 mb-3 italic">
+                        (This is a legally binding document. Please read carefully.)
+                      </p>
+
+                      <div className="space-y-3 text-sm text-gray-700">
+                        <div>
+                          <h5 className="font-medium text-gray-900 mb-2">SHORT RULES OF THE GYM (HOUSE RULES)</h5>
+                          <ul className="list-disc list-inside space-y-1 ml-2 text-xs">
+                            <li>Train at your own risk.</li>
+                            <li>Arrange the equipment after use.</li>
+                            <li>Respect other members and staff.</li>
+                            <li>No inappropriate behavior or language.</li>
+                            <li>Proper gym attire is required.</li>
+                            <li>
+                              Report damaged equipment immediately. If you damage anything in the gym, you will pay.
+                            </li>
+                            <li>Management reserves the right to cancel membership due to rule violations.</li>
+                          </ul>
+                        </div>
+
+                        <div>
+                          <h5 className="font-medium text-gray-900 mb-2">DISCLAIMER / INDEMNITY</h5>
+                          <p className="text-xs text-gray-700 mb-2">
+                            I, the undersigned member, understand and acknowledge that I am voluntarily participating in
+                            physical activities at this gym at my own risk. The gym owners, staff, and affiliates are
+                            not liable for any injury, illness, death, or loss/damage to personal property. I have
+                            consulted a medical professional if necessary and am physically fit to train. I agree to
+                            follow the gym's rules and understand that violations may result in membership termination
+                            without refund.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start space-x-3">
+                      <input
+                        type="checkbox"
+                        id="termsAccepted"
+                        checked={termsAccepted}
+                        onChange={(e) => setTermsAccepted(e.target.checked)}
+                        className="mt-1 h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="termsAccepted" className="text-sm text-gray-700 leading-relaxed">
+                        I have read, understood, and agree to the membership agreement, gym rules, and disclaimer above.
+                        I acknowledge that this is a legally binding document and that I am signing it voluntarily. *
+                      </label>
+                    </div>
+                  </div>
+
                   <Button
                     type="submit"
-                    className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 mt-6 shadow-lg"
-                    disabled={!!ageError || formSubmitting}
+                    className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 mt-6 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!!ageError || formSubmitting || !termsAccepted}
                   >
                     {formSubmitting ? (
                       <LoadingSpinner size="sm" />

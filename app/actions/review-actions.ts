@@ -1,8 +1,29 @@
 "use server"
 import { revalidatePath } from "next/cache"
 
+function validateSupabaseConfig() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!url || !key || url === "undefined" || key === "undefined") {
+    return false
+  }
+
+  try {
+    new URL(url) // Test if URL is valid
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function createReview(userId: string, reviewText: string, rating: number) {
   try {
+    if (!validateSupabaseConfig()) {
+      console.error("Supabase configuration is invalid or missing")
+      return { success: false, message: "Database configuration error" }
+    }
+
     const { createClient } = await import("@supabase/supabase-js")
     const serviceClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
       auth: {
@@ -36,6 +57,11 @@ export async function createReview(userId: string, reviewText: string, rating: n
 
 export async function getApprovedReviews() {
   try {
+    if (!validateSupabaseConfig()) {
+      console.error("Supabase configuration is invalid or missing")
+      return { success: false, data: [] }
+    }
+
     const { createClient } = await import("@supabase/supabase-js")
     const serviceClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
       auth: {
@@ -89,6 +115,11 @@ export async function getApprovedReviews() {
 
 export async function getUserReviews(userId: string) {
   try {
+    if (!validateSupabaseConfig()) {
+      console.error("Supabase configuration is invalid or missing")
+      return { success: false, data: [] }
+    }
+
     const { createClient } = await import("@supabase/supabase-js")
     const serviceClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
       auth: {
@@ -100,8 +131,8 @@ export async function getUserReviews(userId: string) {
     const { data, error } = await serviceClient
       .from("reviews")
       .select("*")
-      .eq("user_id", userId)
       .order("created_at", { ascending: false })
+      .eq("user_id", userId)
 
     if (error) {
       console.error("Error fetching user reviews:", error)
@@ -117,6 +148,11 @@ export async function getUserReviews(userId: string) {
 
 export async function getPendingReviews() {
   try {
+    if (!validateSupabaseConfig()) {
+      console.error("Supabase configuration is invalid or missing")
+      return { success: false, data: [] }
+    }
+
     const { createClient } = await import("@supabase/supabase-js")
     const serviceClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
       auth: {
@@ -168,6 +204,11 @@ export async function getPendingReviews() {
 
 export async function updateReviewStatus(reviewId: string, approved: boolean) {
   try {
+    if (!validateSupabaseConfig()) {
+      console.error("Supabase configuration is invalid or missing")
+      return { success: false, error: "Database configuration error" }
+    }
+
     const { createClient } = await import("@supabase/supabase-js")
     const serviceClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
       auth: {
@@ -201,6 +242,11 @@ export async function updateReviewStatus(reviewId: string, approved: boolean) {
 
 export async function getApprovedReviewsForAdmin() {
   try {
+    if (!validateSupabaseConfig()) {
+      console.error("Supabase configuration is invalid or missing")
+      return { success: false, data: [] }
+    }
+
     const { createClient } = await import("@supabase/supabase-js")
     const serviceClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
       auth: {
@@ -253,6 +299,11 @@ export async function getApprovedReviewsForAdmin() {
 
 export async function toggleReviewFeatured(reviewId: string, featured: boolean) {
   try {
+    if (!validateSupabaseConfig()) {
+      console.error("Supabase configuration is invalid or missing")
+      return { success: false, error: "Database configuration error" }
+    }
+
     const { createClient } = await import("@supabase/supabase-js")
     const serviceClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
       auth: {
@@ -281,6 +332,151 @@ export async function toggleReviewFeatured(reviewId: string, featured: boolean) 
   }
 }
 
+export async function getAllReviews() {
+  try {
+    if (!validateSupabaseConfig()) {
+      console.error("Supabase configuration is invalid or missing")
+      return { success: false, data: [] }
+    }
+
+    const { createClient } = await import("@supabase/supabase-js")
+    const serviceClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+
+    const { data: reviews, error: reviewsError } = await serviceClient
+      .from("reviews")
+      .select("*")
+      .order("created_at", { ascending: false })
+
+    if (reviewsError) {
+      console.error("Error fetching all reviews:", reviewsError)
+      return { success: false, data: [] }
+    }
+
+    if (!reviews || reviews.length === 0) {
+      return { success: true, data: [] }
+    }
+
+    const reviewsWithUsers = await Promise.all(
+      reviews.map(async (review) => {
+        const { data: userData, error: userError } = await serviceClient
+          .from("users")
+          .select("full_name, profile_picture_url")
+          .eq("id", review.user_id)
+          .single()
+
+        return {
+          id: review.id,
+          review_text: review.review_text,
+          rating: review.rating,
+          created_at: review.created_at,
+          status: review.status,
+          is_approved: review.is_approved,
+          is_featured: review.is_featured,
+          users: userError ? { full_name: "Anonymous", profile_picture_url: null } : userData,
+        }
+      }),
+    )
+
+    return { success: true, data: reviewsWithUsers }
+  } catch (error) {
+    console.error("Exception in getAllReviews:", error)
+    return { success: false, data: [] }
+  }
+}
+
+export async function getRejectedReviews() {
+  try {
+    if (!validateSupabaseConfig()) {
+      console.error("Supabase configuration is invalid or missing")
+      return { success: false, data: [] }
+    }
+
+    const { createClient } = await import("@supabase/supabase-js")
+    const serviceClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+
+    const { data: reviews, error: reviewsError } = await serviceClient
+      .from("reviews")
+      .select("*")
+      .eq("status", "rejected")
+      .order("created_at", { ascending: false })
+
+    if (reviewsError) {
+      console.error("Error fetching rejected reviews:", reviewsError)
+      return { success: false, data: [] }
+    }
+
+    if (!reviews || reviews.length === 0) {
+      return { success: true, data: [] }
+    }
+
+    const reviewsWithUsers = await Promise.all(
+      reviews.map(async (review) => {
+        const { data: userData, error: userError } = await serviceClient
+          .from("users")
+          .select("full_name, profile_picture_url")
+          .eq("id", review.user_id)
+          .single()
+
+        return {
+          id: review.id,
+          review_text: review.review_text,
+          rating: review.rating,
+          created_at: review.created_at,
+          status: review.status,
+          users: userError ? { full_name: "Anonymous", profile_picture_url: null } : userData,
+        }
+      }),
+    )
+
+    return { success: true, data: reviewsWithUsers }
+  } catch (error) {
+    console.error("Exception in getRejectedReviews:", error)
+    return { success: false, data: [] }
+  }
+}
+
+export async function deleteReview(reviewId: string) {
+  try {
+    if (!validateSupabaseConfig()) {
+      console.error("Supabase configuration is invalid or missing")
+      return { success: false, error: "Database configuration error" }
+    }
+
+    const { createClient } = await import("@supabase/supabase-js")
+    const serviceClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+
+    const { error } = await serviceClient.from("reviews").delete().eq("id", reviewId)
+
+    if (error) {
+      console.error("Error deleting review:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/")
+    revalidatePath("/admin")
+
+    return { success: true }
+  } catch (error) {
+    console.error("Exception in deleteReview:", error)
+    return { success: false, error: "An unexpected error occurred" }
+  }
+}
+
 export type Review = {
   id: string
   user_id: string
@@ -291,4 +487,8 @@ export type Review = {
   updated_at?: string
   is_approved?: boolean
   is_featured?: boolean
+  users?: {
+    full_name: string
+    profile_picture_url?: string
+  }
 }

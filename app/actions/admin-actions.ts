@@ -413,6 +413,7 @@ export async function updateReceiptStatusAdmin(
   receiptId: string,
   newStatus: "verified" | "rejected",
   adminId: string,
+  declineReason?: string,
 ): Promise<{ success: boolean; message: string }> {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -452,6 +453,8 @@ export async function updateReceiptStatusAdmin(
 
     if (newStatus === "verified") {
       updateData.verified_date = new Date().toISOString()
+    } else if (newStatus === "rejected" && declineReason) {
+      updateData.rejection_reason = declineReason
     }
 
     const { error: updateError } = await supabaseAdmin.from("receipts").update(updateData).eq("id", receiptId)

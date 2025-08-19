@@ -27,10 +27,14 @@ import {
   CheckCircle,
   XCircle,
   X,
+  Download,
+  ChevronRight,
+  Settings,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { deleteReceipt } from "@/app/actions/receipt-actions"
 import { createReview, getUserReviews, type Review } from "@/app/actions/review-actions"
+import { jsPDF } from "jspdf"
 
 export default function Dashboard() {
   const { user, loading: authLoading, refreshUser, refreshSession } = useAuthContext()
@@ -50,6 +54,145 @@ export default function Dashboard() {
   const [reviewText, setReviewText] = useState("")
   const [reviewRating, setReviewRating] = useState(5)
   const [isSubmittingReview, setIsSubmittingReview] = useState(false)
+  const [isWelcomeDialogOpen, setIsWelcomeDialogOpen] = useState(false)
+  const [welcomeDialogStep, setWelcomeDialogStep] = useState(1)
+  const [hasPdfDownloaded, setHasPdfDownloaded] = useState(false)
+
+  const generateGymRules = () => {
+    const currentDate = new Date()
+    const formattedDate = currentDate.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    })
+
+    return `MEMBERSHIP AGREEMENT
+(This is a legally binding document. Please read carefully.)
+
+MEMBER DETAILS
+Full Name: ${user?.full_name || ""}
+ID Number/Passport: ${user?.id_number || ""}
+Residential Address: ${user?.street_address || ""}
+Cell Number: ${user?.phone || ""}
+Email: ${user?.email || ""}
+
+SHORT RULES OF THE GYM (HOUSE RULES)
+• Train at your own risk.
+• Arrange the equipment after use.
+• Respect other members and staff.
+• No inappropriate behavior or language.
+• Proper gym attire is required.
+• Report damaged equipment immediately. If you damage anything in the gym, you will pay.
+• Management reserves the right to cancel membership due to rule violations.
+
+DISCLAIMER / INDEMNITY
+I, the undersigned member, understand and acknowledge that:
+I am voluntarily participating in physical activities at this gym, and I do so entirely at my own risk.
+The owner(s), staff, and affiliates of the gym are not liable for any injury, illness, death, or loss/damage to personal property that may occur on the premises, including but not limited to use of equipment, facilities, or participation in training activities.
+I have consulted a medical professional (if necessary), and I am physically fit to train.
+I agree to follow the gym's rules and understand that a violation may result in the termination of my membership without refund.
+
+Agreement Date: ${formattedDate}
+
+This agreement has been digitally accepted through the Sam24Fit registration system.`
+  }
+
+  const downloadGymRules = async () => {
+    try {
+      const doc = new jsPDF()
+      const pageWidth = doc.internal.pageSize.width
+      const margin = 20
+      const maxWidth = pageWidth - margin * 2
+
+      doc.setFillColor(234, 88, 12) // Orange color
+      doc.rect(0, 0, pageWidth, 30, "F")
+
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(24)
+      doc.setFont("helvetica", "bold")
+      doc.text("Sam24Fit", margin, 20)
+
+      doc.setFontSize(12)
+      doc.setFont("helvetica", "normal")
+      doc.text("Membership Agreement & Gym Rules", margin, 26)
+
+      doc.setTextColor(0, 0, 0)
+      let yPosition = 45
+
+      const rulesText = generateGymRules()
+      const lines = doc.splitTextToSize(rulesText, maxWidth)
+
+      doc.setFontSize(10)
+      doc.setFont("helvetica", "normal")
+
+      lines.forEach((line: string) => {
+        if (yPosition > 270) {
+          // Check if we need a new page
+          doc.addPage()
+          yPosition = 20
+        }
+
+        if (
+          line.includes("MEMBERSHIP AGREEMENT") ||
+          line.includes("MEMBER DETAILS") ||
+          line.includes("SHORT RULES") ||
+          line.includes("DISCLAIMER")
+        ) {
+          doc.setFont("helvetica", "bold")
+          doc.setFontSize(12)
+        } else {
+          doc.setFont("helvetica", "normal")
+          doc.setFontSize(10)
+        }
+
+        doc.text(line, margin, yPosition)
+        yPosition +=
+          line.includes("MEMBERSHIP AGREEMENT") ||
+          line.includes("MEMBER DETAILS") ||
+          line.includes("SHORT RULES") ||
+          line.includes("DISCLAIMER")
+            ? 8
+            : 5
+      })
+
+      const pageCount = doc.getNumberOfPages()
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i)
+        doc.setFontSize(8)
+        doc.setTextColor(128, 128, 128)
+        doc.text(`Sam24Fit - Page ${i} of ${pageCount}`, pageWidth - margin - 30, 285)
+        doc.text("Generated on: " + new Date().toLocaleDateString(), margin, 285)
+      }
+
+      doc.save(`Sam24Fit_Membership_Agreement_${user?.full_name?.replace(/\s+/g, "_") || "Member"}.pdf`)
+
+      setHasPdfDownloaded(true)
+
+      toast({
+        title: "Download Complete",
+        description: "Your personalized membership agreement has been downloaded.",
+      })
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+      toast({
+        title: "Download Error",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const shouldShowWelcomeDialog = () => {
+    if (typeof window === "undefined" || !user?.id) return false
+    const key = `welcome_dialog_shown_${user.id}`
+    return !localStorage.getItem(key)
+  }
+
+  const markWelcomeDialogShown = () => {
+    if (typeof window === "undefined" || !user?.id) return
+    const key = `welcome_dialog_shown_${user.id}`
+    localStorage.setItem(key, "true")
+  }
 
   const getDismissedNotifications = (): string[] => {
     if (typeof window === "undefined" || !user?.id) return []
@@ -83,6 +226,11 @@ export default function Dashboard() {
     }
   }
 
+  const handleWelcomeDialogComplete = async () => {
+    markWelcomeDialogShown()
+    setIsWelcomeDialogOpen(false)
+  }
+
   useEffect(() => {
     console.log("DashboardPage useEffect: authLoading =", authLoading, ", user =", user)
     if (!authLoading && !user) {
@@ -95,6 +243,9 @@ export default function Dashboard() {
       console.log("DashboardPage: User authenticated, fetching receipts.")
       fetchReceipts()
       checkJWTRole()
+      if (shouldShowWelcomeDialog()) {
+        setIsWelcomeDialogOpen(true)
+      }
     }
   }, [user, authLoading, router])
 
@@ -192,6 +343,14 @@ export default function Dashboard() {
   }
 
   const handlePreviewReceipt = async (receipt: Receipt) => {
+    console.log("[v0] Receipt preview data:", {
+      id: receipt.id,
+      filename: receipt.filename,
+      status: receipt.status,
+      rejection_reason: receipt.rejection_reason,
+      hasRejectionReason: !!receipt.rejection_reason,
+      rejectionReasonType: typeof receipt.rejection_reason,
+    })
     setReceiptToPreview(receipt)
     setIsPreviewDialogOpen(true)
   }
@@ -265,7 +424,6 @@ export default function Dashboard() {
       const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
       const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, "0")}`
 
-      // Check payment activity for this month
       const monthPayments = receipts.filter((receipt) => {
         if (receipt.status !== "verified") return false
         const receiptDate = new Date(receipt.upload_date)
@@ -274,7 +432,6 @@ export default function Dashboard() {
         return receiptMonthKey === monthKey
       }).length
 
-      // Determine intensity level (0-4)
       let intensity = 0
       if (monthPayments > 0) intensity = 1
       if (monthPayments > 1) intensity = 2
@@ -315,7 +472,6 @@ export default function Dashboard() {
     const streakData = calculateStreakData()
     const currentStreak = calculateCurrentStreak()
 
-    // Split data into two years (12 months each)
     const previousYearData = streakData.slice(0, 12)
     const currentYearData = streakData.slice(12, 24)
 
@@ -332,9 +488,8 @@ export default function Dashboard() {
         </div>
 
         <div className="space-y-3">
-          {/* Month labels */}
           <div className="flex">
-            <div className="w-12 mr-3"></div> {/* Space for year labels */}
+            <div className="w-12 mr-3"></div>
             <div className="grid grid-cols-12 gap-1 flex-1 text-xs text-gray-600 text-center">
               {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((month) => (
                 <div key={month} className="text-[10px]">
@@ -344,7 +499,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Previous Year Row */}
           <div className="flex items-center">
             <div className="w-12 mr-3 text-xs text-gray-600 text-right font-medium">{previousYear}</div>
             <div className="grid grid-cols-12 gap-1 flex-1">
@@ -358,7 +512,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Current Year Row */}
           <div className="flex items-center">
             <div className="w-12 mr-3 text-xs text-gray-600 text-right font-medium">{currentYear}</div>
             <div className="grid grid-cols-12 gap-1 flex-1">
@@ -372,7 +525,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Legend */}
           <div className="flex items-center justify-between text-xs text-gray-500 pt-2">
             <span>Less</span>
             <div className="flex items-center space-x-1">
@@ -393,7 +545,6 @@ export default function Dashboard() {
     const streakData = calculateStreakData()
     let streak = 0
 
-    // Count from the most recent month backwards
     for (let i = streakData.length - 1; i >= 0; i--) {
       if (streakData[i].paymentCount > 0) {
         streak++
@@ -518,6 +669,12 @@ export default function Dashboard() {
                                   <p className="text-xs text-gray-500">
                                     {receipt.filename} - R{receipt.amount.toFixed(2)}
                                   </p>
+                                  {receipt.status === "rejected" && receipt.rejection_reason && (
+                                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+                                      <p className="text-sm font-medium text-red-800">Rejection Reason:</p>
+                                      <p className="text-sm text-red-700">{receipt.rejection_reason}</p>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                               <Button
@@ -599,6 +756,10 @@ export default function Dashboard() {
               <div>
                 <label className="text-sm font-medium text-gray-500">Email</label>
                 <p className="text-gray-900">{user.email}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">ID Number</label>
+                <p className="text-gray-900">{user.id_number || "Not provided"}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">Role</label>
@@ -684,13 +845,25 @@ export default function Dashboard() {
                                 className={
                                   review.status === "approved"
                                     ? "bg-green-100 text-green-800"
-                                    : "bg-yellow-100 text-yellow-800"
+                                    : review.status === "rejected"
+                                      ? "bg-red-100 text-red-800"
+                                      : "bg-yellow-100 text-yellow-800"
                                 }
                               >
-                                {review.status === "approved" ? "Approved" : "Pending"}
+                                {review.status === "approved"
+                                  ? "Approved"
+                                  : review.status === "rejected"
+                                    ? "Rejected"
+                                    : "Pending"}
                               </Badge>
                             </div>
                             <p className="text-xs text-gray-700">{review.review_text}</p>
+                            {review.status === "rejected" && review.rejection_reason && (
+                              <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+                                <p className="text-xs font-medium text-red-800">Rejection Reason:</p>
+                                <p className="text-xs text-red-700">{review.rejection_reason}</p>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -781,6 +954,12 @@ export default function Dashboard() {
                           {new Date(receipt.upload_date).toLocaleDateString()}
                         </p>
                         {receipt.description && <p className="text-sm text-gray-600">{receipt.description}</p>}
+                        {receipt.status === "rejected" && receipt.rejection_reason && (
+                          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+                            <p className="text-sm font-medium text-red-800">Rejection Reason:</p>
+                            <p className="text-sm text-red-700">{receipt.rejection_reason}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center space-x-4">
@@ -813,6 +992,96 @@ export default function Dashboard() {
         </Card>
       </main>
 
+      <Dialog open={isWelcomeDialogOpen} onOpenChange={() => {}}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <Dumbbell className="h-6 w-6 mr-2 text-orange-600" />
+              Welcome to Sam24Fit!
+            </DialogTitle>
+          </DialogHeader>
+
+          {welcomeDialogStep === 1 ? (
+            <div className="space-y-6">
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Please Review Our Gym Rules & Agreement</h3>
+                <p className="text-sm text-gray-600">
+                  Before you start using our facilities, please take a moment to review our gym rules and membership
+                  agreement.
+                </p>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto border">
+                <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono leading-relaxed">
+                  {generateGymRules()}
+                </pre>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 justify-between">
+                <Button variant="outline" onClick={downloadGymRules} className="flex items-center bg-transparent">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Rules & Agreement
+                </Button>
+
+                <Button
+                  onClick={() => setWelcomeDialogStep(2)}
+                  disabled={!hasPdfDownloaded}
+                  className={`flex items-center ${
+                    hasPdfDownloaded ? "bg-orange-600 hover:bg-orange-700" : "bg-gray-300 cursor-not-allowed"
+                  }`}
+                >
+                  I Understand & Agree
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+
+                {!hasPdfDownloaded && (
+                  <div className="text-center">
+                    <p className="text-sm text-orange-600 font-medium">
+                      Please download the rules and agreement before proceeding
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Manage Your Profile</h3>
+                <p className="text-sm text-gray-600">
+                  You can update your profile information, change your profile picture, and manage your account settings
+                  anytime.
+                </p>
+              </div>
+
+              <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
+                <div className="flex items-start space-x-4">
+                  <div className="flex-shrink-0">
+                    <Settings className="h-8 w-8 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-blue-900 mb-2">Profile Management</h4>
+                    <ul className="text-sm text-blue-800 space-y-1">
+                      <li>
+                        • Update your profile picture by clicking on your current photo in the Account Info section
+                      </li>
+                      <li>• Your personal information can be viewed in the Account Info card on the left</li>
+                      <li>• Contact our staff if you need to update your contact details or membership information</li>
+                      <li>• Upload payment receipts using the "Upload Receipt" button in Quick Actions</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-center">
+                <Button onClick={handleWelcomeDialogComplete} className="bg-orange-600 hover:bg-orange-700 px-8">
+                  Got it, Let's Start!
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
           <DialogHeader>
@@ -843,6 +1112,30 @@ export default function Dashboard() {
                   <div className="col-span-2">
                     <label className="font-medium text-gray-500">Description:</label>
                     <p className="text-gray-900">{receiptToPreview.description}</p>
+                  </div>
+                )}
+                {receiptToPreview.status === "rejected" && (
+                  <div className="col-span-2">
+                    {console.log("[v0] Checking rejection reason display:", {
+                      status: receiptToPreview.status,
+                      rejection_reason: receiptToPreview.rejection_reason,
+                      shouldShow: receiptToPreview.status === "rejected" && receiptToPreview.rejection_reason,
+                    })}
+                    {receiptToPreview.rejection_reason ? (
+                      <div>
+                        <label className="font-medium text-gray-500">Rejection Reason:</label>
+                        <div className="mt-1 p-3 bg-red-50 border border-red-200 rounded-md">
+                          <p className="text-red-800">{receiptToPreview.rejection_reason}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="font-medium text-gray-500">Rejection Reason:</label>
+                        <div className="mt-1 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                          <p className="text-yellow-800">No rejection reason provided</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

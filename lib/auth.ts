@@ -15,11 +15,63 @@ export interface SignUpData {
   emergencyContactName: string
   emergencyContactNumber: string
   profilePicture?: File
+  idNumber: string
+  acceptedTerms: boolean
 }
 
 export interface SignInData {
   email: string
   password: string
+}
+
+const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3, baseDelay = 1000): Promise<any> => {
+  let lastError: Error
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (error) {
+      lastError = error as Error
+
+      // Don't retry for authentication errors (wrong credentials, etc.)
+      if (
+        lastError.message.includes("Invalid login credentials") ||
+        lastError.message.includes("Email not confirmed") ||
+        lastError.message.includes("User not found")
+      ) {
+        throw lastError
+      }
+
+      // Only retry for network-related errors
+      const isNetworkError =
+        lastError.message.includes("Failed to fetch") ||
+        lastError.message.includes("NetworkError") ||
+        lastError.message.includes("ERR_CONNECTION_RESET") ||
+        lastError.message.includes("ERR_NETWORK") ||
+        lastError.message.includes("timeout")
+
+      if (!isNetworkError || attempt === maxRetries) {
+        throw lastError
+      }
+
+      // Wait before retrying with exponential backoff
+      const delay = baseDelay * Math.pow(2, attempt)
+      console.log(`Network error detected, retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries})`)
+      await new Promise((resolve) => setTimeout(resolve, delay))
+    }
+  }
+
+  throw lastError!
+}
+
+const testSupabaseConnection = async (): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase.auth.getSession()
+    return !error
+  } catch (error) {
+    console.error("Supabase connection test failed:", error)
+    return false
+  }
 }
 
 export const signUp = async (data: SignUpData) => {
@@ -111,6 +163,8 @@ export const signUp = async (data: SignUpData) => {
       data.emergencyContactName,
       data.emergencyContactNumber,
       profilePictureData,
+      data.idNumber,
+      data.acceptedTerms,
     )
 
     if (!result.success) {
@@ -162,10 +216,26 @@ export const signIn = async (data: SignInData) => {
 
     console.log("Client: Attempting to sign in...")
 
-    const { data: authData, error } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
-    })
+    console.log("Testing Supabase connection...")
+    const connectionOk = await testSupabaseConnection()
+    if (!connectionOk) {
+      throw new Error(
+        "Unable to connect to authentication service. Please check your internet connection and try again.",
+      )
+    }
+
+    const authResult = await retryWithBackoff(
+      async () => {
+        return await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        })
+      },
+      3,
+      1000,
+    )
+
+    const { data: authData, error } = authResult
 
     if (error) {
       console.error("Client: Sign in error details:", {
@@ -191,6 +261,16 @@ export const signIn = async (data: SignInData) => {
         console.error("3. Users table not accessible to the hook")
 
         throw new Error("Authentication system is temporarily unavailable. Please try again later or contact support.")
+      }
+
+      if (
+        error.message.includes("Failed to fetch") ||
+        error.message.includes("NetworkError") ||
+        error.message.includes("ERR_CONNECTION_RESET")
+      ) {
+        throw new Error(
+          "Network connection error. Please check your internet connection and try again. If the problem persists, the service may be temporarily unavailable.",
+        )
       }
 
       throw error

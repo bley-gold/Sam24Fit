@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Dumbbell, User, MapPin, Heart, CheckCircle, AlertCircle } from "lucide-react"
+import { Dumbbell, User, MapPin, Heart, CheckCircle, AlertCircle, Camera } from "lucide-react"
 
 interface FormData {
   // Personal Information
@@ -18,6 +18,7 @@ interface FormData {
   phone: string
   dateOfBirth: string
   gender: string
+  idNumber: string
 
   // Address
   streetAddress: string
@@ -28,6 +29,8 @@ interface FormData {
   // Health & Fitness
   emergencyContactName: string
   emergencyContactNumber: string
+
+  profilePicture: File | null
 }
 
 interface FormErrors {
@@ -41,17 +44,21 @@ export function MembershipForm() {
     phone: "",
     dateOfBirth: "",
     gender: "",
+    idNumber: "",
     streetAddress: "",
     city: "",
     province: "",
     zipCode: "",
     emergencyContactName: "",
     emergencyContactNumber: "",
+    profilePicture: null,
   })
 
   const [errors, setErrors] = useState<FormErrors>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {}
@@ -70,6 +77,7 @@ export function MembershipForm() {
     }
     if (!formData.dateOfBirth) newErrors.dateOfBirth = "Date of birth is required"
     if (!formData.gender) newErrors.gender = "Please select your gender"
+    if (!formData.idNumber.trim()) newErrors.idNumber = "ID Number/Passport is required"
 
     // Address validation
     if (!formData.streetAddress.trim()) newErrors.streetAddress = "Street address is required"
@@ -85,6 +93,11 @@ export function MembershipForm() {
       newErrors.emergencyContactNumber = "Please enter a valid phone number"
     }
 
+    // Terms and conditions validation
+    if (!termsAccepted) {
+      newErrors.terms = "You must accept the terms and conditions to proceed"
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -94,6 +107,37 @@ export function MembershipForm() {
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }))
+    }
+  }
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        setErrors((prev) => ({ ...prev, profilePicture: "Please select a valid image file" }))
+        return
+      }
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setErrors((prev) => ({ ...prev, profilePicture: "Image size must be less than 5MB" }))
+        return
+      }
+
+      setFormData((prev) => ({ ...prev, profilePicture: file }))
+
+      // Create preview
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setPhotoPreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+
+      // Clear any existing error
+      if (errors.profilePicture) {
+        setErrors((prev) => ({ ...prev, profilePicture: "" }))
+      }
     }
   }
 
@@ -173,6 +217,23 @@ export function MembershipForm() {
                   )}
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="idNumber">ID Number / Passport *</Label>
+                  <Input
+                    id="idNumber"
+                    placeholder="Enter your ID number or passport"
+                    value={formData.idNumber}
+                    onChange={(e) => handleInputChange("idNumber", e.target.value)}
+                    className={errors.idNumber ? "border-red-500" : ""}
+                  />
+                  {errors.idNumber && (
+                    <p className="text-sm text-red-600 flex items-center">
+                      <AlertCircle className="h-4 w-4 mr-1" />
+                      {errors.idNumber}
+                    </p>
+                  )}
+                </div>
+
                 {/* Email */}
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address *</Label>
@@ -227,27 +288,73 @@ export function MembershipForm() {
                     </p>
                   )}
                 </div>
+
+                {/* Gender */}
+                <div className="space-y-2">
+                  <Label htmlFor="gender">Gender *</Label>
+                  <Select value={formData.gender} onValueChange={(value) => handleInputChange("gender", value)}>
+                    <SelectTrigger className={errors.gender ? "border-red-500" : ""}>
+                      <SelectValue placeholder="Select your gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.gender && (
+                    <p className="text-sm text-red-600 flex items-center">
+                      <AlertCircle className="h-4 w-4 mr-1" />
+                      {errors.gender}
+                    </p>
+                  )}
+                </div>
               </div>
 
-              {/* Gender */}
               <div className="space-y-2">
-                <Label htmlFor="gender">Gender *</Label>
-                <Select value={formData.gender} onValueChange={(value) => handleInputChange("gender", value)}>
-                  <SelectTrigger className={errors.gender ? "border-red-500" : ""}>
-                    <SelectValue placeholder="Select your gender" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="male">Male</SelectItem>
-                    <SelectItem value="female">Female</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.gender && (
+                <Label htmlFor="profilePicture">Profile Photo</Label>
+                <div className="flex items-center space-x-4">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-center w-full">
+                      <label
+                        htmlFor="profilePicture"
+                        className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                      >
+                        {photoPreview ? (
+                          <img
+                            src={photoPreview || "/placeholder.svg"}
+                            alt="Profile preview"
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            <Camera className="w-8 h-8 mb-4 text-gray-500" />
+                            <p className="mb-2 text-sm text-gray-500">
+                              <span className="font-semibold">Click to upload</span> profile photo
+                            </p>
+                            <p className="text-xs text-gray-500">PNG, JPG or JPEG (MAX. 5MB)</p>
+                          </div>
+                        )}
+                        <input
+                          id="profilePicture"
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={handlePhotoUpload}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                {errors.profilePicture && (
                   <p className="text-sm text-red-600 flex items-center">
                     <AlertCircle className="h-4 w-4 mr-1" />
-                    {errors.gender}
+                    {errors.profilePicture}
                   </p>
                 )}
+                <p className="text-xs text-gray-500">
+                  Upload a clear photo for your membership ID. This will be used for identification purposes.
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -264,7 +371,7 @@ export function MembershipForm() {
             <CardContent className="space-y-6">
               {/* Street Address */}
               <div className="space-y-2">
-                <Label htmlFor="streetAddress">Street Address *</Label>
+                <Label htmlFor="streetAddress">Residential Address *</Label>
                 <Input
                   id="streetAddress"
                   placeholder="123 Main Street, Apt 4B"
@@ -396,6 +503,89 @@ export function MembershipForm() {
             </CardContent>
           </Card>
 
+          {/* Terms and Conditions Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <CheckCircle className="h-5 w-5 text-blue-600" />
+                <span>Terms and Conditions</span>
+              </CardTitle>
+              <CardDescription>Please review and accept our membership agreement</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="p-6 bg-gray-50 rounded-lg border max-h-64 overflow-y-auto">
+                <h4 className="font-semibold text-gray-900 mb-4">MEMBERSHIP AGREEMENT</h4>
+                <p className="text-sm text-gray-700 mb-4 italic">
+                  (This is a legally binding document. Please read carefully.)
+                </p>
+
+                <div className="space-y-4 text-sm text-gray-700">
+                  <div>
+                    <h5 className="font-medium text-gray-900 mb-2">SHORT RULES OF THE GYM (HOUSE RULES)</h5>
+                    <ul className="list-disc list-inside space-y-1 ml-4">
+                      <li>Train at your own risk.</li>
+                      <li>Arrange the equipment after use.</li>
+                      <li>Respect other members and staff.</li>
+                      <li>No inappropriate behavior or language.</li>
+                      <li>Proper gym attire is required.</li>
+                      <li>Report damaged equipment immediately. If you damage anything in the gym, you will pay.</li>
+                      <li>Management reserves the right to cancel membership due to rule violations.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h5 className="font-medium text-gray-900 mb-2">DISCLAIMER / INDEMNITY</h5>
+                    <p className="mb-2 text-sm text-gray-700">
+                      I, the undersigned member, understand and acknowledge that:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 ml-4">
+                      <li>
+                        I am voluntarily participating in physical activities at this gym, and I do so entirely at my
+                        own risk.
+                      </li>
+                      <li>
+                        The owner(s), staff, and affiliates of the gym are not liable for any injury, illness, death, or
+                        loss/damage to personal property that may occur on the premises, including but not limited to
+                        use of equipment, facilities, or participation in training activities.
+                      </li>
+                      <li>I have consulted a medical professional if necessary, and I am physically fit to train.</li>
+                      <li>
+                        I agree to follow the gym's rules and understand that a violation may result in the termination
+                        of my membership without refund.
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3">
+                <input
+                  type="checkbox"
+                  id="termsAccepted"
+                  checked={termsAccepted}
+                  onChange={(e) => {
+                    setTermsAccepted(e.target.checked)
+                    if (errors.terms) {
+                      setErrors((prev) => ({ ...prev, terms: "" }))
+                    }
+                  }}
+                  className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="termsAccepted" className="text-sm text-gray-700 leading-relaxed">
+                  I have read, understood, and agree to the membership agreement, gym rules, and disclaimer above. I
+                  acknowledge that this is a legally binding document and that I am signing it voluntarily. *
+                </label>
+              </div>
+
+              {errors.terms && (
+                <p className="text-sm text-red-600 flex items-center">
+                  <AlertCircle className="h-4 w-4 mr-1" />
+                  {errors.terms}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Submit Button */}
           <Card>
             <CardContent className="pt-6">
@@ -403,8 +593,8 @@ export function MembershipForm() {
                 <Button
                   type="submit"
                   size="lg"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                  disabled={isSubmitting}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  disabled={isSubmitting || !termsAccepted}
                 >
                   {isSubmitting ? (
                     <>

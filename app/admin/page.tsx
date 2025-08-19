@@ -39,7 +39,8 @@ import {
   BrushIcon as Broom,
   MessageSquare,
   Star,
-  Sparkles,
+  CheckCircle,
+  XCircle,
 } from "lucide-react"
 import {
   getAllUserProfiles,
@@ -54,13 +55,14 @@ import {
   cleanupOldReceipts,
 } from "@/app/actions/admin-actions"
 import {
-  getPendingReviews,
   updateReviewStatus,
   getApprovedReviewsForAdmin,
   toggleReviewFeatured,
+  getAllReviews,
+  deleteReview,
 } from "@/app/actions/review-actions"
 import { deleteReceiptAdmin } from "@/app/actions/receipt-actions"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import {
   ChartContainer,
   ChartTooltip,
@@ -80,6 +82,8 @@ import {
   Pie,
   Cell,
 } from "recharts"
+import { Textarea } from "@/components/ui/textarea"
+import type { Review } from "@/lib/supabase"
 
 // Define chart config for monthly revenue
 const monthlyRevenueChartConfig = {
@@ -104,7 +108,7 @@ const paidUnpaidChartConfig = {
   },
 } satisfies ChartConfig
 
-export default function AdminPage() {
+export default function AdminDashboard() {
   const { user, loading: authLoading, refreshUser } = useAuthContext()
   const router = useRouter()
   const { toast } = useToast()
@@ -138,9 +142,30 @@ export default function AdminPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  const [pendingReviews, setPendingReviews] = useState<any[]>([])
+  const [allReviews, setAllReviews] = useState<any[]>([])
   const [approvedReviews, setApprovedReviews] = useState<any[]>([])
   const [loadingReviews, setLoadingReviews] = useState(false)
+
+  const [declineReasonDialog, setDeclineReasonDialog] = useState<{
+    isOpen: boolean
+    receiptId: string
+    receiptUser: string
+  }>({
+    isOpen: false,
+    receiptId: "",
+    receiptUser: "",
+  })
+  const [declineReason, setDeclineReason] = useState("")
+  const [receiptSearchTerm, setReceiptSearchTerm] = useState("")
+
+  const [reviewDeclineDialog, setReviewDeclineDialog] = useState({
+    isOpen: false,
+    reviewId: "",
+    reviewUser: "",
+  })
+  const [reviewDeclineReason, setReviewDeclineReason] = useState("")
+
+  const [rejectedReviews, setRejectedReviews] = useState<Review[]>([])
 
   // Filter users based on search term
   const filteredUsers = useMemo(() => {
@@ -173,6 +198,30 @@ export default function AdminPage() {
   const loadAdminData = async () => {
     setLoadingData(true)
     try {
+      console.log("[v0] Starting to fetch reviews...")
+      const reviewsData = await getAllReviews()
+      console.log("[v0] getAllReviews result:", reviewsData)
+
+      if (reviewsData.success) {
+        console.log("[v0] Reviews fetched successfully:", reviewsData.data)
+        setAllReviews(reviewsData.data)
+
+        const rejected = reviewsData.data.filter((review: Review) => review.status === "rejected")
+        setRejectedReviews(rejected)
+        console.log("[v0] Rejected reviews:", rejected)
+      }
+
+      const promiseResults = await Promise.all([
+        getAllUserProfiles(),
+        getAdminStats(),
+        getReceiptsByMonth(),
+        getMonthlyRevenue(),
+        getPaidMembersCurrentMonth(),
+        getUnpaidMembersCurrentMonth(),
+        getMembersForDeactivation(),
+        getApprovedReviewsForAdmin(),
+      ])
+
       const [
         usersData,
         statsData,
@@ -181,19 +230,8 @@ export default function AdminPage() {
         paidMembersData,
         unpaidMembersData,
         membersToDeactivateData,
-        pendingReviewsData,
         approvedReviewsData,
-      ] = await Promise.all([
-        getAllUserProfiles(),
-        getAdminStats(),
-        getReceiptsByMonth(),
-        getMonthlyRevenue(),
-        getPaidMembersCurrentMonth(),
-        getUnpaidMembersCurrentMonth(),
-        getMembersForDeactivation(),
-        getPendingReviews(),
-        getApprovedReviewsForAdmin(),
-      ])
+      ] = promiseResults
 
       if (usersData) setAllUsers(usersData)
       if (statsData) setStats(statsData)
@@ -202,8 +240,7 @@ export default function AdminPage() {
       if (paidMembersData) setPaidMembers(paidMembersData)
       if (unpaidMembersData) setUnpaidMembers(unpaidMembersData)
       if (membersToDeactivateData) setMembersForDeactivation(membersToDeactivateData)
-      if (pendingReviewsData.success) setPendingReviews(pendingReviewsData.data)
-      if (approvedReviewsData.success) setApprovedReviews(approvedReviewsData.data)
+      if (approvedReviewsData && approvedReviewsData.success) setApprovedReviews(approvedReviewsData.data)
     } catch (error) {
       console.error("Error loading admin data:", error)
       toast({
@@ -227,7 +264,11 @@ export default function AdminPage() {
     }
   }
 
-  const handleUpdateReceiptStatus = async (receiptId: string, newStatus: "verified" | "rejected") => {
+  const handleUpdateReceiptStatus = async (
+    receiptId: string,
+    newStatus: "verified" | "rejected",
+    declineReason?: string,
+  ) => {
     if (!user?.id) {
       toast({ title: "Error", description: "Admin user ID not found.", variant: "destructive" })
       return
@@ -244,6 +285,7 @@ export default function AdminPage() {
                 status: newStatus,
                 verified_date: newStatus === "verified" ? new Date().toISOString() : undefined,
                 verified_by: user.id,
+                rejection_reason: newStatus === "rejected" ? declineReason : undefined,
               }
             : receipt,
         )
@@ -252,9 +294,10 @@ export default function AdminPage() {
     })
 
     setIsReceiptPreviewOpen(false) // Close preview after action
+    setDeclineReasonDialog({ isOpen: false, receiptId: "", receiptUser: "" }) // Close decline dialog
 
     try {
-      const { success, message } = await updateReceiptStatusAdmin(receiptId, newStatus, user.id)
+      const { success, message } = await updateReceiptStatusAdmin(receiptId, newStatus, user.id, declineReason)
       if (!success) {
         toast({
           title: "Update Failed",
@@ -274,6 +317,23 @@ export default function AdminPage() {
       // Reload data to revert optimistic update
       loadAdminData()
     }
+  }
+
+  const handleRejectWithReason = (receiptId: string, receiptUser: string) => {
+    setDeclineReasonDialog({
+      isOpen: true,
+      receiptId,
+      receiptUser,
+    })
+    setDeclineReason("")
+  }
+
+  const handleSubmitDeclineReason = () => {
+    if (!declineReason.trim()) {
+      toast({ title: "Error", description: "Please provide a reason for declining.", variant: "destructive" })
+      return
+    }
+    handleUpdateReceiptStatus(declineReasonDialog.receiptId, "rejected", declineReason.trim())
   }
 
   const handleUpdateMembershipStatus = async (userId: string, newStatus: "active" | "inactive" | "suspended") => {
@@ -303,6 +363,8 @@ export default function AdminPage() {
     }
   }
 
+  const pendingReviews = allReviews.filter((review) => review.status === "pending")
+
   const handleReviewAction = async (reviewId: string, approve: boolean) => {
     setLoadingReviews(true)
     try {
@@ -314,8 +376,16 @@ export default function AdminPage() {
             ? "Review has been approved and will appear on the website."
             : "Review has been rejected and will not appear on the website.",
         })
+
+        if (!approve) {
+          const rejectedReview = allReviews.find((review) => review.id === reviewId)
+          if (rejectedReview) {
+            setRejectedReviews((prev) => [...prev, { ...rejectedReview, status: "rejected" }])
+          }
+        }
+
         // Remove the review from pending list
-        setPendingReviews((prev) => prev.filter((review) => review.id !== reviewId))
+        setAllReviews((prev) => prev.filter((review) => review.id !== reviewId))
         if (approve) {
           const approvedReviewsData = await getApprovedReviewsForAdmin()
           if (approvedReviewsData.success) setApprovedReviews(approvedReviewsData.data)
@@ -335,6 +405,45 @@ export default function AdminPage() {
       })
     } finally {
       setLoadingReviews(false)
+    }
+  }
+
+  const handleRejectReviewWithReason = (reviewId: string, reviewUser: string) => {
+    setReviewDeclineDialog({
+      isOpen: true,
+      reviewId,
+      reviewUser,
+    })
+    setReviewDeclineReason("")
+  }
+
+  const handleSubmitReviewDeclineReason = async () => {
+    if (!reviewDeclineReason.trim()) {
+      toast({
+        title: "Error",
+        description: "Please provide a reason for rejecting this review.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const { success, message } = await updateReviewStatus(
+        reviewDeclineDialog.reviewId,
+        "rejected",
+        reviewDeclineReason.trim(),
+      )
+      if (success) {
+        toast({ title: "Review Rejected", description: "Review has been rejected with reason provided." })
+        loadAdminData() // Refresh data
+      } else {
+        toast({ title: "Error", description: message || "Failed to reject review.", variant: "destructive" })
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" })
+    } finally {
+      setReviewDeclineDialog({ isOpen: false, reviewId: "", reviewUser: "" })
+      setReviewDeclineReason("")
     }
   }
 
@@ -424,6 +533,9 @@ export default function AdminPage() {
   }
 
   const openReceiptPreview = (receipt: Receipt) => {
+    console.log("[v0] Opening receipt preview for:", receipt.id)
+    console.log("[v0] Receipt file_url:", receipt.file_url)
+    console.log("[v0] Receipt object:", receipt)
     setSelectedReceiptForPreview(receipt)
     setIsReceiptPreviewOpen(true)
   }
@@ -516,12 +628,100 @@ export default function AdminPage() {
     }
   }
 
+  const getFilteredReceipts = (receipts: Receipt[]) => {
+    if (!receiptSearchTerm.trim()) return receipts
+
+    const searchLower = receiptSearchTerm.toLowerCase()
+    return receipts.filter((receipt) => {
+      const userName = receipt.users?.full_name?.toLowerCase() || ""
+      const userEmail = receipt.users?.email?.toLowerCase() || ""
+      const description = receipt.description?.toLowerCase() || ""
+      const amount = receipt.amount?.toString() || ""
+      const status = receipt.status?.toLowerCase() || ""
+
+      return (
+        userName.includes(searchLower) ||
+        userEmail.includes(searchLower) ||
+        description.includes(searchLower) ||
+        amount.includes(searchLower) ||
+        status.includes(searchLower)
+      )
+    })
+  }
+
   if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
         <LoadingSpinner size="lg" text="Loading admin dashboard..." />
       </div>
     )
+  }
+
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    } catch (error) {
+      console.error("Error formatting date:", error)
+      return "Invalid Date"
+    }
+  }
+
+  const handleReceiptPreview = (receipt: Receipt) => {
+    console.log("[v0] Opening receipt preview for:", receipt.filename)
+    console.log("[v0] Receipt file URL:", receipt.file_url)
+    console.log("[v0] Receipt data:", receipt)
+    setSelectedReceiptForPreview(receipt)
+    setIsReceiptPreviewOpen(true)
+  }
+
+  const getFileType = (filename: string): "image" | "pdf" | "other" => {
+    const extension = filename.toLowerCase().split(".").pop()
+    if (["jpg", "jpeg", "png", "gif", "webp"].includes(extension || "")) {
+      return "image"
+    } else if (extension === "pdf") {
+      return "pdf"
+    }
+    return "other"
+  }
+
+  const handleDeleteReview = async (reviewId: string, userName: string) => {
+    if (
+      window.confirm(
+        `Are you sure you want to permanently delete the review by ${userName}? This action cannot be undone.`,
+      )
+    ) {
+      try {
+        setLoadingReviews(true)
+        const result = await deleteReview(reviewId)
+        if (result.success) {
+          // Refresh reviews after deletion
+          await loadAdminData()
+          toast({
+            title: "Review deleted",
+            description: "The review has been permanently deleted.",
+          })
+        } else {
+          toast({
+            title: "Error",
+            description: result.error || "Failed to delete review",
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        console.error("Error deleting review:", error)
+        toast({
+          title: "Error",
+          description: "Failed to delete review",
+          variant: "destructive",
+        })
+      } finally {
+        setLoadingReviews(false)
+      }
+    }
   }
 
   return (
@@ -1020,21 +1220,23 @@ export default function AdminPage() {
                   const { default: jsPDF } = await import("jspdf")
                   const autoTable = (await import("jspdf-autotable")).default
 
-                  const doc = new jsPDF()
-                  doc.text("User List", 14, 10)
+                  const doc = new jsPDF("landscape", "mm", "a4")
+                  doc.text("Sam24Fit - User List Report", 14, 15)
+                  doc.setFontSize(10)
+                  doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22)
 
-                  // Include all original columns
                   const tableData = filteredUsers.map((u) => [
-                    u.full_name,
-                    u.email,
-                    u.phone,
+                    u.full_name || "N/A",
+                    u.email || "N/A",
+                    u.phone || "N/A",
+                    u.id_number || "Not provided",
                     new Date(u.date_of_birth).toLocaleDateString(),
-                    u.gender,
-                    u.street_address,
-                    u.emergency_contact_name,
-                    u.emergency_contact_number,
-                    u.role,
-                    u.membership_status,
+                    u.gender || "N/A",
+                    u.street_address || "N/A",
+                    u.emergency_contact_name || "N/A",
+                    u.emergency_contact_number || "N/A",
+                    u.role || "member",
+                    u.membership_status || "inactive",
                     new Date(u.created_at).toLocaleDateString(),
                   ])
 
@@ -1044,22 +1246,56 @@ export default function AdminPage() {
                         "Full Name",
                         "Email",
                         "Phone",
-                        "DOB",
+                        "ID/Passport",
+                        "Date of Birth",
                         "Gender",
                         "Address",
                         "Emergency Contact",
                         "Emergency Phone",
                         "Role",
-                        "Membership",
+                        "Status",
                         "Joined",
                       ],
                     ],
                     body: tableData,
-                    startY: 20,
-                    styles: { fontSize: 8 },
+                    startY: 30,
+                    styles: {
+                      fontSize: 9,
+                      cellPadding: 2,
+                      overflow: "linebreak",
+                      halign: "left",
+                    },
+                    headStyles: {
+                      fillColor: [41, 128, 185],
+                      textColor: 255,
+                      fontSize: 10,
+                      fontStyle: "bold",
+                    },
+                    columnStyles: {
+                      0: { cellWidth: 25 }, // Full Name
+                      1: { cellWidth: 30 }, // Email
+                      2: { cellWidth: 20 }, // Phone
+                      3: { cellWidth: 22 }, // ID/Passport
+                      4: { cellWidth: 18 }, // DOB
+                      5: { cellWidth: 15 }, // Gender
+                      6: { cellWidth: 30 }, // Address
+                      7: { cellWidth: 25 }, // Emergency Contact
+                      8: { cellWidth: 20 }, // Emergency Phone
+                      9: { cellWidth: 15 }, // Role
+                      10: { cellWidth: 18 }, // Status
+                      11: { cellWidth: 18 }, // Joined
+                    },
+                    alternateRowStyles: {
+                      fillColor: [245, 245, 245],
+                    },
+                    margin: { top: 30, left: 14, right: 14 },
                   })
 
-                  doc.save("user_list.pdf")
+                  const finalY = (doc as any).lastAutoTable.finalY || 30
+                  doc.setFontSize(10)
+                  doc.text(`Total Users: ${filteredUsers.length}`, 14, finalY + 10)
+
+                  doc.save(`sam24fit_users_${new Date().toISOString().split("T")[0]}.pdf`)
                 }}
               >
                 Download PDF
@@ -1097,6 +1333,7 @@ export default function AdminPage() {
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Profile</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID Number</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">DOB</th>
@@ -1127,6 +1364,9 @@ export default function AdminPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {member.full_name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {member.id_number || "N/A"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.email}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.phone}</td>
@@ -1207,6 +1447,22 @@ export default function AdminPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  type="text"
+                  placeholder="Search receipts by name, email, description, amount, or status..."
+                  value={receiptSearchTerm}
+                  onChange={(e) => setReceiptSearchTerm(e.target.value)}
+                  className="pl-10 pr-4 py-2 w-full"
+                />
+              </div>
+              {receiptSearchTerm && (
+                <p className="text-sm text-gray-500 mt-2">Filtering receipts containing "{receiptSearchTerm}"</p>
+              )}
+            </div>
+
             {loadingData ? (
               <div className="text-center py-8">
                 <LoadingSpinner size="md" text="Loading receipts..." />
@@ -1220,10 +1476,16 @@ export default function AdminPage() {
               <div className="space-y-4">
                 {sortedMonthKeys.map((monthKey) => {
                   const monthReceipts = receiptsByMonth[monthKey]
+                  const filteredMonthReceipts = getFilteredReceipts(monthReceipts)
+
+                  if (receiptSearchTerm && filteredMonthReceipts.length === 0) {
+                    return null
+                  }
+
                   const isExpanded = expandedMonths.has(monthKey)
-                  const pendingCount = monthReceipts.filter((r) => r.status === "pending").length
-                  const verifiedCount = monthReceipts.filter((r) => r.status === "verified").length
-                  const rejectedCount = monthReceipts.filter((r) => r.status === "rejected").length
+                  const pendingCount = filteredMonthReceipts.filter((r) => r.status === "pending").length
+                  const verifiedCount = filteredMonthReceipts.filter((r) => r.status === "verified").length
+                  const rejectedCount = filteredMonthReceipts.filter((r) => r.status === "rejected").length
 
                   return (
                     <div key={monthKey} className="border rounded-lg">
@@ -1236,7 +1498,16 @@ export default function AdminPage() {
                           <div>
                             <h3 className="font-semibold text-lg">{formatMonthYear(monthKey)}</h3>
                             <p className="text-sm text-gray-600">
-                              {monthReceipts.length} receipt{monthReceipts.length !== 1 ? "s" : ""} •{" "}
+                              {receiptSearchTerm ? (
+                                <>
+                                  {filteredMonthReceipts.length} of {monthReceipts.length} receipt
+                                  {monthReceipts.length !== 1 ? "s" : ""} •{" "}
+                                </>
+                              ) : (
+                                <>
+                                  {monthReceipts.length} receipt{monthReceipts.length !== 1 ? "s" : ""} •{" "}
+                                </>
+                              )}
                               <span className="text-yellow-600">{pendingCount} pending</span> •{" "}
                               <span className="text-green-600">{verifiedCount} verified</span> •{" "}
                               <span className="text-red-600">{rejectedCount} rejected</span>
@@ -1258,11 +1529,10 @@ export default function AdminPage() {
                       {isExpanded && (
                         <div className="border-t bg-gray-50 p-4">
                           <div className="space-y-4">
-                            {monthReceipts.map((receipt) => (
+                            {filteredMonthReceipts.map((receipt) => (
                               <div key={receipt.id} className="bg-white border rounded-lg p-4">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center space-x-4">
-                                    {/* Clickable User Profile Picture */}
                                     <Button
                                       variant="ghost"
                                       className="h-10 w-10 p-0 rounded-full hover:ring-2 hover:ring-orange-500 transition-all"
@@ -1274,6 +1544,24 @@ export default function AdminPage() {
                                         src={
                                           receipt.users?.profile_picture_url ||
                                           "/placeholder.svg?height=40&width=40&query=user profile" ||
+                                          "/placeholder.svg" ||
+                                          "/placeholder.svg" ||
+                                          "/placeholder.svg" ||
+                                          "/placeholder.svg" ||
+                                          "/placeholder.svg" ||
+                                          "/placeholder.svg" ||
+                                          "/placeholder.svg" ||
+                                          "/placeholder.svg" ||
+                                          "/placeholder.svg" ||
+                                          "/placeholder.svg" ||
+                                          "/placeholder.svg" ||
+                                          "/placeholder.svg" ||
+                                          "/placeholder.svg" ||
+                                          "/placeholder.svg" ||
+                                          "/placeholder.svg" ||
+                                          "/placeholder.svg" ||
+                                          "/placeholder.svg" ||
+                                          "/placeholder.svg" ||
                                           "/placeholder.svg" ||
                                           "/placeholder.svg"
                                         }
@@ -1294,6 +1582,11 @@ export default function AdminPage() {
                                       </p>
                                       {receipt.description && (
                                         <p className="text-sm text-gray-600 mt-1">{receipt.description}</p>
+                                      )}
+                                      {receipt.status === "rejected" && receipt.rejection_reason && (
+                                        <p className="text-sm text-red-600 mt-1">
+                                          <strong>Rejection Reason:</strong> {receipt.rejection_reason}
+                                        </p>
                                       )}
                                     </div>
                                   </div>
@@ -1335,7 +1628,9 @@ export default function AdminPage() {
                                       <Button
                                         size="sm"
                                         variant="destructive"
-                                        onClick={() => handleUpdateReceiptStatus(receipt.id, "rejected")}
+                                        onClick={() =>
+                                          handleRejectWithReason(receipt.id, receipt.users?.full_name || "Unknown User")
+                                        }
                                       >
                                         <X className="h-4 w-4 mr-1" />
                                         Reject
@@ -1391,9 +1686,10 @@ export default function AdminPage() {
                                 src={
                                   review.users?.profile_picture_url ||
                                   "/placeholder.svg?height=40&width=40&query=user profile" ||
+                                  "/placeholder.svg" ||
                                   "/placeholder.svg"
                                 }
-                                alt={`${review.users?.full_name || "User"}'s profile picture`}
+                                alt={`${review.users?.full_name || "Unknown User"}'s profile picture`}
                                 width={40}
                                 height={40}
                                 className="rounded-full object-cover"
@@ -1421,24 +1717,35 @@ export default function AdminPage() {
                                 </p>
                               </div>
                             </div>
-                            <div className="flex space-x-2">
+                            <div className="flex items-center space-x-2">
                               <Button
                                 size="sm"
-                                className="bg-green-600 hover:bg-green-700"
                                 onClick={() => handleReviewAction(review.id, true)}
                                 disabled={loadingReviews}
+                                className="bg-green-600 hover:bg-green-700 text-white"
                               >
                                 <Check className="h-4 w-4 mr-1" />
                                 Approve
                               </Button>
+                             <Button
+  size="sm"
+  variant="outline"
+  onClick={() => handleRejectReviewWithReason(review.id, review.users?.full_name || "Unknown User")}
+  disabled={loadingReviews}
+  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+>
+  <X className="h-4 w-4 mr-1" />
+  Decline
+</Button>
                               <Button
                                 size="sm"
-                                variant="destructive"
-                                onClick={() => handleReviewAction(review.id, false)}
+                                variant="outline"
+                                onClick={() => handleDeleteReview(review.id, review.users?.full_name || "Unknown User")}
                                 disabled={loadingReviews}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
                               >
-                                <X className="h-4 w-4 mr-1" />
-                                Reject
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Delete
                               </Button>
                             </div>
                           </div>
@@ -1450,29 +1757,26 @@ export default function AdminPage() {
 
                 {/* Approved Reviews Section */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Approved Reviews - Feature Control</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Only featured reviews will appear on the index page (maximum 10). Toggle the feature status to
-                    control visibility.
-                  </p>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Approved Reviews</h3>
                   {approvedReviews.length === 0 ? (
                     <div className="text-center py-8">
-                      <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500">No approved reviews available</p>
+                      <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">No approved reviews yet</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
                       {approvedReviews.map((review) => (
-                        <div key={review.id} className="bg-white border rounded-lg p-4">
+                        <div key={review.id} className="bg-green-50 border border-green-200 rounded-lg p-4">
                           <div className="flex items-start justify-between">
                             <div className="flex items-start space-x-4">
                               <Image
                                 src={
                                   review.users?.profile_picture_url ||
                                   "/placeholder.svg?height=40&width=40&query=user profile" ||
+                                  "/placeholder.svg" ||
                                   "/placeholder.svg"
                                 }
-                                alt={`${review.users?.full_name || "User"}'s profile picture`}
+                                alt={`${review.users?.full_name || "Unknown User"}'s profile picture`}
                                 width={40}
                                 height={40}
                                 className="rounded-full object-cover"
@@ -1493,29 +1797,124 @@ export default function AdminPage() {
                                     ))}
                                   </div>
                                   <span className="text-sm text-gray-500">({review.rating}/5)</span>
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Approved
+                                  </span>
                                   {review.is_featured && (
-                                    <Badge className="bg-yellow-100 text-yellow-800">
-                                      <Sparkles className="h-3 w-3 mr-1" />
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                      <Star className="h-3 w-3 mr-1" />
                                       Featured
-                                    </Badge>
+                                    </span>
                                   )}
                                 </div>
                                 <p className="text-gray-700 mb-2">{review.review_text}</p>
                                 <p className="text-sm text-gray-500">
-                                  Approved: {new Date(review.created_at).toLocaleDateString()}
+                                  Approved: {new Date(review.updated_at || review.created_at).toLocaleDateString()}
                                 </p>
                               </div>
                             </div>
-                            <div className="flex space-x-2">
+                            <div className="flex items-center space-x-2">
                               <Button
                                 size="sm"
-                                variant={review.is_featured ? "destructive" : "default"}
-                                className={review.is_featured ? "" : "bg-yellow-600 hover:bg-yellow-700"}
+                                variant={review.is_featured ? "default" : "outline"}
                                 onClick={() => handleToggleFeatured(review.id, !review.is_featured)}
                                 disabled={loadingReviews}
+                                className={
+                                  review.is_featured
+                                    ? "bg-blue-600 hover:bg-blue-700 text-white"
+                                    : "text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                }
                               >
-                                <Sparkles className="h-4 w-4 mr-1" />
+                                <Star className="h-4 w-4 mr-1" />
                                 {review.is_featured ? "Unfeature" : "Feature"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeleteReview(review.id, review.users?.full_name || "Unknown User")}
+                                disabled={loadingReviews}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Rejected Reviews Section */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Rejected Reviews</h3>
+                  {rejectedReviews.length === 0 ? (
+                    <div className="text-center py-8">
+                      <XCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">No rejected reviews</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {rejectedReviews.map((review) => (
+                        <div key={review.id} className="bg-red-50 border border-red-200 rounded-lg p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-4">
+                              <Image
+                                src={
+                                  review.users?.profile_picture_url ||
+                                  "/placeholder.svg?height=40&width=40&query=user profile" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg"
+                                }
+                                alt={`${review.users?.full_name || "Unknown User"}'s profile picture`}
+                                width={40}
+                                height={40}
+                                className="rounded-full object-cover"
+                              />
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <p className="font-medium text-gray-900">
+                                    {review.users?.full_name || "Unknown User"}
+                                  </p>
+                                  <div className="flex items-center">
+                                    {[...Array(5)].map((_, i) => (
+                                      <Star
+                                        key={i}
+                                        className={`h-4 w-4 ${
+                                          i < review.rating ? "text-yellow-400 fill-current" : "text-gray-300"
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                  <span className="text-sm text-gray-500">({review.rating}/5)</span>
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    <XCircle className="h-3 w-3 mr-1" />
+                                    Rejected
+                                  </span>
+                                </div>
+                                <p className="text-gray-700 mb-2">{review.review_text}</p>
+                                {review.rejection_reason && (
+                                  <p className="text-sm text-red-600 mb-2">
+                                    <strong>Rejection reason:</strong> {review.rejection_reason}
+                                  </p>
+                                )}
+                                <p className="text-sm text-gray-500">
+                                  Rejected: {new Date(review.updated_at || review.created_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeleteReview(review.id, review.users?.full_name || "Unknown User")}
+                                disabled={loadingReviews}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Delete
                               </Button>
                             </div>
                           </div>
@@ -1530,7 +1929,7 @@ export default function AdminPage() {
         </Card>
       </main>
 
-      {/* Delete Receipt Confirmation Dialog */}
+      {/* Delete Receipt */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1572,53 +1971,159 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={declineReasonDialog.isOpen}
+        onOpenChange={(open) => setDeclineReasonDialog((prev) => ({ ...prev, isOpen: open }))}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Decline Receipt</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for declining {declineReasonDialog.receiptUser}'s receipt.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Textarea
+              placeholder="Enter reason for declining this receipt..."
+              value={declineReason}
+              onChange={(e) => setDeclineReason(e.target.value)}
+              rows={4}
+            />
+          </div>
+          <div className="flex justify-end space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeclineReasonDialog({ isOpen: false, receiptId: "", receiptUser: "" })}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleSubmitDeclineReason} disabled={!declineReason.trim()}>
+              <X className="h-4 w-4 mr-1" />
+              Decline Receipt
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Review Decline Reason Dialog */}
+
       {/* Receipt Preview Dialog */}
       <Dialog open={isReceiptPreviewOpen} onOpenChange={setIsReceiptPreviewOpen}>
-        <DialogContent className="max-w-4xl w-full h-[90vh] flex flex-col">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
           <DialogHeader>
-            <DialogTitle>Receipt Preview: {selectedReceiptForPreview?.filename}</DialogTitle>
+            <DialogTitle>Receipt Preview</DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-hidden flex items-center justify-center bg-gray-100 rounded-md">
-            {selectedReceiptForPreview?.file_url &&
-              (selectedReceiptForPreview.file_url.endsWith(".pdf") ? (
-                <iframe
-                  src={selectedReceiptForPreview.file_url}
-                  className="w-full h-full"
-                  title="Receipt PDF Preview"
-                />
-              ) : (
-                <div className="relative w-full h-full">
-                  <Image
-                    src={
-                      selectedReceiptForPreview.file_url ||
-                      "/placeholder.svg?height=600&width=800&query=receipt preview" ||
-                      "/placeholder.svg" ||
-                      "/placeholder.svg"
-                    }
-                    alt="Receipt Preview"
-                    fill
-                    style={{ objectFit: "contain" }}
-                    className="rounded-md"
-                  />
+          {selectedReceiptForPreview && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <label className="font-medium text-gray-500">Filename:</label>
+                  <p className="text-gray-900">{selectedReceiptForPreview.filename}</p>
                 </div>
-              ))}
-          </div>
-          {selectedReceiptForPreview && selectedReceiptForPreview.status === "pending" && (
-            <div className="flex justify-end space-x-2 mt-4">
-              <Button
-                className="bg-green-600 hover:bg-green-700"
-                onClick={() => handleUpdateReceiptStatus(selectedReceiptForPreview.id, "verified")}
-              >
-                <Check className="h-4 w-4 mr-1" />
-                Verify
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => handleUpdateReceiptStatus(selectedReceiptForPreview.id, "rejected")}
-              >
-                <X className="h-4 w-4 mr-1" />
-                Reject
-              </Button>
+                <div>
+                  <label className="font-medium text-gray-500">Amount:</label>
+                  <p className="text-gray-900">R{selectedReceiptForPreview.amount.toFixed(2)}</p>
+                </div>
+                <div>
+                  <label className="font-medium text-gray-500">Upload Date:</label>
+                  <p className="text-gray-900">
+                    {new Date(selectedReceiptForPreview.upload_date).toLocaleDateString()}
+                  </p>
+                </div>
+                <div>
+                  <label className="font-medium text-gray-500">Status:</label>
+                  <Badge className={getStatusColor(selectedReceiptForPreview.status)}>
+                    {selectedReceiptForPreview.status.charAt(0).toUpperCase() +
+                      selectedReceiptForPreview.status.slice(1)}
+                  </Badge>
+                </div>
+                {selectedReceiptForPreview.description && (
+                  <div className="col-span-2">
+                    <label className="font-medium text-gray-500">Description:</label>
+                    <p className="text-gray-900">{selectedReceiptForPreview.description}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="border rounded-lg overflow-hidden">
+                {(() => {
+                  const fileType = getFileType(selectedReceiptForPreview.filename)
+                  console.log("[v0] File type detected:", fileType)
+                  console.log("[v0] File URL being used:", selectedReceiptForPreview.file_url)
+
+                  if (fileType === "image") {
+                    return (
+                      <Image
+                        src={selectedReceiptForPreview.file_url || "/placeholder.svg"}
+                        alt={`Receipt: ${selectedReceiptForPreview.filename}`}
+                        width={800}
+                        height={600}
+                        className="w-full h-auto object-contain"
+                        unoptimized
+                        onError={() => console.log("[v0] Image failed to load:", selectedReceiptForPreview.file_url)}
+                        onLoad={() =>
+                          console.log("[v0] Image loaded successfully:", selectedReceiptForPreview.file_url)
+                        }
+                      />
+                    )
+                  } else if (fileType === "pdf") {
+                    return (
+                      <div className="w-full h-[600px]">
+                        <iframe
+                          src={selectedReceiptForPreview.file_url}
+                          className="w-full h-full border-0"
+                          title={`Receipt: ${selectedReceiptForPreview.filename}`}
+                          onError={() => console.log("[v0] PDF failed to load:", selectedReceiptForPreview.file_url)}
+                          onLoad={() =>
+                            console.log("[v0] PDF loaded successfully:", selectedReceiptForPreview.file_url)
+                          }
+                        />
+                      </div>
+                    )
+                  } else {
+                    return (
+                      <div className="flex flex-col items-center justify-center h-64 bg-gray-50">
+                        <FileText className="h-16 w-16 text-gray-400 mb-4" />
+                        <p className="text-gray-600 mb-4">Preview not available for this file type</p>
+                        <Button
+                          onClick={() => window.open(selectedReceiptForPreview.file_url, "_blank")}
+                          className="bg-orange-600 hover:bg-orange-700"
+                        >
+                          Open File
+                        </Button>
+                      </div>
+                    )
+                  }
+                })()}
+              </div>
+
+              {selectedReceiptForPreview.status === "pending" && (
+                <div className="flex justify-end space-x-2 pt-4 border-t">
+                  <Button
+                    className="bg-green-600 hover:bg-green-700"
+                    onClick={() => {
+                      handleUpdateReceiptStatus(selectedReceiptForPreview.id, "verified")
+                      setIsReceiptPreviewOpen(false)
+                    }}
+                  >
+                    <Check className="h-4 w-4 mr-2" />
+                    Verify Receipt
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      handleRejectWithReason(
+                        selectedReceiptForPreview.id,
+                        selectedReceiptForPreview.users?.full_name || "Unknown User",
+                      )
+                      setIsReceiptPreviewOpen(false)
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Reject Receipt
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
@@ -1636,6 +2141,23 @@ export default function AdminPage() {
                 src={
                   selectedUserForProfilePreview.profile_picture_url ||
                   "/placeholder.svg?height=300&width=300&query=user profile large" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
                   "/placeholder.svg" ||
                   "/placeholder.svg"
                 }
