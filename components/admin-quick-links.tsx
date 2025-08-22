@@ -117,23 +117,23 @@ export function AdminQuickLinks() {
       <div className="w-full bg-gradient-to-r from-orange-50 to-red-50 border-b border-orange-200 shadow-sm mb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-center mb-3">
-            <h3 className="font-semibold text-gray-900 flex items-center text-lg">
-              <Navigation className="h-5 w-5 mr-2 text-orange-600" />
+            <h3 className="font-semibold text-gray-900 flex items-center text-base sm:text-lg">
+              <Navigation className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-orange-600" />
               Quick Navigation
             </h3>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-3">
             {quickLinks.map((link) => {
               const IconComponent = link.icon
               return (
                 <Button
                   key={link.id}
                   variant="ghost"
-                  className={`${link.color} transition-all duration-200 hover:scale-105 flex flex-col items-center p-4 h-auto bg-white/80 hover:bg-white border border-orange-100 hover:border-orange-300 shadow-sm hover:shadow-md`}
+                  className={`${link.color} transition-all duration-200 hover:scale-105 flex flex-col items-center p-2 sm:p-4 h-auto bg-white/80 hover:bg-white border border-orange-100 hover:border-orange-300 shadow-sm hover:shadow-md`}
                   onClick={() => scrollToSection(link.id)}
                 >
-                  <IconComponent className="h-6 w-6 mb-2" />
-                  <span className="text-xs font-medium text-center leading-tight">{link.label}</span>
+                  <IconComponent className="h-4 w-4 sm:h-6 sm:w-6 mb-1 sm:mb-2" />
+                  <span className="text-[10px] sm:text-xs font-medium text-center leading-tight">{link.label}</span>
                 </Button>
               )
             })}
@@ -144,7 +144,7 @@ export function AdminQuickLinks() {
   }
 
   return (
-    <div className="fixed top-1/2 right-6 -translate-y-1/2 z-40">
+    <div className="hidden md:block fixed top-1/2 right-6 -translate-y-1/2 z-40">
       <Button
         onClick={() => setIsExpanded(!isExpanded)}
         className="mb-2 bg-orange-600 hover:bg-orange-700 text-white shadow-lg rounded-full p-3"

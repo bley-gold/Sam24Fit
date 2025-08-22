@@ -27,9 +27,6 @@ import {
   CheckCircle,
   XCircle,
   X,
-  Download,
-  ChevronRight,
-  Settings,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { deleteReceipt } from "@/app/actions/receipt-actions"
@@ -321,22 +318,22 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
     }
   }
 
-const handleLogout = async () => {
-  try {
-    await signOut()
-    toast({
-      title: "Logged out",
-      description: "You have been successfully logged out.",
-    })
-    router.push("/")
-  } catch (error) {
-    toast({
-      title: "Error",
-      description: "Failed to log out. Please try again.",
-      variant: "destructive",
-    })
+  const handleLogout = async () => {
+    try {
+      await signOut()
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out.",
+      })
+      router.push("/")
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
-}
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -433,164 +430,132 @@ const handleLogout = async () => {
   }
 
   const calculateStreakData = () => {
-  const months: any[] = []
-  const now = new Date()
+    const months: any[] = []
+    const now = new Date()
 
-  // Generate the last 24 months
-  for (let i = 23; i >= 0; i--) {
-    const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const monthKey = `${monthDate.getFullYear()}-${String(
-      monthDate.getMonth() + 1
-    ).padStart(2, "0")}`
+    // Generate the last 24 months
+    for (let i = 23; i >= 0; i--) {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, "0")}`
 
-    const hasPayment = receipts.some((receipt) => {
-      if (receipt.status !== "verified") return false
-      const receiptDate = new Date(receipt.upload_date)
-      const receiptMonthKey = `${receiptDate.getFullYear()}-${String(
-        receiptDate.getMonth() + 1
-      ).padStart(2, "0")}`
-      return receiptMonthKey === monthKey
-    })
+      const hasPayment = receipts.some((receipt) => {
+        if (receipt.status !== "verified") return false
+        const receiptDate = new Date(receipt.upload_date)
+        const receiptMonthKey = `${receiptDate.getFullYear()}-${String(receiptDate.getMonth() + 1).padStart(2, "0")}`
+        return receiptMonthKey === monthKey
+      })
 
-    months.push({
-      date: monthDate,
-      hasPayment,
-      monthKey,
-      monthName: monthDate.toLocaleDateString("en-US", { month: "short" }),
-      year: monthDate.getFullYear(),
-      monthIndex: monthDate.getMonth(),
-    })
-  }
-
-  return months
-}
-
-const groupByYear = (months: any[]) => {
-  const grouped: Record<number, (any | null)[]> = {}
-
-  months.forEach((m) => {
-    if (!grouped[m.year]) grouped[m.year] = new Array(12).fill(null)
-    grouped[m.year][m.monthIndex] = m
-  })
-
-  return grouped
-}
-
-const calculateCurrentStreak = () => {
-  const streakData = calculateStreakData()
-  let streak = 0
-
-  for (let i = streakData.length - 1; i >= 0; i--) {
-    if (streakData[i].hasPayment) {
-      streak++
-    } else {
-      break
+      months.push({
+        date: monthDate,
+        hasPayment,
+        monthKey,
+        monthName: monthDate.toLocaleDateString("en-US", { month: "short" }),
+        year: monthDate.getFullYear(),
+        monthIndex: monthDate.getMonth(),
+      })
     }
+
+    return months
   }
 
-  return streak
-}
+  const groupByYear = (months: any[]) => {
+    const grouped: Record<number, (any | null)[]> = {}
 
-const StreakGraphic = () => {
-  const streakData = calculateStreakData()
-  const currentStreak = calculateCurrentStreak()
-  const grouped = groupByYear(streakData)
+    months.forEach((m) => {
+      if (!grouped[m.year]) grouped[m.year] = new Array(12).fill(null)
+      grouped[m.year][m.monthIndex] = m
+    })
 
-  // Sort years ascending
-  const years = Object.keys(grouped)
-    .map(Number)
-    .sort((a, b) => a - b)
+    return grouped
+  }
 
-  const now = new Date()
-  const currentMonth = now.getMonth()
+  const calculateCurrentStreak = () => {
+    const streakData = calculateStreakData()
+    let streak = 0
 
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-900">
-          Gym Attendance Streak
-        </h3>
-        <div className="text-xs text-gray-600">
-          Current streak:{" "}
-          <span className="font-semibold text-green-600">
-            {currentStreak} months
-          </span>
-        </div>
-      </div>
+    for (let i = streakData.length - 1; i >= 0; i--) {
+      if (streakData[i].hasPayment) {
+        streak++
+      } else {
+        break
+      }
+    }
 
+    return streak
+  }
+
+  const StreakGraphic = () => {
+    const streakData = calculateStreakData()
+    const currentStreak = calculateCurrentStreak()
+    const grouped = groupByYear(streakData)
+
+    // Sort years ascending
+    const years = Object.keys(grouped)
+      .map(Number)
+      .sort((a, b) => a - b)
+
+    const now = new Date()
+    const currentMonth = now.getMonth()
+
+    return (
       <div className="space-y-3">
-        {/* Month labels */}
-        <div className="flex">
-          <div className="w-12 mr-3"></div>
-          <div className="grid grid-cols-12 gap-1 flex-1 text-xs text-gray-600 text-center">
-            {[
-              "Jan",
-              "Feb",
-              "Mar",
-              "Apr",
-              "May",
-              "Jun",
-              "Jul",
-              "Aug",
-              "Sep",
-              "Oct",
-              "Nov",
-              "Dec",
-            ].map((month) => (
-              <div key={month} className="text-[10px]">
-                {month}
-              </div>
-            ))}
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900">Gym Attendance Streak</h3>
+          <div className="text-xs text-gray-600">
+            Current streak: <span className="font-semibold text-green-600">{currentStreak} months</span>
           </div>
         </div>
 
-        {/* Year rows */}
-        {years.map((year) => (
-          <div key={year} className="flex items-center">
-            <div className="w-12 mr-3 text-xs text-gray-600 text-right font-medium">
-              {year}
-            </div>
-            <div className="grid grid-cols-12 gap-1 flex-1">
-              {grouped[year].map((month, index) => {
-                // Hide future months for the current year
-                if (year === now.getFullYear() && index > currentMonth) return null
-
-                // Determine if this is the last month of the current streak
-                const streakStartIndex =
-                  streakData.length - currentStreak
-                const isLastStreakMonth =
-                  month &&
-                  streakData.findIndex((m) => m.monthKey === month.monthKey) ===
-                    streakStartIndex
-
-                return (
-                  <div
-                    key={`${year}-${index}`}
-                    className={`w-4 h-4 rounded-sm border ${
-                      month?.hasPayment
-                        ? "bg-green-500 border-green-600"
-                        : "bg-gray-200 border-gray-300"
-                    } ${isLastStreakMonth ? "ring-2 ring-green-400" : ""}`} // subtle highlight
-                    title={
-                      month
-                        ? `${month.monthName} ${month.year}: ${
-                            month.hasPayment
-                              ? "Attendance recorded"
-                              : "No attendance"
-                          }`
-                        : "No data"
-                    }
-                  />
-                )
-              })}
+        <div className="space-y-3">
+          {/* Month labels */}
+          <div className="flex">
+            <div className="w-12 mr-3"></div>
+            <div className="grid grid-cols-12 gap-1 flex-1 text-xs text-gray-600 text-center">
+              {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((month) => (
+                <div key={month} className="text-[10px]">
+                  {month}
+                </div>
+              ))}
             </div>
           </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
+          {/* Year rows */}
+          {years.map((year) => (
+            <div key={year} className="flex items-center">
+              <div className="w-12 mr-3 text-xs text-gray-600 text-right font-medium">{year}</div>
+              <div className="grid grid-cols-12 gap-1 flex-1">
+                {grouped[year].map((month, index) => {
+                  // Hide future months for the current year
+                  if (year === now.getFullYear() && index > currentMonth) return null
+
+                  // Determine if this is the last month of the current streak
+                  const streakStartIndex = streakData.length - currentStreak
+                  const isLastStreakMonth =
+                    month && streakData.findIndex((m) => m.monthKey === month.monthKey) === streakStartIndex
+
+                  return (
+                    <div
+                      key={`${year}-${index}`}
+                      className={`w-4 h-4 rounded-sm border ${
+                        month?.hasPayment ? "bg-green-500 border-green-600" : "bg-gray-200 border-gray-300"
+                      } ${isLastStreakMonth ? "ring-2 ring-green-400" : ""}`} // subtle highlight
+                      title={
+                        month
+                          ? `${month.monthName} ${month.year}: ${
+                              month.hasPayment ? "Attendance recorded" : "No attendance"
+                            }`
+                          : "No data"
+                      }
+                    />
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   const handleSubmitReview = async () => {
     if (!user || !reviewText.trim()) return
@@ -652,106 +617,121 @@ const StreakGraphic = () => {
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 gap-3 sm:gap-0">
             <div className="flex items-center space-x-2">
-              <Dumbbell className="h-8 w-8 text-orange-600" />
-              <h1 className="text-2xl font-bold text-gray-900">Sam24Fit</h1>
+              <Dumbbell className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600" />
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Sam24Fit</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">Welcome, {user.full_name}</span>
-              {isAdmin() && (
-                <Badge className="bg-red-100 text-red-800">
-                  <Shield className="h-3 w-3 mr-1" />
-                  Admin
-                </Badge>
-              )}
-              <div className="relative">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-                  className="relative"
-                >
-                  <Bell className="h-4 w-4" />
-                  {recentStatusChanges.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                      {recentStatusChanges.length}
-                    </span>
-                  )}
-                </Button>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <span className="text-sm sm:text-base font-medium text-gray-700 truncate">Welcome, {user.full_name}</span>
+              <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+                {isAdmin() && (
+                  <Badge className="bg-red-100 text-red-800 text-xs">
+                    <Shield className="h-3 w-3 mr-1" />
+                    Admin
+                  </Badge>
+                )}
+                <div className="relative">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                    className="relative"
+                  >
+                    <Bell className="h-4 w-4" />
+                    {recentStatusChanges.length > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {recentStatusChanges.length}
+                      </span>
+                    )}
+                  </Button>
 
-                {isNotificationOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-lg shadow-lg border z-50">
-                    <div className="p-4 border-b">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-semibold text-gray-900">Notifications</h3>
-                        <Button variant="ghost" size="sm" onClick={() => setIsNotificationOpen(false)}>
-                          <X className="h-4 w-4" />
-                        </Button>
+                  {isNotificationOpen && (
+                    <div className="fixed sm:absolute top-16 sm:top-full right-2 sm:right-0 mt-2 w-[calc(100vw-1rem)] sm:w-96 max-w-sm sm:max-w-96 bg-white rounded-lg shadow-xl border z-[9999]">
+                      <div className="p-3 sm:p-4 border-b">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Notifications</h3>
+                          <Button variant="ghost" size="sm" onClick={() => setIsNotificationOpen(false)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto">
+                        {recentStatusChanges.length === 0 ? (
+                          <div className="p-4 text-center text-gray-500 text-sm">No recent notifications</div>
+                        ) : (
+                          <div className="space-y-1">
+                            {recentStatusChanges.map((receipt) => (
+                              <div
+                                key={receipt.id}
+                                className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 hover:bg-gray-50 gap-2 sm:gap-0"
+                              >
+                                <div className="flex items-start space-x-3 flex-1 min-w-0">
+                                  {receipt.status === "verified" ? (
+                                    <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                                  ) : (
+                                    <XCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-900">
+                                      Receipt {receipt.status === "verified" ? "Approved" : "Rejected"}
+                                    </p>
+                                    <p className="text-xs text-gray-500 break-all">
+                                      {receipt.filename} - R{receipt.amount.toFixed(2)}
+                                    </p>
+                                    {receipt.status === "rejected" && receipt.rejection_reason && (
+                                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+                                        <p className="text-xs font-medium text-red-800">Rejection Reason:</p>
+                                        <p className="text-xs text-red-700 break-words">{receipt.rejection_reason}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => dismissNotification(receipt.id)}
+                                  className="flex-shrink-0 h-6 w-6 p-0 self-start sm:self-center"
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div className="max-h-64 overflow-y-auto">
-                      {recentStatusChanges.length === 0 ? (
-                        <div className="p-4 text-center text-gray-500">No recent notifications</div>
-                      ) : (
-                        <div className="space-y-1">
-                          {recentStatusChanges.map((receipt) => (
-                            <div key={receipt.id} className="flex items-center justify-between p-3 hover:bg-gray-50">
-                              <div className="flex items-center space-x-3 flex-1">
-                                {receipt.status === "verified" ? (
-                                  <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
-                                ) : (
-                                  <XCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
-                                )}
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-gray-900">
-                                    Receipt {receipt.status === "verified" ? "Approved" : "Rejected"}
-                                  </p>
-                                  <p className="text-xs text-gray-500">
-                                    {receipt.filename} - R{receipt.amount.toFixed(2)}
-                                  </p>
-                                  {receipt.status === "rejected" && receipt.rejection_reason && (
-                                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
-                                      <p className="text-sm font-medium text-red-800">Rejection Reason:</p>
-                                      <p className="text-sm text-red-700">{receipt.rejection_reason}</p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => dismissNotification(receipt.id)}
-                                className="flex-shrink-0 h-6 w-6 p-0"
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  )}
+                </div>
+                {isAdmin() && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push("/admin")}
+                    className="text-xs sm:text-sm whitespace-nowrap"
+                  >
+                    Admin Panel
+                  </Button>
                 )}
-              </div>
-              {isAdmin() && (
-                <Button variant="outline" size="sm" onClick={() => router.push("/admin")}>
-                  Admin Panel
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="text-xs sm:text-sm bg-transparent"
+                >
+                  <LogOut className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  Logout
                 </Button>
-              )}
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
+              </div>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto py-8 px-4">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h2>
-          <p className="text-gray-600">Manage your gym payments and receipts</p>
+      <main className="max-w-4xl mx-auto py-6 sm:py-8 px-4">
+        <div className="mb-6 sm:mb-8">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Dashboard</h2>
+          <p className="text-gray-600 text-sm sm:text-base">Manage your gym payments and receipts</p>
 
           {user.role === "admin" && jwtRole !== "admin" && (
             <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
@@ -769,11 +749,11 @@ const StreakGraphic = () => {
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           <Card className="lg:col-span-1">
             <CardHeader>
-              <CardTitle className="flex items-center">
-                <User className="h-5 w-5 mr-2" />
+              <CardTitle className="flex items-center text-base sm:text-lg">
+                <User className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                 Account Info
               </CardTitle>
             </CardHeader>
@@ -783,9 +763,9 @@ const StreakGraphic = () => {
                   <Image
                     src={user.profile_picture_url || "/placeholder.svg?height=96&width=96&query=user profile"}
                     alt="Profile Picture"
-                    width={96}
-                    height={96}
-                    className="rounded-full object-cover border-2 border-orange-500"
+                    width={80}
+                    height={80}
+                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-2 border-orange-500"
                   />
                   <ProfilePictureUpload user={user} onProfileUpdate={handleProfileUpdate} isAdmin={isAdmin()} />
                 </div>
@@ -831,36 +811,44 @@ const StreakGraphic = () => {
 
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Upload receipts and manage your payments</CardDescription>
+              <CardTitle className="text-base sm:text-lg">Quick Actions</CardTitle>
+              <CardDescription className="text-sm">Upload receipts and manage your payments</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Button className="h-20 bg-orange-600 hover:bg-orange-700" onClick={() => router.push("/upload")}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <Button
+                  className="h-16 sm:h-20 bg-orange-600 hover:bg-orange-700 text-sm sm:text-base"
+                  onClick={() => router.push("/upload")}
+                >
                   <div className="text-center">
-                    <Upload className="h-6 w-6 mx-auto mb-2" />
+                    <Upload className="h-5 w-5 sm:h-6 sm:w-6 mx-auto mb-1 sm:mb-2" />
                     <span>Upload Receipt</span>
                   </div>
                 </Button>
-                <Button variant="outline" className="h-20 bg-transparent" onClick={() => router.push("/payments")}>
+                <Button
+                  variant="outline"
+                  className="h-16 sm:h-20 bg-transparent text-sm sm:text-base"
+                  onClick={() => router.push("/payments")}
+                >
                   <div className="text-center">
-                    <CreditCard className="h-6 w-6 mx-auto mb-2" />
+                    <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 mx-auto mb-1 sm:mb-2" />
                     <span>Payment History</span>
                   </div>
                 </Button>
                 {isAdmin() && (
                   <Button
                     variant="outline"
-                    className="h-20 bg-red-50 border-red-200 hover:bg-red-100"
+                    className="h-16 sm:h-20 bg-red-50 border-red-200 hover:bg-red-100 text-sm sm:text-base sm:col-span-2"
                     onClick={() => router.push("/admin")}
                   >
                     <div className="text-center">
-                      <Shield className="h-6 w-6 mx-auto mb-2 text-red-600" />
+                      <Shield className="h-5 w-5 sm:h-6 sm:w-6 mx-auto mb-1 sm:mb-2 text-red-600" />
                       <span className="text-red-600">Admin Panel</span>
                     </div>
                   </Button>
                 )}
               </div>
+
               <div className="mt-6 pt-6 border-t">
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-gray-900">Share Your Experience</h3>
@@ -1045,13 +1033,13 @@ const StreakGraphic = () => {
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-3 mt-6">
+          <Card className="lg:col-span-3">
             <CardHeader>
-              <CardTitle className="flex items-center">
-                <FileText className="h-5 w-5 mr-2" />
+              <CardTitle className="flex items-center text-base sm:text-lg">
+                <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                 Recent Receipts
               </CardTitle>
-              <CardDescription>Your uploaded payment receipts</CardDescription>
+              <CardDescription className="text-sm">Your uploaded payment receipts</CardDescription>
             </CardHeader>
             <CardContent>
               {loadingReceipts ? (
@@ -1059,56 +1047,65 @@ const StreakGraphic = () => {
                   <LoadingSpinner size="md" text="Loading receipts..." />
                 </div>
               ) : receipts.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500 mb-4">No receipts uploaded yet</p>
-                  <Button onClick={() => router.push("/upload")}>
+                <div className="text-center py-6 sm:py-8">
+                  <FileText className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500 mb-4 text-sm sm:text-base">No receipts uploaded yet</p>
+                  <Button onClick={() => router.push("/upload")} className="text-sm sm:text-base">
                     <Upload className="h-4 w-4 mr-2" />
                     Upload Your First Receipt
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {receipts.map((receipt) => (
-                    <div key={receipt.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <FileText className="h-8 w-8 text-gray-400" />
-                        <div>
-                          <p className="font-medium text-gray-900">{receipt.filename}</p>
-                          <p className="text-sm text-gray-500">
-                            <Calendar className="h-4 w-4 inline mr-1" />
+                    <div
+                      key={receipt.id}
+                      className="flex flex-col md:flex-row md:items-center p-4 border rounded-lg gap-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-start space-x-4 flex-1 min-w-0">
+                        <FileText className="h-8 w-8 text-gray-400 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-900 text-base break-all">{receipt.filename}</p>
+                          <p className="text-sm text-gray-500 flex items-center mt-1">
+                            <Calendar className="h-4 w-4 inline mr-1 flex-shrink-0" />
                             {new Date(receipt.upload_date).toLocaleDateString()}
                           </p>
-                          {receipt.description && <p className="text-sm text-gray-600">{receipt.description}</p>}
+                          {receipt.description && (
+                            <p className="text-sm text-gray-600 mt-1 break-words">{receipt.description}</p>
+                          )}
                           {receipt.status === "rejected" && receipt.rejection_reason && (
                             <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
-                              <p className="text-sm font-medium text-red-800">Rejection Reason:</p>
-                              <p className="text-sm text-red-700">{receipt.rejection_reason}</p>
+                              <p className="text-xs font-medium text-red-800">Rejection Reason:</p>
+                              <p className="text-xs text-red-700 break-words">{receipt.rejection_reason}</p>
                             </div>
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center space-x-4">
-                        <span className="font-medium text-gray-900">R{receipt.amount.toFixed(2)}</span>
-                        <Badge className={getStatusColor(receipt.status)}>
-                          {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
-                        </Badge>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handlePreviewReceipt(receipt)}
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDeleteReceipt(receipt)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <div className="flex items-center justify-between md:justify-end gap-4 flex-shrink-0">
+                        <div className="flex items-center gap-3">
+                          <span className="font-medium text-gray-900 text-base">R{receipt.amount.toFixed(2)}</span>
+                          <Badge className={`${getStatusColor(receipt.status)} text-xs whitespace-nowrap`}>
+                            {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
+                          </Badge>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handlePreviewReceipt(receipt)}
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteReceipt(receipt)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1119,140 +1116,50 @@ const StreakGraphic = () => {
         </div>
       </main>
 
-      <Dialog open={isWelcomeDialogOpen} onOpenChange={() => {}}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center">
-              <Dumbbell className="h-6 w-6 mr-2 text-orange-600" />
-              Welcome to Sam24Fit!
-            </DialogTitle>
-          </DialogHeader>
-
-          {welcomeDialogStep === 1 ? (
-            <div className="space-y-6">
-              <div className="text-center">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Please Review Our Gym Rules & Agreement</h3>
-                <p className="text-sm text-gray-600">
-                  Before you start using our facilities, please take a moment to review our gym rules and membership
-                  agreement.
-                </p>
-              </div>
-
-              <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto border">
-                <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono leading-relaxed">
-                  {generateGymRules()}
-                </pre>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 justify-between">
-                <Button variant="outline" onClick={downloadGymRules} className="flex items-center bg-transparent">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Rules & Agreement
-                </Button>
-
-                <Button
-                  onClick={() => setWelcomeDialogStep(2)}
-                  disabled={!hasPdfDownloaded}
-                  className={`flex items-center ${
-                    hasPdfDownloaded ? "bg-orange-600 hover:bg-orange-700" : "bg-gray-300 cursor-not-allowed"
-                  }`}
-                >
-                  I Understand & Agree
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-
-                {!hasPdfDownloaded && (
-                  <div className="text-center">
-                    <p className="text-sm text-orange-600 font-medium">
-                      Please download the rules and agreement before proceeding
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="text-center">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Manage Your Profile</h3>
-                <p className="text-sm text-gray-600">
-                  You can update your profile information, change your profile picture, and manage your account settings
-                  anytime.
-                </p>
-              </div>
-
-              <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
-                <div className="flex items-start space-x-4">
-                  <div className="flex-shrink-0">
-                    <Settings className="h-8 w-8 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-blue-900 mb-2">Profile Management</h4>
-                    <ul className="text-sm text-blue-800 space-y-1">
-                      <li>
-                        • Update your profile picture by clicking on your current photo in the Account Info section
-                      </li>
-                      <li>• Your personal information can be viewed in the Account Info card on the left</li>
-                      <li>• Contact our staff if you need to update your contact details or membership information</li>
-                      <li>• Upload payment receipts using the "Upload Receipt" button in Quick Actions</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-center">
-                <Button onClick={handleWelcomeDialogComplete} className="bg-orange-600 hover:bg-orange-700 px-8">
-                  Got it, Let's Start!
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+        <DialogContent className="max-w-[95vw] md:max-w-4xl max-h-[90vh] overflow-auto">
           <DialogHeader>
-            <DialogTitle>Receipt Preview</DialogTitle>
+            <DialogTitle className="text-lg">Receipt Preview</DialogTitle>
           </DialogHeader>
           {receiptToPreview && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                 <div>
-                  <label className="font-medium text-gray-500">Filename:</label>
-                  <p className="text-gray-900">{receiptToPreview.filename}</p>
+                  <label className="font-medium text-gray-500 text-sm">Filename:</label>
+                  <p className="text-gray-900 break-all">{receiptToPreview.filename}</p>
                 </div>
                 <div>
-                  <label className="font-medium text-gray-500">Amount:</label>
+                  <label className="font-medium text-gray-500 text-sm">Amount:</label>
                   <p className="text-gray-900">R{receiptToPreview.amount.toFixed(2)}</p>
                 </div>
                 <div>
-                  <label className="font-medium text-gray-500">Upload Date:</label>
+                  <label className="font-medium text-gray-500 text-sm">Upload Date:</label>
                   <p className="text-gray-900">{new Date(receiptToPreview.upload_date).toLocaleDateString()}</p>
                 </div>
                 <div>
-                  <label className="font-medium text-gray-500">Status:</label>
-                  <Badge className={getStatusColor(receiptToPreview.status)}>
+                  <label className="font-medium text-gray-500 text-sm">Status:</label>
+                  <Badge className={`${getStatusColor(receiptToPreview.status)} text-xs`}>
                     {receiptToPreview.status.charAt(0).toUpperCase() + receiptToPreview.status.slice(1)}
                   </Badge>
                 </div>
                 {receiptToPreview.description && (
-                  <div className="col-span-2">
-                    <label className="font-medium text-gray-500">Description:</label>
-                    <p className="text-gray-900">{receiptToPreview.description}</p>
+                  <div className="md:col-span-2 lg:col-span-4">
+                    <label className="font-medium text-gray-500 text-sm">Description:</label>
+                    <p className="text-gray-900 break-words">{receiptToPreview.description}</p>
                   </div>
                 )}
                 {receiptToPreview.status === "rejected" && (
-                  <div className="col-span-2">
+                  <div className="md:col-span-2 lg:col-span-4">
                     {receiptToPreview.rejection_reason ? (
                       <div>
-                        <label className="font-medium text-gray-500">Rejection Reason:</label>
+                        <label className="font-medium text-gray-500 text-sm">Rejection Reason:</label>
                         <div className="mt-1 p-3 bg-red-50 border border-red-200 rounded-md">
-                          <p className="text-red-800">{receiptToPreview.rejection_reason}</p>
+                          <p className="text-red-800 break-words">{receiptToPreview.rejection_reason}</p>
                         </div>
                       </div>
                     ) : (
                       <div>
-                        <label className="font-medium text-gray-500">Rejection Reason:</label>
+                        <label className="font-medium text-gray-500 text-sm">Rejection Reason:</label>
                         <div className="mt-1 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                           <p className="text-yellow-800">No rejection reason provided</p>
                         </div>
@@ -1268,11 +1175,11 @@ const StreakGraphic = () => {
                     alt={`Receipt: ${receiptToPreview.filename}`}
                     width={800}
                     height={600}
-                    className="w-full h-auto object-contain"
+                    className="w-full h-auto object-contain max-h-[50vh] sm:max-h-[60vh] lg:max-h-[70vh]"
                     unoptimized
                   />
                 ) : getFileType(receiptToPreview.filename) === "pdf" ? (
-                  <div className="w-full h-[600px]">
+                  <div className="w-full h-[50vh] sm:h-[60vh] lg:h-[70vh]">
                     <iframe
                       src={receiptToPreview.file_url}
                       className="w-full h-full border-0"
@@ -1280,59 +1187,22 @@ const StreakGraphic = () => {
                     />
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-64 bg-gray-50">
-                    <FileText className="h-16 w-16 text-gray-400 mb-4" />
-                    <p className="text-gray-600 mb-4">Preview not available for this file type</p>
+                  <div className="flex flex-col items-center justify-center h-48 sm:h-64 bg-gray-50">
+                    <FileText className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400 mb-4" />
+                    <p className="text-gray-600 mb-4 text-sm sm:text-base text-center px-4">
+                      Preview not available for this file type
+                    </p>
                     <Button
                       onClick={() => window.open(receiptToPreview.file_url, "_blank")}
-                      className="bg-orange-600 hover:bg-orange-700"
+                      className="bg-orange-600 hover:bg-orange-700 text-sm sm:text-base"
                     >
-                      Open File
+                      Open in New Tab
                     </Button>
                   </div>
                 )}
               </div>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Receipt</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-gray-600 mb-4">
-              Are you sure you want to delete the receipt "{receiptToDelete?.filename}"? This action cannot be undone.
-            </p>
-            {receiptToDelete?.status === "verified" && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
-                <p className="text-sm text-yellow-800">
-                  <strong>Warning:</strong> This receipt has been verified and deleting it will also remove the
-                  associated payment record.
-                </p>
-              </div>
-            )}
-          </div>
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={isDeleting}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={confirmDeleteReceipt} disabled={isDeleting}>
-              {isDeleting ? (
-                <>
-                  <LoadingSpinner size="sm" className="mr-2" />
-                  Deleting...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Receipt
-                </>
-              )}
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
     </div>

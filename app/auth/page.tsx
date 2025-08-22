@@ -24,17 +24,15 @@ import {
   AlertCircle,
   Mail,
   CheckCircle,
-  Settings,
 } from "lucide-react"
 import { useAuthContext } from "@/components/auth-provider"
-import { testEnvironmentVariables } from "@/app/actions/test-env-action"
 
 export default function AuthPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [formSubmitting, setFormSubmitting] = useState(false)
   const { user, loading: authLoading } = useAuthContext()
-  const [testEnvLoading, setTestEnvLoading] = useState(false)
+
   const [showEmailConfirmation, setShowEmailConfirmation] = useState(false)
   const [confirmationEmail, setConfirmationEmail] = useState("")
   const [forceShowAuth, setForceShowAuth] = useState(false)
@@ -230,16 +228,6 @@ export default function AuthPage() {
     }
   }
 
-  const handleTestEnv = async () => {
-    setTestEnvLoading(true)
-    const result = await testEnvironmentVariables()
-    toast({
-      title: "Environment Test Result",
-      description: result.message,
-      variant: result.success ? "default" : "destructive",
-    })
-    setTestEnvLoading(false)
-  }
 
   // Show loading spinner only if authentication is loading AND we haven't forced show yet
   if (authLoading && !forceShowAuth) {
@@ -430,29 +418,6 @@ export default function AuthPage() {
                   </Button>
                 </form>
 
-                <div className="mt-4 space-y-2">
-                  <Button
-                    type="button"
-                    onClick={handleTestEnv}
-                    className="w-full bg-gray-200 text-gray-800 hover:bg-gray-300"
-                    disabled={testEnvLoading}
-                  >
-                    {testEnvLoading ? <LoadingSpinner size="sm" /> : "Test Environment Variables"}
-                  </Button>
-
-                  <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <div className="flex items-start space-x-2">
-                      <Settings className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                      <div className="text-left">
-                        <p className="text-sm text-blue-800 font-medium">Email Issues?</p>
-                        <p className="text-xs text-blue-700 mt-1">
-                          If you're not receiving confirmation emails, you can disable email confirmation in your
-                          Supabase dashboard: Authentication → Settings → Uncheck "Enable email confirmations"
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </TabsContent>
 
               <TabsContent value="signup">

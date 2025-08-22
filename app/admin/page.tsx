@@ -758,39 +758,41 @@ export default function AdminDashboard() {
         {/* Admin Personal Details */}
         <Card className="mb-8" id="admin-profile">
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <UserIcon className="h-5 w-5 mr-2" />
+            <CardTitle className="flex items-center text-lg sm:text-xl">
+              <UserIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
               Your Admin Profile
             </CardTitle>
-            <CardDescription>Details of the currently logged-in administrator</CardDescription>
+            <CardDescription className="text-sm">Details of the currently logged-in administrator</CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col md:flex-row items-center gap-6">
-            <div className="relative">
+          <CardContent className="flex flex-col items-center gap-4 sm:gap-6 md:flex-row md:items-start">
+            <div className="relative flex-shrink-0">
               <Image
                 src={user.profile_picture_url || "/placeholder.svg?height=120&width=120&query=admin profile"}
                 alt="Admin Profile Picture"
                 width={120}
                 height={120}
-                className="rounded-full object-cover border-4 border-orange-500 shadow-md"
+                className="rounded-full object-cover border-4 border-orange-500 shadow-md w-20 h-20 sm:w-24 sm:h-24 md:w-[120px] md:h-[120px]"
               />
               <ProfilePictureUpload user={user} onProfileUpdate={handleAdminProfileUpdate} isAdmin={true} />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 flex-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-8 gap-y-3 sm:gap-y-4 flex-1 w-full">
               <div>
-                <p className="text-sm font-medium text-gray-500">Full Name</p>
-                <p className="text-lg font-semibold text-gray-900">{user.full_name}</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-500">Full Name</p>
+                <p className="text-sm sm:text-lg font-semibold text-gray-900 break-words">{user.full_name}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-500">Email</p>
-                <p className="text-lg font-semibold text-gray-900">{user.email}</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-500">Email</p>
+                <p className="text-sm sm:text-lg font-semibold text-gray-900 break-all">{user.email}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-500">Role</p>
-                <Badge className="bg-red-100 text-red-800 text-base">{user.role}</Badge>
+                <p className="text-xs sm:text-sm font-medium text-gray-500">Role</p>
+                <Badge className="bg-red-100 text-red-800 text-xs sm:text-base">{user.role}</Badge>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-500">Member Since</p>
-                <p className="text-lg font-semibold text-gray-900">{new Date(user.created_at).toLocaleDateString()}</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-500">Member Since</p>
+                <p className="text-sm sm:text-lg font-semibold text-gray-900">
+                  {new Date(user.created_at).toLocaleDateString()}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -1114,85 +1116,92 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Profile
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Name
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Email
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Membership Status
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {membersForDeactivation.map((member) => (
-                      <tr key={member.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex-shrink-0 h-10 w-10">
-                            <Image
-                              className="h-10 w-10 rounded-full object-cover"
-                              src={
-                                member.profile_picture_url || "/placeholder.svg?height=40&width=40&query=user profile"
-                              }
-                              alt={`${member.full_name}'s profile picture`}
-                              width={40}
-                              height={40}
-                            />
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {member.full_name}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.email}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge
-                            className={
-                              member.membership_status === "active"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
-                            }
-                          >
-                            {member.membership_status}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleUpdateMembershipStatus(member.id, "inactive")}
-                          >
-                            Deactivate
-                          </Button>
-                        </td>
+                <div className="min-w-full">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th
+                          scope="col"
+                          className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Profile
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Name
+                        </th>
+                        <th
+                          scope="col"
+                          className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Email
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Status
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Actions
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {membersForDeactivation.map((member) => (
+                        <tr key={member.id}>
+                          <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10">
+                              <Image
+                                className="h-8 w-8 sm:h-10 sm:w-10 rounded-full object-cover"
+                                src={
+                                  member.profile_picture_url || "/placeholder.svg?height=40&width=40&query=user profile"
+                                }
+                                alt={`${member.full_name}'s profile picture`}
+                                width={40}
+                                height={40}
+                              />
+                            </div>
+                          </td>
+                          <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900 truncate max-w-[120px] sm:max-w-none">
+                              {member.full_name}
+                            </div>
+                            <div className="text-xs text-gray-500 sm:hidden truncate max-w-[120px]">{member.email}</div>
+                          </td>
+                          <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {member.email}
+                          </td>
+                          <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                            <Badge
+                              className={
+                                member.membership_status === "active"
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-red-100 text-red-800"
+                              }
+                            >
+                              {member.membership_status}
+                            </Badge>
+                          </td>
+                          <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleUpdateMembershipStatus(member.id, "inactive")}
+                            >
+                              Deactivate
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </CardContent>
@@ -1426,17 +1435,17 @@ export default function AdminDashboard() {
         {/* Receipts Management by Month */}
         <Card className="mb-8" id="receipt-management">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
+            <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-center">
-                <FileText className="h-5 w-5 mr-2" />
-                Receipt Management by Month
+                <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                <span className="text-lg sm:text-xl">Receipt Management by Month</span>
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleCleanupOldReceipts}
                 disabled={isCleaningUp}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50 bg-transparent"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 bg-transparent text-xs sm:text-sm w-full sm:w-auto"
               >
                 {isCleaningUp ? (
                   <>
@@ -1445,13 +1454,13 @@ export default function AdminDashboard() {
                   </>
                 ) : (
                   <>
-                    <Broom className="h-4 w-4 mr-2" />
+                    <Broom className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                     Cleanup Old Receipts
                   </>
                 )}
               </Button>
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-sm">
               Review and verify member payment receipts organized by month. Receipts older than 3 months can be
               automatically cleaned up.
             </CardDescription>
@@ -1462,14 +1471,16 @@ export default function AdminDashboard() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
                   type="text"
-                  placeholder="Search receipts by name, email, description, amount, or status..."
+                  placeholder="Search receipts..."
                   value={receiptSearchTerm}
                   onChange={(e) => setReceiptSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 w-full"
+                  className="pl-10 pr-4 py-2 w-full text-sm"
                 />
               </div>
               {receiptSearchTerm && (
-                <p className="text-sm text-gray-500 mt-2">Filtering receipts containing "{receiptSearchTerm}"</p>
+                <p className="text-xs sm:text-sm text-gray-500 mt-2">
+                  Filtering receipts containing "{receiptSearchTerm}"
+                </p>
               )}
             </div>
 
@@ -1540,12 +1551,12 @@ export default function AdminDashboard() {
                         <div className="border-t bg-gray-50 p-4">
                           <div className="space-y-4">
                             {filteredMonthReceipts.map((receipt) => (
-                              <div key={receipt.id} className="bg-white border rounded-lg p-4">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-4">
+                              <div key={receipt.id} className="bg-white border rounded-lg p-3 sm:p-4">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+                                  <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                                     <Button
                                       variant="ghost"
-                                      className="h-10 w-10 p-0 rounded-full hover:ring-2 hover:ring-orange-500 transition-all"
+                                      className="h-8 w-8 sm:h-10 sm:w-10 p-0 rounded-full hover:ring-2 hover:ring-orange-500 transition-all flex-shrink-0"
                                       onClick={() => receipt.users && openProfilePicturePreview(receipt.users)}
                                       disabled={!receipt.users?.profile_picture_url}
                                       title={`View ${receipt.users?.full_name || "User"}'s profile picture`}
@@ -1554,14 +1565,6 @@ export default function AdminDashboard() {
                                         src={
                                           receipt.users?.profile_picture_url ||
                                           "/placeholder.svg?height=40&width=40&query=user profile" ||
-                                          "/placeholder.svg" ||
-                                          "/placeholder.svg" ||
-                                          "/placeholder.svg" ||
-                                          "/placeholder.svg" ||
-                                          "/placeholder.svg" ||
-                                          "/placeholder.svg" ||
-                                          "/placeholder.svg" ||
-                                          "/placeholder.svg" ||
                                           "/placeholder.svg" ||
                                           "/placeholder.svg"
                                         }
@@ -1572,27 +1575,29 @@ export default function AdminDashboard() {
                                       />
                                       <span className="sr-only">View profile picture</span>
                                     </Button>
-                                    <div>
-                                      <p className="font-medium text-gray-900">
+                                    <div className="min-w-0 flex-1">
+                                      <p className="font-medium text-gray-900 truncate">
                                         {receipt.users?.full_name || "Unknown User"}
                                       </p>
-                                      <p className="text-sm text-gray-500">{receipt.filename}</p>
-                                      <p className="text-sm text-gray-500">
+                                      <p className="text-sm text-gray-500 truncate">{receipt.filename}</p>
+                                      <p className="text-xs sm:text-sm text-gray-500">
                                         Uploaded: {new Date(receipt.upload_date).toLocaleDateString()}
                                       </p>
                                       {receipt.description && (
-                                        <p className="text-sm text-gray-600 mt-1">{receipt.description}</p>
+                                        <p className="text-xs sm:text-sm text-gray-600 mt-1 truncate sm:whitespace-normal">
+                                          {receipt.description}
+                                        </p>
                                       )}
                                       {receipt.status === "rejected" && receipt.rejection_reason && (
-                                        <p className="text-sm text-red-600 mt-1">
+                                        <p className="text-xs sm:text-sm text-red-600 mt-1">
                                           <strong>Rejection Reason:</strong> {receipt.rejection_reason}
                                         </p>
                                       )}
                                     </div>
                                   </div>
-                                  <div className="flex items-center space-x-4">
+                                  <div className="flex items-center justify-between sm:justify-end sm:space-x-4">
                                     {receipt.amount && (
-                                      <span className="font-bold text-lg text-gray-900">
+                                      <span className="font-bold text-base sm:text-lg text-gray-900">
                                         R{receipt.amount.toFixed(2)}
                                       </span>
                                     )}
@@ -1601,29 +1606,37 @@ export default function AdminDashboard() {
                                     </Badge>
                                   </div>
                                 </div>
-                                <div className="flex space-x-2 mt-4">
-                                  <Button size="sm" variant="outline" onClick={() => openReceiptPreview(receipt)}>
+                                <div className="flex flex-wrap gap-2 mt-3 sm:mt-4">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openReceiptPreview(receipt)}
+                                    className="flex-1 sm:flex-none"
+                                  >
                                     <Eye className="h-4 w-4 mr-1" />
-                                    Preview Receipt
+                                    <span className="hidden sm:inline">Preview Receipt</span>
+                                    <span className="sm:hidden">Preview</span>
                                   </Button>
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleDeleteReceipt(receipt)}
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 flex-1 sm:flex-none"
                                   >
                                     <Trash2 className="h-4 w-4 mr-1" />
-                                    Delete
+                                    <span className="hidden sm:inline">Delete</span>
+                                    <span className="sm:hidden">Del</span>
                                   </Button>
                                   {receipt.status === "pending" && (
                                     <>
                                       <Button
                                         size="sm"
-                                        className="bg-green-600 hover:bg-green-700"
+                                        className="bg-green-600 hover:bg-green-700 flex-1 sm:flex-none"
                                         onClick={() => handleUpdateReceiptStatus(receipt.id, "verified")}
                                       >
                                         <Check className="h-4 w-4 mr-1" />
-                                        Verify
+                                        <span className="hidden sm:inline">Verify</span>
+                                        <span className="sm:hidden">Ver</span>
                                       </Button>
                                       <Button
                                         size="sm"
@@ -1631,9 +1644,11 @@ export default function AdminDashboard() {
                                         onClick={() =>
                                           handleRejectWithReason(receipt.id, receipt.users?.full_name || "Unknown User")
                                         }
+                                        className="flex-1 sm:flex-none"
                                       >
                                         <X className="h-4 w-4 mr-1" />
-                                        Reject
+                                        <span className="hidden sm:inline">Reject</span>
+                                        <span className="sm:hidden">Rej</span>
                                       </Button>
                                     </>
                                   )}
@@ -1653,11 +1668,11 @@ export default function AdminDashboard() {
 
         <Card className="mb-8" id="review-management">
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <MessageSquare className="h-5 w-5 mr-2" />
+            <CardTitle className="flex items-center text-lg sm:text-xl">
+              <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
               Review Management
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-sm">
               Approve or disapprove user reviews and control which ones are featured on the website
             </CardDescription>
           </CardHeader>
@@ -1667,43 +1682,35 @@ export default function AdminDashboard() {
                 <LoadingSpinner size="md" text="Loading reviews..." />
               </div>
             ) : (
-              <div className="space-y-8">
+              <div className="space-y-6 sm:space-y-8">
                 {/* Pending Reviews Section */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Pending Reviews</h3>
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Pending Reviews</h3>
                   {pendingReviews.length === 0 ? (
                     <div className="text-center py-8">
-                      <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500">No pending reviews to manage</p>
+                      <MessageSquare className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500 text-sm sm:text-base">No pending reviews to manage</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
                       {pendingReviews.map((review) => (
-                        <div key={review.id} className="bg-white border rounded-lg p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-start space-x-4">
+                        <div key={review.id} className="bg-white border rounded-lg p-3 sm:p-4">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                            <div className="flex items-start space-x-3 sm:space-x-4 flex-1">
                               <Image
                                 src={
                                   review.users?.profile_picture_url ||
                                   "/placeholder.svg?height=40&width=40&query=user profile" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
                                   "/placeholder.svg"
                                 }
                                 alt={`${review.users?.full_name || "Unknown User"}'s profile picture`}
                                 width={40}
                                 height={40}
-                                className="rounded-full object-cover"
+                                className="rounded-full object-cover w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0"
                               />
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <p className="font-medium text-gray-900">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
+                                  <p className="font-medium text-gray-900 text-sm sm:text-base truncate">
                                     {review.users?.full_name || "Unknown User"}
                                   </p>
                                   <div className="flex items-center">
@@ -1718,18 +1725,18 @@ export default function AdminDashboard() {
                                   </div>
                                   <span className="text-sm text-gray-500">({review.rating}/5)</span>
                                 </div>
-                                <p className="text-gray-700 mb-2">{review.review_text}</p>
-                                <p className="text-sm text-gray-500">
+                                <p className="text-gray-700 text-sm sm:text-base mb-2">{review.review_text}</p>
+                                <p className="text-gray-500 text-xs sm:text-sm">
                                   Submitted: {new Date(review.created_at).toLocaleDateString()}
                                 </p>
                               </div>
                             </div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex flex-col sm:items-end gap-2">
                               <Button
                                 size="sm"
                                 onClick={() => handleReviewAction(review.id, true)}
                                 disabled={loadingReviews}
-                                className="bg-green-600 hover:bg-green-700 text-white"
+                                className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto"
                               >
                                 <Check className="h-4 w-4 mr-1" />
                                 Approve
@@ -1745,7 +1752,7 @@ export default function AdminDashboard() {
                                   })
                                 }
                                 disabled={loadingReviews}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 w-full sm:w-auto"
                               >
                                 <X className="h-4 w-4 mr-1" />
                                 Decline
@@ -1755,7 +1762,7 @@ export default function AdminDashboard() {
                                 variant="outline"
                                 onClick={() => handleDeleteReview(review.id, review.users?.full_name || "Unknown User")}
                                 disabled={loadingReviews}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 w-full sm:w-auto"
                               >
                                 <Trash2 className="h-4 w-4 mr-1" />
                                 Delete
@@ -1770,40 +1777,32 @@ export default function AdminDashboard() {
 
                 {/* Approved Reviews Section */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Approved Reviews</h3>
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Approved Reviews</h3>
                   {approvedReviews.length === 0 ? (
                     <div className="text-center py-8">
-                      <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500">No approved reviews yet</p>
+                      <CheckCircle className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500 text-sm sm:text-base">No approved reviews yet</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
                       {approvedReviews.map((review) => (
-                        <div key={review.id} className="bg-green-50 border border-green-200 rounded-lg p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-start space-x-4">
+                        <div key={review.id} className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                            <div className="flex items-start space-x-3 sm:space-x-4 flex-1">
                               <Image
                                 src={
                                   review.users?.profile_picture_url ||
                                   "/placeholder.svg?height=40&width=40&query=user profile" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
                                   "/placeholder.svg"
                                 }
                                 alt={`${review.users?.full_name || "Unknown User"}'s profile picture`}
                                 width={40}
                                 height={40}
-                                className="rounded-full object-cover"
+                                className="rounded-full object-cover w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0"
                               />
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <p className="font-medium text-gray-900">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
+                                  <p className="font-medium text-gray-900 text-sm sm:text-base truncate">
                                     {review.users?.full_name || "Unknown User"}
                                   </p>
                                   <div className="flex items-center">
@@ -1828,13 +1827,13 @@ export default function AdminDashboard() {
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-gray-700 mb-2">{review.review_text}</p>
-                                <p className="text-sm text-gray-500">
+                                <p className="text-gray-700 text-sm sm:text-base mb-2">{review.review_text}</p>
+                                <p className="text-gray-500 text-xs sm:text-sm">
                                   Approved: {new Date(review.updated_at || review.created_at).toLocaleDateString()}
                                 </p>
                               </div>
                             </div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex flex-col sm:items-end gap-2">
                               <Button
                                 size="sm"
                                 variant={review.is_featured ? "default" : "outline"}
@@ -1842,8 +1841,8 @@ export default function AdminDashboard() {
                                 disabled={loadingReviews}
                                 className={
                                   review.is_featured
-                                    ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                    : "text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                    ? "bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"
+                                    : "text-blue-600 hover:text-blue-700 hover:bg-blue-50 w-full sm:w-auto"
                                 }
                               >
                                 <Star className="h-4 w-4 mr-1" />
@@ -1854,7 +1853,7 @@ export default function AdminDashboard() {
                                 variant="outline"
                                 onClick={() => handleDeleteReview(review.id, review.users?.full_name || "Unknown User")}
                                 disabled={loadingReviews}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 w-full sm:w-auto"
                               >
                                 <Trash2 className="h-4 w-4 mr-1" />
                                 Delete
@@ -1869,40 +1868,32 @@ export default function AdminDashboard() {
 
                 {/* Rejected Reviews Section */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Rejected Reviews</h3>
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Rejected Reviews</h3>
                   {rejectedReviews.length === 0 ? (
                     <div className="text-center py-8">
-                      <XCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500">No rejected reviews</p>
+                      <XCircle className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500 text-sm sm:text-base">No rejected reviews</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
                       {rejectedReviews.map((review) => (
-                        <div key={review.id} className="bg-red-50 border border-red-200 rounded-lg p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-start space-x-4">
+                        <div key={review.id} className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                            <div className="flex items-start space-x-3 sm:space-x-4 flex-1">
                               <Image
                                 src={
                                   review.users?.profile_picture_url ||
                                   "/placeholder.svg?height=40&width=40&query=user profile" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg" ||
                                   "/placeholder.svg"
                                 }
                                 alt={`${review.users?.full_name || "Unknown User"}'s profile picture`}
                                 width={40}
                                 height={40}
-                                className="rounded-full object-cover"
+                                className="rounded-full object-cover w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0"
                               />
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <p className="font-medium text-gray-900">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
+                                  <p className="font-medium text-gray-900 text-sm sm:text-base truncate">
                                     {review.users?.full_name || "Unknown User"}
                                   </p>
                                   <div className="flex items-center">
@@ -1921,24 +1912,24 @@ export default function AdminDashboard() {
                                     Rejected
                                   </span>
                                 </div>
-                                <p className="text-gray-700 mb-2">{review.review_text}</p>
+                                <p className="text-gray-700 text-sm sm:text-base mb-2">{review.review_text}</p>
                                 {review.rejection_reason && (
                                   <p className="text-sm text-red-600 mb-2">
                                     <strong>Rejection reason:</strong> {review.rejection_reason}
                                   </p>
                                 )}
-                                <p className="text-sm text-gray-500">
+                                <p className="text-gray-500 text-xs sm:text-sm">
                                   Rejected: {new Date(review.updated_at || review.created_at).toLocaleDateString()}
                                 </p>
                               </div>
                             </div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex flex-col sm:items-end gap-2">
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleDeleteReview(review.id, review.users?.full_name || "Unknown User")}
                                 disabled={loadingReviews}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 w-full sm:w-auto"
                               >
                                 <Trash2 className="h-4 w-4 mr-1" />
                                 Delete
@@ -2270,6 +2261,8 @@ export default function AdminDashboard() {
                 src={
                   selectedUserForProfilePreview.profile_picture_url ||
                   "/placeholder.svg?height=300&width=300&query=user profile large" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
                   "/placeholder.svg" ||
                   "/placeholder.svg" ||
                   "/placeholder.svg" ||

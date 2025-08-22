@@ -197,23 +197,23 @@ export default function UploadPage() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 space-y-3 sm:space-y-0">
             <div className="flex items-center space-x-2">
-              <Dumbbell className="h-8 w-8 text-orange-600" />
-              <h1 className="text-2xl font-bold text-gray-900">Sam24Fit</h1>
+              <Dumbbell className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600" />
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Sam24Fit</h1>
             </div>
-            <Button variant="outline" onClick={() => router.push("/dashboard")}>
+            <Button variant="outline" onClick={() => router.push("/dashboard")} className="self-start sm:self-auto">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
+              <span className="text-sm sm:text-base">Back to Dashboard</span>
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto py-8 px-4">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Upload Receipt</h2>
-          <p className="text-gray-600">Upload your payment receipt for verification</p>
+      <main className="max-w-2xl mx-auto py-6 sm:py-8 px-4">
+        <div className="mb-6 sm:mb-8">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Upload Receipt</h2>
+          <p className="text-sm sm:text-base text-gray-600">Upload your payment receipt for verification</p>
         </div>
 
         <Card>

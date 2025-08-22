@@ -10,7 +10,7 @@ import { useAuthContext } from "@/components/auth-provider"
 import { signOut } from "@/lib/auth"
 import { supabase, type Payment } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
-import { Dumbbell, LogOut, CreditCard, Calendar, DollarSign } from 'lucide-react'
+import { Dumbbell, LogOut, CreditCard, Calendar, DollarSign } from "lucide-react"
 
 export default function PaymentsPage() {
   const { user, loading: authLoading } = useAuthContext()
@@ -99,14 +99,14 @@ export default function PaymentsPage() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 gap-3">
             <div className="flex items-center space-x-2">
-              <Dumbbell className="h-8 w-8 text-orange-600" />
-              <h1 className="text-2xl font-bold text-gray-900">Sam24Fit</h1>
+              <Dumbbell className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600" />
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Sam24Fit</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">Welcome, {user.full_name}</span>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <span className="text-xs sm:text-sm text-gray-600 truncate">Welcome, {user.full_name}</span>
+              <Button variant="outline" size="sm" onClick={handleLogout} className="w-full sm:w-auto bg-transparent">
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
               </Button>
@@ -115,28 +115,28 @@ export default function PaymentsPage() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto py-8 px-4">
+      <main className="max-w-4xl mx-auto py-6 sm:py-8 px-4">
         {/* Page Header */}
-        <div className="mb-8 flex justify-between items-center">
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Payment History</h2>
-            <p className="text-gray-600">Review your past membership payments</p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Payment History</h2>
+            <p className="text-sm sm:text-base text-gray-600">Review your past membership payments</p>
           </div>
-          <Button onClick={() => router.push("/dashboard")} variant="outline">
+          <Button onClick={() => router.push("/dashboard")} variant="outline" className="w-full sm:w-auto">
             Back to Dashboard
           </Button>
         </div>
 
         {/* Payments List */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <CreditCard className="h-5 w-5 mr-2" />
+          <CardHeader className="px-4 sm:px-6">
+            <CardTitle className="flex items-center text-lg sm:text-xl">
+              <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
               Your Payments
             </CardTitle>
-            <CardDescription>A record of all your completed and pending payments</CardDescription>
+            <CardDescription className="text-sm">A record of all your completed and pending payments</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 sm:px-6">
             {loadingPayments ? (
               <div className="text-center py-8">
                 <LoadingSpinner size="md" text="Loading payments..." />
@@ -145,32 +145,39 @@ export default function PaymentsPage() {
               <div className="text-center py-8">
                 <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-500 mb-4">No payment records found.</p>
-                <Button onClick={() => router.push("/upload")}>
+                <Button onClick={() => router.push("/upload")} className="w-full sm:w-auto">
                   <DollarSign className="h-4 w-4 mr-2" />
                   Make a Payment
                 </Button>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {payments.map((payment) => (
-                  <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <DollarSign className="h-8 w-8 text-gray-400" />
-                      <div>
-                        <p className="font-medium text-gray-900">
+                  <div
+                    key={payment.id}
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border rounded-lg gap-3 sm:gap-4"
+                  >
+                    <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 flex-1">
+                      <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400 mt-1 sm:mt-0 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 text-sm sm:text-base">
                           {payment.payment_type.charAt(0).toUpperCase() + payment.payment_type.slice(1)}{" "}
                           {payment.month_year ? `(${payment.month_year})` : ""}
                         </p>
-                        <p className="text-sm text-gray-500">
-                          <Calendar className="h-4 w-4 inline mr-1" />
+                        <p className="text-xs sm:text-sm text-gray-500 flex items-center mt-1">
+                          <Calendar className="h-3 w-3 sm:h-4 sm:w-4 inline mr-1 flex-shrink-0" />
                           {new Date(payment.payment_date).toLocaleDateString()}
                         </p>
-                        {payment.notes && <p className="text-sm text-gray-600">{payment.notes}</p>}
+                        {payment.notes && (
+                          <p className="text-xs sm:text-sm text-gray-600 mt-1 break-words">{payment.notes}</p>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center space-x-4">
-                      <span className="font-medium text-gray-900">R{payment.amount.toFixed(2)}</span>
-                      <Badge className={getStatusColor(payment.status)}>
+                    <div className="flex items-center justify-between sm:justify-end space-x-3 sm:space-x-4 flex-shrink-0">
+                      <span className="font-medium text-gray-900 text-sm sm:text-base">
+                        R{payment.amount.toFixed(2)}
+                      </span>
+                      <Badge className={`${getStatusColor(payment.status)} text-xs`}>
                         {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
                       </Badge>
                     </div>
