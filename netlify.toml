@@ -3,8 +3,9 @@
   command = "npm run build"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "20"
   NPM_VERSION = "9"
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,NEXT_PUBLIC_SITE_URL"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
@@ -12,7 +13,6 @@
 [functions]
   node_bundler = "esbuild"
 
-# Correct redirects for Next.js (single page app routing)
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -21,22 +21,16 @@
 # Environment variables for production
 [context.production.environment]
   NEXT_PUBLIC_SITE_URL = "https://sam24fit.netlify.app"
-  NEXT_PUBLIC_SUPABASE_URL = "https://noidkepohqhgdalkvzze.supabase.co"
-  NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vaWRrZXBvaHFoZ2RhbGt2enplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMTE4MTYsImV4cCI6MjA2OTg4NzgxNn0.sPoMpbSuSFgwvs_HbqBMhOWLU1PnM4EMm0psMQxhLLM"
   NODE_ENV = "production"
 
 # Environment variables for deploy previews
 [context.deploy-preview.environment]
   NEXT_PUBLIC_SITE_URL = "https://deploy-preview-$DEPLOY_ID--sam24fit.netlify.app"
-  NEXT_PUBLIC_SUPABASE_URL = "https://noidkepohqhgdalkvzze.supabase.co"
-  NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vaWRrZXBvaHFoZ2RhbGt2enplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMTE4MTYsImV4cCI6MjA2OTg4NzgxNn0.sPoMpbSuSFgwvs_HbqBMhOWLU1PnM4EMm0psMQxhLLM"
   NODE_ENV = "production"
 
 # Environment variables for branch deploys
 [context.branch-deploy.environment]
   NEXT_PUBLIC_SITE_URL = "https://$BRANCH--sam24fit.netlify.app"
-  NEXT_PUBLIC_SUPABASE_URL = "https://noidkepohqhgdalkvzze.supabase.co"
-  NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vaWRrZXBvaHFoZ2RhbGt2enplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMTE4MTYsImV4cCI6MjA2OTg4NzgxNn0.sPoMpbSuSFgwvs_HbqBMhOWLU1PnM4EMm0psMQxhLLM"
   NODE_ENV = "production"
 
 # Headers for security and performance
