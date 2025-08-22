@@ -1,12 +1,8 @@
 import { createClient } from "@supabase/supabase-js"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://noidkepohqhgdalkvzze.supabase.co"
-const supabaseAnonKey =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vaWRrZXBvaHFoZ2RhbGt2enplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMTE4MTYsImV4cCI6MjA2OTg4NzgxNn0.sPoMpbSuSFgwvs_HbqBMhOWLU1PnM4EMm0psMQxhLLM"
-const supabaseServiceKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vaWRrZXBvaHFoZ2RhbGt2enplIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDMxMTgxNiwiZXhwIjoyMDY5ODg3ODE2fQ.dXqkt5LDLdCctvZeiOLqKUOguzZkeUB-ojZh2dshJtk"
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 export const isSupabaseConfigured = (): boolean => {
   return !!(supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith("http"))
@@ -16,6 +12,7 @@ export const isSupabaseAdminConfigured = (): boolean => {
   return !!(supabaseUrl && supabaseServiceKey && supabaseUrl.startsWith("http"))
 }
 
+// Create supabase client only if environment variables are properly configured
 let supabase: ReturnType<typeof createClient>
 
 try {
@@ -90,6 +87,7 @@ try {
           },
         }
       },
+      // Additional mock auth methods can be added here if needed
     },
     from: () => ({
       select: () => ({
@@ -117,13 +115,17 @@ try {
             ),
           }),
       }),
-      insert: () =>
-        Promise.resolve({
-          data: null,
-          error: new Error(
-            "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
-          ),
+      insert: () => ({
+        select: () => ({
+          single: () =>
+            Promise.resolve({
+              data: null,
+              error: new Error(
+                "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
+              ),
+            }),
         }),
+      }),
       update: () => ({
         eq: () =>
           Promise.resolve({
@@ -153,7 +155,6 @@ try {
         getPublicUrl: () => ({ data: { publicUrl: "" } }),
         remove: () =>
           Promise.resolve({
-            data: null,
             error: new Error(
               "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
             ),
@@ -170,37 +171,67 @@ try {
   } as any
 }
 
-let supabaseAdmin: ReturnType<typeof createClient> | null
+let supabaseAdmin: ReturnType<typeof createClient>
 
-if (typeof window === "undefined") {
-  // Server-side only
-  try {
-    if (isSupabaseAdminConfigured()) {
-      supabaseAdmin = createClient(supabaseUrl!, supabaseServiceKey!, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      })
-    } else {
-      console.warn("Supabase admin environment variables not configured - admin features will be disabled")
-      supabaseAdmin = null
-    }
-  } catch (error) {
-    console.warn("Supabase admin client creation failed:", error)
-    supabaseAdmin = null
+try {
+  if (isSupabaseAdminConfigured()) {
+    supabaseAdmin = createClient(supabaseUrl!, supabaseServiceKey!, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+  } else {
+    throw new Error("Supabase admin environment variables not configured")
   }
-} else {
-  // Client-side - admin client not available
-  supabaseAdmin = null
-}
-
-export const getSupabaseAdmin = () => {
-  if (typeof window !== "undefined") {
-    console.warn("Admin client is only available on the server side")
-    return null
-  }
-  return supabaseAdmin
+} catch (error) {
+  console.warn("Supabase admin client creation failed:", error)
+  // Create a mock admin client
+  supabaseAdmin = {
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: () =>
+            Promise.resolve({
+              data: null,
+              error: new Error("Please configure SUPABASE_SERVICE_ROLE_KEY in Project Settings for admin operations"),
+            }),
+          order: () =>
+            Promise.resolve({
+              data: null,
+              error: new Error("Please configure SUPABASE_SERVICE_ROLE_KEY in Project Settings for admin operations"),
+            }),
+        }),
+        order: () =>
+          Promise.resolve({
+            data: null,
+            error: new Error("Please configure SUPABASE_SERVICE_ROLE_KEY in Project Settings for admin operations"),
+          }),
+      }),
+      insert: () =>
+        Promise.resolve({
+          data: null,
+          error: new Error("Please configure SUPABASE_SERVICE_ROLE_KEY in Project Settings for admin operations"),
+        }),
+      update: () => ({
+        eq: () =>
+          Promise.resolve({
+            error: new Error("Please configure SUPABASE_SERVICE_ROLE_KEY in Project Settings for admin operations"),
+          }),
+      }),
+      delete: () => ({
+        eq: () =>
+          Promise.resolve({
+            error: new Error("Please configure SUPABASE_SERVICE_ROLE_KEY in Project Settings for admin operations"),
+          }),
+      }),
+    }),
+    rpc: () =>
+      Promise.resolve({
+        data: null,
+        error: new Error("Please configure SUPABASE_SERVICE_ROLE_KEY in Project Settings for admin operations"),
+      }),
+  } as any
 }
 
 export { supabase, supabaseAdmin }
@@ -238,7 +269,6 @@ export interface Receipt {
   upload_date: string
   verified_date?: string
   verified_by?: string
-  receipt_number?: number
   users?: User
 }
 
