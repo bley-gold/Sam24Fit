@@ -321,23 +321,22 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
     }
   }
 
-  const handleLogout = async () => {
-    try {
-      clearDismissedNotifications()
-      await signOut()
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out.",
-      })
-      router.push("/")
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to log out. Please try again.",
-        variant: "destructive",
-      })
-    }
+const handleLogout = async () => {
+  try {
+    await signOut()
+    toast({
+      title: "Logged out",
+      description: "You have been successfully logged out.",
+    })
+    router.push("/")
+  } catch (error) {
+    toast({
+      title: "Error",
+      description: "Failed to log out. Please try again.",
+      variant: "destructive",
+    })
   }
+}
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -434,144 +433,164 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
   }
 
   const calculateStreakData = () => {
-    const months = []
-    const now = new Date()
+  const months: any[] = []
+  const now = new Date()
 
-    for (let i = 23; i >= 0; i--) {
-      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, "0")}`
+  // Generate the last 24 months
+  for (let i = 23; i >= 0; i--) {
+    const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const monthKey = `${monthDate.getFullYear()}-${String(
+      monthDate.getMonth() + 1
+    ).padStart(2, "0")}`
 
-      const monthPayments = receipts.filter((receipt) => {
-        if (receipt.status !== "verified") return false
-        const receiptDate = new Date(receipt.upload_date)
-        const receiptMonthKey = `${receiptDate.getFullYear()}-${String(receiptDate.getMonth() + 1).padStart(2, "0")}`
+    const hasPayment = receipts.some((receipt) => {
+      if (receipt.status !== "verified") return false
+      const receiptDate = new Date(receipt.upload_date)
+      const receiptMonthKey = `${receiptDate.getFullYear()}-${String(
+        receiptDate.getMonth() + 1
+      ).padStart(2, "0")}`
+      return receiptMonthKey === monthKey
+    })
 
-        return receiptMonthKey === monthKey
-      }).length
-
-      let intensity = 0
-      if (monthPayments > 0) intensity = 1
-      if (monthPayments > 1) intensity = 2
-      if (monthPayments > 2) intensity = 3
-      if (monthPayments > 3) intensity = 4
-
-      months.push({
-        date: monthDate,
-        paymentCount: monthPayments,
-        intensity,
-        monthKey,
-        monthName: monthDate.toLocaleDateString("en-US", { month: "short" }),
-        year: monthDate.getFullYear(),
-      })
-    }
-
-    return months
+    months.push({
+      date: monthDate,
+      hasPayment,
+      monthKey,
+      monthName: monthDate.toLocaleDateString("en-US", { month: "short" }),
+      year: monthDate.getFullYear(),
+      monthIndex: monthDate.getMonth(),
+    })
   }
 
-  const getIntensityColor = (intensity: number) => {
-    switch (intensity) {
-      case 0:
-        return "bg-gray-100 border-gray-200"
-      case 1:
-        return "bg-green-200 border-green-300"
-      case 2:
-        return "bg-green-300 border-green-400"
-      case 3:
-        return "bg-green-500 border-green-600"
-      case 4:
-        return "bg-green-700 border-green-800"
-      default:
-        return "bg-gray-100 border-gray-200"
+  return months
+}
+
+const groupByYear = (months: any[]) => {
+  const grouped: Record<number, (any | null)[]> = {}
+
+  months.forEach((m) => {
+    if (!grouped[m.year]) grouped[m.year] = new Array(12).fill(null)
+    grouped[m.year][m.monthIndex] = m
+  })
+
+  return grouped
+}
+
+const calculateCurrentStreak = () => {
+  const streakData = calculateStreakData()
+  let streak = 0
+
+  for (let i = streakData.length - 1; i >= 0; i--) {
+    if (streakData[i].hasPayment) {
+      streak++
+    } else {
+      break
     }
   }
 
-  const StreakGraphic = () => {
-    const streakData = calculateStreakData()
-    const currentStreak = calculateCurrentStreak()
+  return streak
+}
 
-    const previousYearData = streakData.slice(0, 12)
-    const currentYearData = streakData.slice(12, 24)
+const StreakGraphic = () => {
+  const streakData = calculateStreakData()
+  const currentStreak = calculateCurrentStreak()
+  const grouped = groupByYear(streakData)
 
-    const previousYear = previousYearData[0]?.year
-    const currentYear = currentYearData[0]?.year
+  // Sort years ascending
+  const years = Object.keys(grouped)
+    .map(Number)
+    .sort((a, b) => a - b)
 
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-900">Gym Payment Activity</h3>
-          <div className="text-xs text-gray-600">
-            Current streak: <span className="font-semibold text-orange-600">{currentStreak} months</span>
-          </div>
-        </div>
+  const now = new Date()
+  const currentMonth = now.getMonth()
 
-        <div className="space-y-3">
-          <div className="flex">
-            <div className="w-12 mr-3"></div>
-            <div className="grid grid-cols-12 gap-1 flex-1 text-xs text-gray-600 text-center">
-              {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((month) => (
-                <div key={month} className="text-[10px]">
-                  {month}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center">
-            <div className="w-12 mr-3 text-xs text-gray-600 text-right font-medium">{previousYear}</div>
-            <div className="grid grid-cols-12 gap-1 flex-1">
-              {previousYearData.map((month, index) => (
-                <div
-                  key={`prev-${index}`}
-                  className={`w-4 h-4 rounded-sm border ${getIntensityColor(month.intensity)}`}
-                  title={`${month.monthName} ${month.year}: ${month.paymentCount} payment${month.paymentCount !== 1 ? "s" : ""}`}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center">
-            <div className="w-12 mr-3 text-xs text-gray-600 text-right font-medium">{currentYear}</div>
-            <div className="grid grid-cols-12 gap-1 flex-1">
-              {currentYearData.map((month, index) => (
-                <div
-                  key={`curr-${index}`}
-                  className={`w-4 h-4 rounded-sm border ${getIntensityColor(month.intensity)}`}
-                  title={`${month.monthName} ${month.year}: ${month.paymentCount} payment${month.paymentCount !== 1 ? "s" : ""}`}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between text-xs text-gray-500 pt-2">
-            <span>Less</span>
-            <div className="flex items-center space-x-1">
-              <div className="w-3 h-3 rounded-sm bg-gray-100 border border-gray-200"></div>
-              <div className="w-3 h-3 rounded-sm bg-green-200 border border-green-300"></div>
-              <div className="w-3 h-3 rounded-sm bg-green-300 border border-green-400"></div>
-              <div className="w-3 h-3 rounded-sm bg-green-500 border border-green-600"></div>
-              <div className="w-3 h-3 rounded-sm bg-green-700 border border-green-800"></div>
-            </div>
-            <span>More</span>
-          </div>
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-900">
+          Gym Attendance Streak
+        </h3>
+        <div className="text-xs text-gray-600">
+          Current streak:{" "}
+          <span className="font-semibold text-green-600">
+            {currentStreak} months
+          </span>
         </div>
       </div>
-    )
-  }
 
-  const calculateCurrentStreak = () => {
-    const streakData = calculateStreakData()
-    let streak = 0
+      <div className="space-y-3">
+        {/* Month labels */}
+        <div className="flex">
+          <div className="w-12 mr-3"></div>
+          <div className="grid grid-cols-12 gap-1 flex-1 text-xs text-gray-600 text-center">
+            {[
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec",
+            ].map((month) => (
+              <div key={month} className="text-[10px]">
+                {month}
+              </div>
+            ))}
+          </div>
+        </div>
 
-    for (let i = streakData.length - 1; i >= 0; i--) {
-      if (streakData[i].paymentCount > 0) {
-        streak++
-      } else {
-        break
-      }
-    }
+        {/* Year rows */}
+        {years.map((year) => (
+          <div key={year} className="flex items-center">
+            <div className="w-12 mr-3 text-xs text-gray-600 text-right font-medium">
+              {year}
+            </div>
+            <div className="grid grid-cols-12 gap-1 flex-1">
+              {grouped[year].map((month, index) => {
+                // Hide future months for the current year
+                if (year === now.getFullYear() && index > currentMonth) return null
 
-    return streak
-  }
+                // Determine if this is the last month of the current streak
+                const streakStartIndex =
+                  streakData.length - currentStreak
+                const isLastStreakMonth =
+                  month &&
+                  streakData.findIndex((m) => m.monthKey === month.monthKey) ===
+                    streakStartIndex
+
+                return (
+                  <div
+                    key={`${year}-${index}`}
+                    className={`w-4 h-4 rounded-sm border ${
+                      month?.hasPayment
+                        ? "bg-green-500 border-green-600"
+                        : "bg-gray-200 border-gray-300"
+                    } ${isLastStreakMonth ? "ring-2 ring-green-400" : ""}`} // subtle highlight
+                    title={
+                      month
+                        ? `${month.monthName} ${month.year}: ${
+                            month.hasPayment
+                              ? "Attendance recorded"
+                              : "No attendance"
+                          }`
+                        : "No data"
+                    }
+                  />
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 
   const handleSubmitReview = async () => {
     if (!user || !reviewText.trim()) return

@@ -7,16 +7,17 @@ import {
   Dumbbell,
   Clock,
   Trophy,
-  Shield,
+  Users,
   ArrowRight,
   MapPin,
   Phone,
   Mail,
   Heart,
   Camera,
-  Play,
   CheckCircle,
   Star,
+  BookOpen,
+  MessageCircle,
 } from "lucide-react"
 import Image from "next/image"
 import { getApprovedReviews } from "@/app/actions/review-actions"
@@ -53,13 +54,32 @@ export default function LandingPage() {
     window.location.href = "/auth"
   }
 
+  const handleOurStory = () => {
+    window.location.href = "/our-story"
+  }
+
+  const handleContact = () => {
+    const message = encodeURIComponent(
+      "Hi Sam! I'm interested in joining Sam24Fit gym. Can you please tell me more about membership and getting started?",
+    )
+    window.open(`https://wa.me/27679934104?text=${message}`, "_blank")
+  }
+
+  const handleFacilities = () => {
+    window.location.href = "/gallery"
+  }
+
+  const handleMembership = () => {
+    window.location.href = "/auth"
+  }
+
   const galleryImages = [
     { id: 1, title: "State-of-the-art Equipment", category: "Equipment" },
     { id: 2, title: "Spacious Workout Area", category: "Facility" },
     { id: 3, title: "Cardio Zone", category: "Equipment" },
     { id: 4, title: "Free Weights Section", category: "Equipment" },
     { id: 5, title: "Group Training Area", category: "Classes" },
-    { id: 6, title: "Locker Rooms", category: "Facility" },
+    { id: 6, title: "Community Vibes", category: "Facility" },
     { id: 7, title: "Functional Training", category: "Training" },
     { id: 8, title: "Members in Action", category: "Community" },
   ]
@@ -92,12 +112,22 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-blue-50 via-white to-purple-50 py-20">
+      <section className="bg-gradient-to-br from-blue-50 via-white to-purple-50 py-20 relative overflow-hidden">
+        <div className="absolute top-10 right-10 opacity-10 rotate-12">
+          <Image
+            src="/urban-fitness-graffiti.png"
+            alt="Urban fitness vibe"
+            width={300}
+            height={200}
+            className="object-contain"
+          />
+        </div>
+
         <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-8">
             <div className="space-y-4">
               <Badge className="bg-blue-100 text-blue-800 px-4 py-2 text-sm font-medium">
-                🏆 Pretoria's #1 Fitness Destination
+                🏆 Pretoria's Community Gym
               </Badge>
               <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
                 Your Fitness
@@ -105,8 +135,8 @@ export default function LandingPage() {
                 <span className="text-purple-600">Here</span>
               </h1>
               <p className="text-xl text-gray-600 leading-relaxed max-w-lg">
-                Join Sam24Fit and discover a world-class fitness experience in the heart of Pretoria. Modern equipment,
-                expert guidance, and a supportive community await you.
+                Join Sam24Fit and become part of our tight-knit fitness family in the heart of Pretoria. Real people,
+                real results, real community.
               </p>
             </div>
 
@@ -119,15 +149,16 @@ export default function LandingPage() {
                 size="lg"
                 variant="outline"
                 className="text-lg px-8 py-4 border-gray-300 hover:bg-gray-50 bg-transparent"
+                onClick={handleOurStory}
               >
-                <Play className="mr-2 h-5 w-5" />
-                Virtual Tour
+                <BookOpen className="mr-2 h-5 w-5" />
+                Our Story
               </Button>
             </div>
 
             <div className="flex items-center space-x-8 pt-4">
               <div className="text-center">
-                <div className="text-3xl font-bold text-blue-600">5000+</div>
+                <div className="text-3xl font-bold text-blue-600">120+</div>
                 <div className="text-sm text-gray-500">Active Members</div>
               </div>
               <div className="text-center">
@@ -135,8 +166,8 @@ export default function LandingPage() {
                 <div className="text-sm text-gray-500">Per Month</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-green-600">24/6</div>
-                <div className="text-sm text-gray-500">Operating Days</div>
+                <div className="text-3xl font-bold text-green-600">6</div>
+                <div className="text-sm text-gray-500">Days a Week</div>
               </div>
             </div>
           </div>
@@ -146,7 +177,7 @@ export default function LandingPage() {
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-2xl font-bold">Premium Membership</h3>
+                    <h3 className="text-2xl font-bold">Monthly Membership</h3>
                     <p className="opacity-90">Everything you need to succeed</p>
                   </div>
                   <div className="text-right">
@@ -166,11 +197,11 @@ export default function LandingPage() {
                   </div>
                   <div className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5" />
-                    <span>Locker room facilities</span>
+                    <span>Community support</span>
                   </div>
                   <div className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5" />
-                    <span>Community support</span>
+                    <span>Personal guidance</span>
                   </div>
                 </div>
 
@@ -200,7 +231,7 @@ export default function LandingPage() {
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Why Choose Sam24Fit?</h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              We provide everything you need for a successful fitness journey in a modern, welcoming environment.
+              We're more than just a gym - we're your neighborhood fitness family where everyone knows your name.
             </p>
           </div>
 
@@ -214,7 +245,8 @@ export default function LandingPage() {
               </CardHeader>
               <CardContent className="text-center">
                 <CardDescription className="text-base">
-                  Open Monday to Saturday with extended hours to fit your busy schedule. Train when it works for you.
+                  Open Mon-Fri 5:30-8 and Sat 6:30-6. Train when it works for your schedule, whether you're an early
+                  bird or after-work warrior.
                 </CardDescription>
               </CardContent>
             </Card>
@@ -222,13 +254,14 @@ export default function LandingPage() {
             <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-shadow duration-300">
               <CardHeader className="text-center pb-4">
                 <div className="bg-purple-100 rounded-full p-4 w-16 h-16 mx-auto mb-4">
-                  <Trophy className="h-8 w-8 text-purple-600" />
+                  <Users className="h-8 w-8 text-purple-600" />
                 </div>
-                <CardTitle className="text-xl">Proven Results</CardTitle>
+                <CardTitle className="text-xl">Community Spirit</CardTitle>
               </CardHeader>
               <CardContent className="text-center">
                 <CardDescription className="text-base">
-                  Our members achieve their goals with our comprehensive approach to fitness and wellness.
+                  Join a family of 120+ members who support each other's goals. Real friendships, real motivation, real
+                  results together.
                 </CardDescription>
               </CardContent>
             </Card>
@@ -236,13 +269,14 @@ export default function LandingPage() {
             <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-shadow duration-300">
               <CardHeader className="text-center pb-4">
                 <div className="bg-green-100 rounded-full p-4 w-16 h-16 mx-auto mb-4">
-                  <Shield className="h-8 w-8 text-green-600" />
+                  <Trophy className="h-8 w-8 text-green-600" />
                 </div>
-                <CardTitle className="text-xl">Safe Environment</CardTitle>
+                <CardTitle className="text-xl">Personal Touch</CardTitle>
               </CardHeader>
               <CardContent className="text-center">
                 <CardDescription className="text-base">
-                  Clean, sanitized facilities with top-notch safety protocols to keep you healthy and secure.
+                  Sam knows every member personally. Get the guidance and encouragement you need to reach your fitness
+                  goals in a welcoming space.
                 </CardDescription>
               </CardContent>
             </Card>
@@ -378,7 +412,7 @@ export default function LandingPage() {
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Take a Look Inside</h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Explore our modern facilities and see why Sam24Fit is Pretoria's premier fitness destination.
+              Check out our community space where neighbors become training partners and fitness goals become reality.
             </p>
           </div>
 
@@ -406,7 +440,7 @@ export default function LandingPage() {
           </div>
 
           <div className="text-center mt-12">
-            <Button variant="outline" size="lg" className="px-8 bg-transparent">
+            <Button variant="outline" size="lg" className="px-8 bg-transparent" onClick={handleFacilities}>
               <Camera className="mr-2 h-5 w-5" />
               View Full Gallery
             </Button>
@@ -518,6 +552,11 @@ export default function LandingPage() {
                             review.users?.profile_picture_url ||
                             "/placeholder.svg?height=40&width=40&query=user profile" ||
                             "/placeholder.svg" ||
+                            "/placeholder.svg" ||
+                            "/placeholder.svg" ||
+                            "/placeholder.svg" ||
+                            "/placeholder.svg" ||
+                            "/placeholder.svg" ||
                             "/placeholder.svg"
                           }
                           alt={review.users?.full_name || "User"}
@@ -628,18 +667,18 @@ export default function LandingPage() {
                   </div>
                   <div className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span>Locker room access</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span>Clean and safe environment</span>
+                    <span>Personal guidance from Sam</span>
                   </div>
                   <div className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
                     <span>Supportive fitness community</span>
                   </div>
+                  <div className="flex items-center space-x-3">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <span>Friendly neighborhood atmosphere</span>
+                  </div>
                 </div>
-                <Button className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-lg py-3" onClick={handleGetStarted}>
+                <Button className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-lg py-3" onClick={handleMembership}>
                   Join Sam24Fit Today
                 </Button>
               </CardContent>
@@ -653,16 +692,22 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h2 className="text-4xl font-bold text-gray-900 mb-6">Ready to Transform Your Life?</h2>
           <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto">
-            Join thousands of members who have already started their fitness journey with Sam24Fit. Your transformation
-            begins with a single step.
+            Join our family of 120+ members who have already started their fitness journey with Sam24Fit. Your
+            transformation begins with a single step.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-lg px-12 py-4" onClick={handleGetStarted}>
               Start Your Journey
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-            <Button size="lg" variant="outline" className="text-lg px-12 py-4 border-gray-300 bg-transparent">
-              Contact Us
+            <Button
+              size="lg"
+              variant="outline"
+              className="text-lg px-12 py-4 border-gray-300 bg-transparent"
+              onClick={handleContact}
+            >
+              <MessageCircle className="mr-2 h-5 w-5" />
+              WhatsApp Sam
             </Button>
           </div>
         </div>
@@ -683,8 +728,7 @@ export default function LandingPage() {
                 </div>
               </div>
               <p className="text-gray-400 leading-relaxed">
-                Your premier fitness destination in Pretoria, dedicated to helping you achieve your health and wellness
-                goals.
+                Your neighborhood fitness family in Pretoria, where everyone knows your name and supports your goals.
               </p>
             </div>
 
@@ -701,23 +745,23 @@ export default function LandingPage() {
               <h4 className="text-lg font-semibold mb-4">Quick Links</h4>
               <ul className="space-y-2 text-gray-400">
                 <li>
-                  <a href="#" className="hover:text-white transition-colors">
+                  <a href="/auth" className="hover:text-white transition-colors">
                     Membership
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-white transition-colors">
+                  <a href="/gallery" className="hover:text-white transition-colors">
                     Facilities
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-white transition-colors">
+                  <a
+                    href="https://wa.me/27679934104"
+                    target="_blank"
+                    className="hover:text-white transition-colors"
+                    rel="noreferrer"
+                  >
                     Contact
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    FAQ
                   </a>
                 </li>
               </ul>
