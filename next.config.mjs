@@ -7,7 +7,7 @@ swcMinify: true,
 images: {
   // IMPORTANT: Replace 'cybjdyouocdxrcedtjkq.supabase.co' with YOUR ACTUAL Supabase Project URL
   // You can find this in your Supabase Dashboard -> Project Settings -> API -> Project URL
-  domains: ['cybjdyouocdxrcedtjkq.supabase.co', 'noidkepohqhgdalkvzze.supabase.co'], 
+  domains: ['https://noidkepohqhgdalkvzze.supabase.co'], 
   formats: ['image/webp', 'image/avif'],
 },
 
