@@ -13,7 +13,7 @@ import { LoadingSpinner } from "@/components/loading-spinner"
 import { useAuthContext } from "@/components/auth-provider"
 import { uploadReceipt } from "@/lib/auth"
 import { useToast } from "@/hooks/use-toast"
-import { Dumbbell, Upload, ArrowLeft, FileText, CheckCircle, User } from "lucide-react"
+import { Dumbbell, Upload, ArrowLeft, FileText, CheckCircle, User, CreditCard } from "lucide-react"
 
 type PaymentType = "membership" | "admin" | "both"
 
@@ -225,6 +225,30 @@ export default function UploadPage() {
             <CardDescription>Please upload a clear image or PDF of your payment receipt</CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
+              <h3 className="font-medium text-green-900 mb-3 flex items-center">
+                <CreditCard className="h-4 w-4 mr-2" />
+                Bank Account Details for Payments
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium text-green-800">Bank:</span> First National Bank (FNB)
+                </div>
+                <div>
+                  <span className="font-medium text-green-800">Account:</span> 62847291056
+                </div>
+                <div>
+                  <span className="font-medium text-green-800">Branch Code:</span> 250655
+                </div>
+                <div>
+                  <span className="font-medium text-green-800">Account Holder:</span> Sam24Fit Gym (Pty) Ltd
+                </div>
+              </div>
+              <p className="text-xs text-green-700 mt-2">
+                <strong>Reference:</strong> Use "{user?.full_name || "Your Name"} - Membership" when making payment
+              </p>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* File Upload */}
               <div className="space-y-2">

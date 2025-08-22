@@ -44,6 +44,7 @@ export async function getAdminStats(): Promise<{
   activeMembers: number
   pendingReceipts: number
   totalRevenue: number
+  currentMonthRevenue: number // Added current month revenue field
   unpaidMembers: number
 } | null> {
   try {
@@ -104,6 +105,15 @@ export async function getAdminStats(): Promise<{
       return null
     }
 
+    // Get current month revenue using RPC function
+    const { data: currentMonthRevenueData, error: currentMonthRevenueError } =
+      await supabaseAdmin.rpc("get_current_month_revenue")
+
+    if (currentMonthRevenueError) {
+      console.error("Server Action: Error fetching current month revenue:", currentMonthRevenueError.message)
+      return null
+    }
+
     // Get unpaid members count for current month
     const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM format
     const { data: unpaidMembersData, error: unpaidMembersError } = await supabaseAdmin.rpc(
@@ -123,6 +133,7 @@ export async function getAdminStats(): Promise<{
       activeMembers: activeMembers || 0,
       pendingReceipts: pendingReceipts || 0,
       totalRevenue: totalRevenueData || 0,
+      currentMonthRevenue: currentMonthRevenueData || 0, // Added current month revenue to stats
       unpaidMembers,
     }
 

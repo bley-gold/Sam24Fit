@@ -17,11 +17,72 @@ function validateSupabaseConfig() {
   }
 }
 
+export async function canUserSubmitReview(userId: string) {
+  try {
+    if (!validateSupabaseConfig()) {
+      console.error("Supabase configuration is invalid or missing")
+      return { success: false, canSubmit: false, message: "Database configuration error" }
+    }
+
+    const { createClient } = await import("@supabase/supabase-js")
+    const serviceClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+
+    // Calculate date 3 months ago
+    const threeMonthsAgo = new Date()
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+
+    const { data: recentReviews, error } = await serviceClient
+      .from("reviews")
+      .select("created_at")
+      .eq("user_id", userId)
+      .gte("created_at", threeMonthsAgo.toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1)
+
+    if (error) {
+      console.error("Error checking user review eligibility:", error)
+      return { success: false, canSubmit: false, message: "Failed to check review eligibility" }
+    }
+
+    const canSubmit = !recentReviews || recentReviews.length === 0
+    let nextSubmissionDate = null
+
+    if (!canSubmit && recentReviews.length > 0) {
+      const lastReviewDate = new Date(recentReviews[0].created_at)
+      nextSubmissionDate = new Date(lastReviewDate)
+      nextSubmissionDate.setMonth(nextSubmissionDate.getMonth() + 3)
+    }
+
+    return {
+      success: true,
+      canSubmit,
+      nextSubmissionDate: nextSubmissionDate?.toISOString() || null,
+      message: canSubmit ? "You can submit a review" : "You can submit another review in 3 months",
+    }
+  } catch (error) {
+    console.error("Exception in canUserSubmitReview:", error)
+    return { success: false, canSubmit: false, message: "An unexpected error occurred" }
+  }
+}
+
 export async function createReview(userId: string, reviewText: string, rating: number) {
   try {
     if (!validateSupabaseConfig()) {
       console.error("Supabase configuration is invalid or missing")
       return { success: false, message: "Database configuration error" }
+    }
+
+    const eligibilityCheck = await canUserSubmitReview(userId)
+    if (!eligibilityCheck.success || !eligibilityCheck.canSubmit) {
+      return {
+        success: false,
+        message: eligibilityCheck.message || "You can only submit one review every 3 months",
+      }
     }
 
     const { createClient } = await import("@supabase/supabase-js")
@@ -37,7 +98,6 @@ export async function createReview(userId: string, reviewText: string, rating: n
       review_text: reviewText,
       rating: rating,
       status: "pending",
-      is_approved: false,
     }
 
     const { data, error } = await serviceClient.from("reviews").insert(insertData).select().single()
@@ -74,10 +134,7 @@ export async function getApprovedReviews() {
       .from("reviews")
       .select("*")
       .eq("status", "approved")
-      .eq("is_approved", true)
-      .eq("is_featured", true)
       .order("created_at", { ascending: false })
-      .limit(10)
 
     if (reviewsError) {
       console.error("Error fetching reviews:", reviewsError)
@@ -101,6 +158,9 @@ export async function getApprovedReviews() {
           review_text: review.review_text,
           rating: review.rating,
           created_at: review.created_at,
+          status: review.status,
+          is_featured: review.is_featured || false,
+          rejection_reason: review.rejection_reason,
           users: userError ? { full_name: "Anonymous", profile_picture_url: null } : userData,
         }
       }),
@@ -164,7 +224,7 @@ export async function getPendingReviews() {
     const { data: reviews, error: reviewsError } = await serviceClient
       .from("reviews")
       .select("*")
-      .or("status.eq.pending,is_approved.eq.false")
+      .eq("status", "pending")
       .order("created_at", { ascending: false })
 
     if (reviewsError) {
@@ -190,6 +250,8 @@ export async function getPendingReviews() {
           rating: review.rating,
           created_at: review.created_at,
           status: review.status,
+          is_featured: review.is_featured || false,
+          rejection_reason: review.rejection_reason,
           users: userError ? { full_name: "Anonymous", profile_picture_url: null } : userData,
         }
       }),
@@ -202,7 +264,7 @@ export async function getPendingReviews() {
   }
 }
 
-export async function updateReviewStatus(reviewId: string, approved: boolean) {
+export async function updateReviewStatus(reviewId: string, approved: boolean, rejectionReason?: string) {
   try {
     if (!validateSupabaseConfig()) {
       console.error("Supabase configuration is invalid or missing")
@@ -217,10 +279,13 @@ export async function updateReviewStatus(reviewId: string, approved: boolean) {
       },
     })
 
-    const updateData = {
-      is_approved: approved,
+    const updateData: any = {
       status: approved ? "approved" : "rejected",
       updated_at: new Date().toISOString(),
+    }
+
+    if (!approved && rejectionReason) {
+      updateData.rejection_reason = rejectionReason
     }
 
     const { error } = await serviceClient.from("reviews").update(updateData).eq("id", reviewId)
@@ -259,7 +324,6 @@ export async function getApprovedReviewsForAdmin() {
       .from("reviews")
       .select("*")
       .eq("status", "approved")
-      .eq("is_approved", true)
       .order("created_at", { ascending: false })
 
     if (reviewsError) {
@@ -284,7 +348,9 @@ export async function getApprovedReviewsForAdmin() {
           review_text: review.review_text,
           rating: review.rating,
           created_at: review.created_at,
-          is_featured: review.is_featured,
+          status: review.status,
+          is_featured: review.is_featured || false,
+          rejection_reason: review.rejection_reason || null,
           users: userError ? { full_name: "Anonymous", profile_picture_url: null } : userData,
         }
       }),
@@ -294,41 +360,6 @@ export async function getApprovedReviewsForAdmin() {
   } catch (error) {
     console.error("Exception in getApprovedReviewsForAdmin:", error)
     return { success: false, data: [] }
-  }
-}
-
-export async function toggleReviewFeatured(reviewId: string, featured: boolean) {
-  try {
-    if (!validateSupabaseConfig()) {
-      console.error("Supabase configuration is invalid or missing")
-      return { success: false, error: "Database configuration error" }
-    }
-
-    const { createClient } = await import("@supabase/supabase-js")
-    const serviceClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-
-    const { error } = await serviceClient
-      .from("reviews")
-      .update({ is_featured: featured, updated_at: new Date().toISOString() })
-      .eq("id", reviewId)
-
-    if (error) {
-      console.error("Error toggling review featured status:", error)
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath("/")
-    revalidatePath("/admin")
-
-    return { success: true }
-  } catch (error) {
-    console.error("Exception in toggleReviewFeatured:", error)
-    return { success: false, error: "An unexpected error occurred" }
   }
 }
 
@@ -375,8 +406,8 @@ export async function getAllReviews() {
           rating: review.rating,
           created_at: review.created_at,
           status: review.status,
-          is_approved: review.is_approved,
-          is_featured: review.is_featured,
+          is_featured: review.is_featured || false,
+          rejection_reason: review.rejection_reason || null,
           users: userError ? { full_name: "Anonymous", profile_picture_url: null } : userData,
         }
       }),
@@ -433,6 +464,8 @@ export async function getRejectedReviews() {
           rating: review.rating,
           created_at: review.created_at,
           status: review.status,
+          is_featured: review.is_featured || false,
+          rejection_reason: review.rejection_reason,
           users: userError ? { full_name: "Anonymous", profile_picture_url: null } : userData,
         }
       }),
@@ -477,6 +510,65 @@ export async function deleteReview(reviewId: string) {
   }
 }
 
+export async function toggleReviewFeatured(reviewId: string, featured: boolean) {
+  try {
+    if (!validateSupabaseConfig()) {
+      console.error("Supabase configuration is invalid or missing")
+      return { success: false, error: "Database configuration error" }
+    }
+
+    const { createClient } = await import("@supabase/supabase-js")
+    const serviceClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+
+    if (featured) {
+      const { data: featuredReviews, error: countError } = await serviceClient
+        .from("reviews")
+        .select("id")
+        .eq("is_featured", true)
+        .eq("status", "approved")
+
+      if (countError) {
+        console.error("Error counting featured reviews:", countError)
+        return { success: false, error: "Failed to check featured review limit" }
+      }
+
+      if (featuredReviews && featuredReviews.length >= 10) {
+        return {
+          success: false,
+          error: "You can only feature up to 10 reviews at a time. Please unfeature another review first.",
+          limitReached: true,
+        }
+      }
+    }
+
+    const { error } = await serviceClient
+      .from("reviews")
+      .update({
+        is_featured: featured,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", reviewId)
+
+    if (error) {
+      console.error("Error toggling review featured status:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/")
+    revalidatePath("/admin")
+
+    return { success: true }
+  } catch (error) {
+    console.error("Exception in toggleReviewFeatured:", error)
+    return { success: false, error: "An unexpected error occurred" }
+  }
+}
+
 export type Review = {
   id: string
   user_id: string
@@ -485,7 +577,7 @@ export type Review = {
   status: string
   created_at: string
   updated_at?: string
-  is_approved?: boolean
+  rejection_reason?: string
   is_featured?: boolean
   users?: {
     full_name: string

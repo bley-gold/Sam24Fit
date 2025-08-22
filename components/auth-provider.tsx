@@ -32,7 +32,8 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const { user, loading, refreshUser, refreshSession } = useAuth()
+  const authHook = useAuth()
+  const { user, loading } = authHook
   const router = useRouter()
 
   useEffect(() => {
@@ -41,9 +42,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }, [user, router])
 
-  return (
-    <AuthContext.Provider value={{ user, loading, refreshUser, refreshSession }}>
-      {children}
-    </AuthContext.Provider>
-  )
+  const contextValue = {
+    user,
+    loading,
+    refreshUser: async () => null,
+    refreshSession: async () => ({ user: null, error: null }),
+  }
+
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
 }

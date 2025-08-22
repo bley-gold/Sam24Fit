@@ -27,14 +27,23 @@ export default function LandingPage() {
 
   useEffect(() => {
     const fetchReviews = async () => {
-      console.log("[v0] Fetching reviews...")
-      const { success, data } = await getApprovedReviews()
-      console.log("[v0] Review fetch result:", { success, data, dataLength: data?.length })
-      if (success) {
-        setReviews(data)
-        console.log("[v0] Reviews set in state:", data)
-      } else {
-        console.log("[v0] Failed to fetch reviews")
+      console.log("[v0] Starting to fetch reviews...")
+      try {
+        const result = await getApprovedReviews()
+        console.log("[v0] getApprovedReviews result:", result)
+
+        if (result.success) {
+          console.log("[v0] Reviews fetched successfully:", result.data)
+          console.log("[v0] Number of reviews:", result.data?.length || 0)
+          const featuredReviews = result.data?.filter((review) => review.is_featured === true) || []
+          console.log("[v0] Featured reviews:", featuredReviews)
+          console.log("[v0] Number of featured reviews:", featuredReviews.length)
+          setReviews(result.data || [])
+        } else {
+          console.log("[v0] Failed to fetch reviews:", result.error)
+        }
+      } catch (error) {
+        console.log("[v0] Error in fetchReviews:", error)
       }
     }
     fetchReviews()
@@ -241,6 +250,128 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* How It Works Section */}
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">How It Works</h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Getting started with Sam24Fit is simple. Follow these easy steps to begin your fitness journey.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+            {/* Steps */}
+            <div className="space-y-8">
+              <div className="flex items-start space-x-4">
+                <div className="bg-blue-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg flex-shrink-0">
+                  1
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Sign Up Online</h3>
+                  <p className="text-gray-600">
+                    Create your account on our website and fill in your personal details to get started.
+                  </p>
+                </div>
+                <ArrowRight className="h-6 w-6 text-blue-600 mt-2 hidden lg:block" />
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <div className="bg-purple-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg flex-shrink-0">
+                  2
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Make Payment</h3>
+                  <p className="text-gray-600">
+                    Transfer your membership fee to our bank account using the details provided below.
+                  </p>
+                </div>
+                <ArrowRight className="h-6 w-6 text-purple-600 mt-2 hidden lg:block" />
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <div className="bg-green-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg flex-shrink-0">
+                  3
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Upload Receipt</h3>
+                  <p className="text-gray-600">
+                    Upload your payment receipt through your dashboard for verification by our team.
+                  </p>
+                </div>
+                <ArrowRight className="h-6 w-6 text-green-600 mt-2 hidden lg:block" />
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <div className="bg-orange-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg flex-shrink-0">
+                  4
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Start Training</h3>
+                  <p className="text-gray-600">
+                    Once approved, you're ready to start your fitness journey at Sam24Fit!
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Bank Account Details */}
+            <div className="lg:sticky lg:top-8">
+              <Card className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 shadow-lg">
+                <CardHeader className="text-center pb-4">
+                  <div className="bg-blue-600 rounded-full p-3 w-16 h-16 mx-auto mb-4">
+                    <svg className="h-10 w-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M2 6h20v2H2zm0 5h20v7H2z" />
+                      <circle cx="6" cy="16" r="1" />
+                    </svg>
+                  </div>
+                  <CardTitle className="text-2xl text-gray-900">Payment Details</CardTitle>
+                  <CardDescription className="text-base">
+                    Use these bank details to make your membership payment
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="bg-white rounded-lg p-4 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 font-medium">Bank:</span>
+                      <span className="text-gray-900 font-semibold">First National Bank (FNB)</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 font-medium">Account Name:</span>
+                      <span className="text-gray-900 font-semibold">Sam24Fit Gym</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 font-medium">Account Number:</span>
+                      <span className="text-gray-900 font-semibold font-mono">62847291056</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 font-medium">Branch Code:</span>
+                      <span className="text-gray-900 font-semibold font-mono">250655</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 font-medium">Account Type:</span>
+                      <span className="text-gray-900 font-semibold">Business Cheque</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-yellow-800 mb-2">Payment Reference:</h4>
+                    <p className="text-yellow-700 text-sm">Use your full name and phone number as reference</p>
+                    <p className="text-yellow-700 text-sm font-mono">Example: "John Smith 0821234567"</p>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-blue-800 mb-2">Monthly Fee:</h4>
+                    <p className="text-2xl font-bold text-blue-600">R120.00</p>
+                    <p className="text-blue-700 text-sm">+ R50 joining fee (first payment only)</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Gallery Section */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4">
@@ -294,68 +425,130 @@ export default function LandingPage() {
           </div>
 
           <div className="relative h-96">
-            {console.log("[v0] Rendering reviews section, reviews count:", reviews.length)}
-            {reviews.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <p className="text-gray-500 text-lg">No reviews available yet</p>
-              </div>
-            )}
-            {reviews.slice(0, 8).map((review, index) => {
-              const positions = [
-                { top: "10%", left: "5%" },
-                { top: "20%", right: "10%" },
-                { top: "40%", left: "15%" },
-                { top: "60%", right: "20%" },
-                { top: "15%", left: "50%" },
-                { top: "70%", left: "60%" },
-                { top: "30%", right: "5%" },
-                { top: "80%", left: "25%" },
-              ]
+            {(() => {
+              const featuredReviews = reviews.filter((review) => review.is_featured === true)
+              const displayReviews = featuredReviews
 
-              const position = positions[index] || { top: "50%", left: "50%" }
+              console.log("[v0] All reviews:", reviews)
+              console.log("[v0] Featured reviews for display:", featuredReviews)
 
-              return (
-                <div
-                  key={review.id}
-                  className="absolute animate-float"
-                  style={{
-                    ...position,
-                    animationDelay: `${index * 0.5}s`,
-                    animationDuration: `${4 + (index % 3)}s`,
-                  }}
-                >
-                  <div className="bg-white rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300 max-w-xs group hover:scale-105">
-                    <div className="flex items-center space-x-3 mb-3">
-                      <Image
-                        src={
-                          review.users?.profile_picture_url || "/placeholder.svg?height=40&width=40&query=user profile"
-                        }
-                        alt={review.users?.full_name || "User"}
-                        width={40}
-                        height={40}
-                        className="rounded-full object-cover"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">
-                          {review.users?.full_name || "Anonymous"}
-                        </p>
-                        <div className="flex items-center">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`h-3 w-3 ${
-                                i < review.rating ? "text-yellow-400 fill-current" : "text-gray-300"
-                              }`}
-                            />
-                          ))}
+              if (displayReviews.length === 0 && reviews.length > 0) {
+                return (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <p className="text-gray-500 text-lg">No featured reviews to display</p>
+                  </div>
+                )
+              }
+
+              if (displayReviews.length === 0) {
+                return (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <p className="text-gray-500 text-lg">No reviews available yet</p>
+                  </div>
+                )
+              }
+
+              const generatePositions = (count: number) => {
+                if (count === 0) return []
+                if (count === 1) return [{ top: "50%", left: "50%", transform: "translate(-50%, -50%)" }]
+                if (count === 2)
+                  return [
+                    { top: "40%", left: "25%", transform: "translate(-50%, -50%)" },
+                    { top: "60%", right: "25%", transform: "translate(50%, -50%)" },
+                  ]
+
+                const positions = []
+                const sections = Math.ceil(count / 4) // Divide into vertical sections
+                const itemsPerSection = Math.ceil(count / sections)
+
+                for (let i = 0; i < count; i++) {
+                  const sectionIndex = Math.floor(i / itemsPerSection)
+                  const itemInSection = i % itemsPerSection
+
+                  // Calculate vertical position based on section
+                  const sectionHeight = 100 / sections
+                  const sectionStart = sectionIndex * sectionHeight
+                  const sectionCenter = sectionStart + sectionHeight / 2
+
+                  // Add some vertical variation within the section
+                  const verticalVariation = itemInSection % 2 === 0 ? -15 : 15
+                  const top = Math.max(10, Math.min(90, sectionCenter + verticalVariation))
+
+                  // Calculate horizontal position with more even distribution
+                  const horizontalSections = Math.min(4, Math.ceil(count / 2))
+                  const horizontalIndex = i % horizontalSections
+                  const horizontalSpacing = 80 / (horizontalSections - 1 || 1)
+                  const left = 10 + horizontalIndex * horizontalSpacing
+
+                  // Add slight random offset for natural look
+                  const randomOffsetX = Math.sin(i * 2.5) * 8
+                  const randomOffsetY = Math.cos(i * 1.8) * 8
+
+                  positions.push({
+                    top: `${Math.max(5, Math.min(85, top + randomOffsetY))}%`,
+                    left: `${Math.max(5, Math.min(85, left + randomOffsetX))}%`,
+                    transform: "translate(-50%, -50%)",
+                  })
+                }
+
+                return positions
+              }
+
+              const positions = generatePositions(displayReviews.length)
+
+              return displayReviews.map((review, index) => {
+                const position = positions[index]
+
+                return (
+                  <div
+                    key={review.id}
+                    className="absolute animate-float z-10 hover:z-[999]"
+                    style={{
+                      ...position,
+                      animationDelay: `${index * 0.5}s`,
+                      animationDuration: `${4 + (index % 3)}s`,
+                    }}
+                  >
+                    <div
+                      className={`bg-white rounded-2xl p-4 shadow-lg hover:shadow-2xl transition-all duration-300 max-w-xs group hover:scale-110 cursor-pointer hover:rotate-1`}
+                    >
+                      <div className="flex items-center space-x-3 mb-3">
+                        <Image
+                          src={
+                            review.users?.profile_picture_url ||
+                            "/placeholder.svg?height=40&width=40&query=user profile" ||
+                            "/placeholder.svg" ||
+                            "/placeholder.svg"
+                          }
+                          alt={review.users?.full_name || "User"}
+                          width={40}
+                          height={40}
+                          className="rounded-full object-cover"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <p className="text-sm font-semibold text-gray-900 truncate">
+                              {review.users?.full_name || "Anonymous"}
+                            </p>
+                          </div>
+                          <div className="flex items-center">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`h-3 w-3 ${
+                                  i < review.rating ? "text-yellow-400 fill-current" : "text-gray-300"
+                                }`}
+                              />
+                            ))}
+                          </div>
                         </div>
                       </div>
+                      <p className="text-sm text-gray-600 line-clamp-3">{review.review_text}</p>
                     </div>
-                    <p className="text-sm text-gray-600 line-clamp-3">{review.review_text}</p>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })
+            })()}
           </div>
         </div>
       </section>

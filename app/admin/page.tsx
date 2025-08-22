@@ -14,8 +14,6 @@ import { signOut } from "@/lib/auth"
 import type { User, Receipt } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import {
-  Dumbbell,
-  LogOut,
   FileText,
   Check,
   X,
@@ -26,7 +24,6 @@ import {
   UserIcon,
   BarChart,
   AlertCircle,
-  Shield,
   CircleDollarSign,
   UserMinus,
   UserCheck,
@@ -36,7 +33,7 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
-  BrushIcon as Broom,
+  Book as Broom,
   MessageSquare,
   Star,
   CheckCircle,
@@ -84,6 +81,8 @@ import {
 } from "recharts"
 import { Textarea } from "@/components/ui/textarea"
 import type { Review } from "@/lib/supabase"
+import { AdminQuickLinks } from "@/components/admin-quick-links"
+import { AdminHeader } from "@/components/admin-header"
 
 // Define chart config for monthly revenue
 const monthlyRevenueChartConfig = {
@@ -121,6 +120,7 @@ export default function AdminDashboard() {
     activeMembers: 0,
     pendingReceipts: 0,
     totalRevenue: 0,
+    currentMonthRevenue: 0,
     unpaidMembers: 0,
   })
   const [monthlyRevenueData, setMonthlyRevenueData] = useState<
@@ -158,7 +158,11 @@ export default function AdminDashboard() {
   const [declineReason, setDeclineReason] = useState("")
   const [receiptSearchTerm, setReceiptSearchTerm] = useState("")
 
-  const [reviewDeclineDialog, setReviewDeclineDialog] = useState({
+  const [reviewDeclineDialog, setReviewDeclineDialog] = useState<{
+    isOpen: boolean
+    reviewId: string
+    reviewUser: string
+  }>({
     isOpen: false,
     reviewId: "",
     reviewUser: "",
@@ -166,6 +170,18 @@ export default function AdminDashboard() {
   const [reviewDeclineReason, setReviewDeclineReason] = useState("")
 
   const [rejectedReviews, setRejectedReviews] = useState<Review[]>([])
+
+  const [featuredLimitDialog, setFeaturedLimitDialog] = useState<{
+    isOpen: boolean
+    reviewId: string
+    reviewUser: string
+    currentFeaturedCount: number
+  }>({
+    isOpen: false,
+    reviewId: "",
+    reviewUser: "",
+    currentFeaturedCount: 0,
+  })
 
   // Filter users based on search term
   const filteredUsers = useMemo(() => {
@@ -408,15 +424,6 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleRejectReviewWithReason = (reviewId: string, reviewUser: string) => {
-    setReviewDeclineDialog({
-      isOpen: true,
-      reviewId,
-      reviewUser,
-    })
-    setReviewDeclineReason("")
-  }
-
   const handleSubmitReviewDeclineReason = async () => {
     if (!reviewDeclineReason.trim()) {
       toast({
@@ -428,16 +435,16 @@ export default function AdminDashboard() {
     }
 
     try {
-      const { success, message } = await updateReviewStatus(
+      const { success, error } = await updateReviewStatus(
         reviewDeclineDialog.reviewId,
-        "rejected",
+        false, // approved = false for rejection
         reviewDeclineReason.trim(),
       )
       if (success) {
         toast({ title: "Review Rejected", description: "Review has been rejected with reason provided." })
         loadAdminData() // Refresh data
       } else {
-        toast({ title: "Error", description: message || "Failed to reject review.", variant: "destructive" })
+        toast({ title: "Error", description: error || "Failed to reject review.", variant: "destructive" })
       }
     } catch (error) {
       toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" })
@@ -450,7 +457,7 @@ export default function AdminDashboard() {
   const handleToggleFeatured = async (reviewId: string, featured: boolean) => {
     setLoadingReviews(true)
     try {
-      const { success, error } = await toggleReviewFeatured(reviewId, featured)
+      const { success, error, limitReached } = await toggleReviewFeatured(reviewId, featured)
       if (success) {
         toast({
           title: featured ? "Review Featured" : "Review Unfeatured",
@@ -463,11 +470,22 @@ export default function AdminDashboard() {
           prev.map((review) => (review.id === reviewId ? { ...review, is_featured: featured } : review)),
         )
       } else {
-        toast({
-          title: "Action Failed",
-          description: error || "Failed to update review featured status.",
-          variant: "destructive",
-        })
+        if (limitReached) {
+          const currentFeaturedCount = approvedReviews.filter((r) => r.is_featured).length
+          const reviewUser = approvedReviews.find((r) => r.id === reviewId)?.users?.full_name || "Unknown User"
+          setFeaturedLimitDialog({
+            isOpen: true,
+            reviewId,
+            reviewUser,
+            currentFeaturedCount,
+          })
+        } else {
+          toast({
+            title: "Action Failed",
+            description: error || "Failed to update review featured status.",
+            variant: "destructive",
+          })
+        }
       }
     } catch (error) {
       toast({
@@ -725,31 +743,12 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-2">
-              <Dumbbell className="h-8 w-8 text-orange-600" />
-              <h1 className="text-2xl font-bold text-gray-900">Sam24Fit Admin</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Badge className="bg-red-100 text-red-800">
-                <Shield className="h-3 w-3 mr-1" />
-                Admin
-              </Badge>
-              <span className="text-sm text-gray-600">Welcome, {user.full_name}</span>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gray-50">
+      <AdminHeader />
 
-      <main className="max-w-7xl mx-auto py-8 px-4">
+      <AdminQuickLinks />
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Dashboard Header */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h2>
@@ -757,7 +756,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Admin Personal Details */}
-        <Card className="mb-8">
+        <Card className="mb-8" id="admin-profile">
           <CardHeader>
             <CardTitle className="flex items-center">
               <UserIcon className="h-5 w-5 mr-2" />
@@ -798,7 +797,7 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Stats Cards */}
-        <Card className="mb-8">
+        <Card className="mb-8" id="statistics">
           <CardHeader>
             <CardTitle className="flex items-center">
               <BarChart className="h-5 w-5 mr-2" />
@@ -812,50 +811,61 @@ export default function AdminDashboard() {
                 <LoadingSpinner size="md" text="Loading stats..." />
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <Card className="bg-white border-0 shadow-sm">
-                  <CardContent className="p-6 flex items-center">
-                    <Users2 className="h-8 w-8 text-blue-600" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Total Users</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.totalUsers}</p>
+                  <CardContent className="p-4 flex items-center">
+                    <Users2 className="h-6 w-6 text-blue-600" />
+                    <div className="ml-3">
+                      <p className="text-xs font-medium text-gray-600">Total Users</p>
+                      <p className="text-xl font-bold text-gray-900">{stats.totalUsers}</p>
                     </div>
                   </CardContent>
                 </Card>
                 <Card className="bg-white border-0 shadow-sm">
-                  <CardContent className="p-6 flex items-center">
-                    <Check className="h-8 w-8 text-green-600" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Active Members</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.activeMembers}</p>
+                  <CardContent className="p-4 flex items-center">
+                    <Check className="h-6 w-6 text-green-600" />
+                    <div className="ml-3">
+                      <p className="text-xs font-medium text-gray-600">Active Members</p>
+                      <p className="text-xl font-bold text-gray-900">{stats.activeMembers}</p>
                     </div>
                   </CardContent>
                 </Card>
                 <Card className="bg-white border-0 shadow-sm">
-                  <CardContent className="p-6 flex items-center">
-                    <FileWarning className="h-8 w-8 text-yellow-600" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Pending Receipts</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.pendingReceipts}</p>
+                  <CardContent className="p-4 flex items-center">
+                    <FileWarning className="h-6 w-6 text-yellow-600" />
+                    <div className="ml-3">
+                      <p className="text-xs font-medium text-gray-600">Pending Receipts</p>
+                      <p className="text-xl font-bold text-gray-900">{stats.pendingReceipts}</p>
                     </div>
                   </CardContent>
                 </Card>
                 <Card className="bg-white border-0 shadow-sm">
-                  <CardContent className="p-6 flex items-center">
-                    <AlertCircle className="h-8 w-8 text-red-600" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Unpaid Members (Current Month)</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.unpaidMembers}</p>
+                  <CardContent className="p-4 flex items-center">
+                    <AlertCircle className="h-6 w-6 text-red-600" />
+                    <div className="ml-3">
+                      <p className="text-xs font-medium text-gray-600">Unpaid Members</p>
+                      <p className="text-xs text-gray-500">(Current Month)</p>
+                      <p className="text-xl font-bold text-gray-900">{stats.unpaidMembers}</p>
                     </div>
                   </CardContent>
                 </Card>
                 <Card className="bg-white border-0 shadow-sm">
-                  <CardContent className="p-6 flex items-center">
-                    <DollarSign className="h-8 w-8 text-purple-600" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Total Verified Revenue</p>
-                      <p className="text-sm text-gray-500 mb-1">From approved receipts</p>
-                      <p className="text-2xl font-bold text-gray-900">R{stats.totalRevenue.toFixed(2)}</p>
+                  <CardContent className="p-4 flex items-center">
+                    <DollarSign className="h-6 w-6 text-purple-600" />
+                    <div className="ml-3">
+                      <p className="text-xs font-medium text-gray-600">Total Revenue</p>
+                      <p className="text-xs text-gray-500">All time</p>
+                      <p className="text-xl font-bold text-gray-900">R{stats.totalRevenue.toFixed(2)}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-white border-0 shadow-sm">
+                  <CardContent className="p-4 flex items-center">
+                    <DollarSign className="h-6 w-6 text-green-600" />
+                    <div className="ml-3">
+                      <p className="text-xs font-medium text-gray-600">Month Revenue</p>
+                      <p className="text-xs text-gray-500">Resets monthly</p>
+                      <p className="text-xl font-bold text-gray-900">R{stats.currentMonthRevenue.toFixed(2)}</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -865,7 +875,7 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Monthly Revenue Chart - Fixed responsiveness */}
-        <Card className="mb-8">
+        <Card className="mb-8" id="revenue-chart">
           <CardHeader>
             <CardTitle className="flex items-center">
               <BarChart className="h-5 w-5 mr-2" />
@@ -934,7 +944,7 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Paid vs Unpaid Members Overview - Fixed responsiveness */}
-        <Card className="mb-8">
+        <Card className="mb-8" id="membership-status">
           <CardHeader>
             <CardTitle className="flex items-center">
               <CircleDollarSign className="h-5 w-5 mr-2" />
@@ -1082,7 +1092,7 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Inactive Members for Deactivation */}
-        <Card className="mb-8">
+        <Card className="mb-8" id="deactivation">
           <CardHeader>
             <CardTitle className="flex items-center">
               <UserMinus className="h-5 w-5 mr-2" />
@@ -1189,7 +1199,7 @@ export default function AdminDashboard() {
         </Card>
 
         {/* User Management with Search */}
-        <Card className="mb-8">
+        <Card className="mb-8" id="user-management">
           <CardHeader>
             <CardTitle className="flex items-center">
               <Users2 className="h-5 w-5 mr-2" />
@@ -1414,7 +1424,7 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Receipts Management by Month */}
-        <Card className="mb-8">
+        <Card className="mb-8" id="receipt-management">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center">
@@ -1553,19 +1563,9 @@ export default function AdminDashboard() {
                                           "/placeholder.svg" ||
                                           "/placeholder.svg" ||
                                           "/placeholder.svg" ||
-                                          "/placeholder.svg" ||
-                                          "/placeholder.svg" ||
-                                          "/placeholder.svg" ||
-                                          "/placeholder.svg" ||
-                                          "/placeholder.svg" ||
-                                          "/placeholder.svg" ||
-                                          "/placeholder.svg" ||
-                                          "/placeholder.svg" ||
-                                          "/placeholder.svg" ||
-                                          "/placeholder.svg" ||
                                           "/placeholder.svg"
                                         }
-                                        alt={`${receipt.users?.full_name || "User"}'s profile picture`}
+                                        alt={`${receipt.users?.full_name || "Unknown User"}'s profile picture`}
                                         width={40}
                                         height={40}
                                         className="rounded-full object-cover"
@@ -1651,7 +1651,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="mb-8">
+        <Card className="mb-8" id="review-management">
           <CardHeader>
             <CardTitle className="flex items-center">
               <MessageSquare className="h-5 w-5 mr-2" />
@@ -1686,6 +1686,13 @@ export default function AdminDashboard() {
                                 src={
                                   review.users?.profile_picture_url ||
                                   "/placeholder.svg?height=40&width=40&query=user profile" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
                                   "/placeholder.svg" ||
                                   "/placeholder.svg"
                                 }
@@ -1727,16 +1734,22 @@ export default function AdminDashboard() {
                                 <Check className="h-4 w-4 mr-1" />
                                 Approve
                               </Button>
-                             <Button
-  size="sm"
-  variant="outline"
-  onClick={() => handleRejectReviewWithReason(review.id, review.users?.full_name || "Unknown User")}
-  disabled={loadingReviews}
-  className="text-red-600 hover:text-red-700 hover:bg-red-50"
->
-  <X className="h-4 w-4 mr-1" />
-  Decline
-</Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  setReviewDeclineDialog({
+                                    isOpen: true,
+                                    reviewId: review.id,
+                                    reviewUser: review.users?.full_name || "Unknown User",
+                                  })
+                                }
+                                disabled={loadingReviews}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <X className="h-4 w-4 mr-1" />
+                                Decline
+                              </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -1773,6 +1786,13 @@ export default function AdminDashboard() {
                                 src={
                                   review.users?.profile_picture_url ||
                                   "/placeholder.svg?height=40&width=40&query=user profile" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
                                   "/placeholder.svg" ||
                                   "/placeholder.svg"
                                 }
@@ -1866,6 +1886,13 @@ export default function AdminDashboard() {
                                   review.users?.profile_picture_url ||
                                   "/placeholder.svg?height=40&width=40&query=user profile" ||
                                   "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
+                                  "/placeholder.svg" ||
                                   "/placeholder.svg"
                                 }
                                 alt={`${review.users?.full_name || "Unknown User"}'s profile picture`}
@@ -1928,6 +1955,8 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </main>
+
+      <AdminQuickLinks />
 
       {/* Delete Receipt */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -2006,6 +2035,106 @@ export default function AdminDashboard() {
       </Dialog>
 
       {/* Review Decline Reason Dialog */}
+      <Dialog
+        open={reviewDeclineDialog.isOpen}
+        onOpenChange={(open) => !open && setReviewDeclineDialog({ isOpen: false, reviewId: "", reviewUser: "" })}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Review</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for rejecting the review by {reviewDeclineDialog.reviewUser}. This will help the
+              user understand why their review was not approved.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Textarea
+              placeholder="Enter rejection reason..."
+              value={reviewDeclineReason}
+              onChange={(e) => setReviewDeclineReason(e.target.value)}
+              rows={4}
+            />
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setReviewDeclineDialog({ isOpen: false, reviewId: "", reviewUser: "" })
+                  setReviewDeclineReason("")
+                }}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSubmitReviewDeclineReason} className="bg-red-600 hover:bg-red-700">
+                Reject Review
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={featuredLimitDialog.isOpen}
+        onOpenChange={(open) =>
+          !open && setFeaturedLimitDialog({ isOpen: false, reviewId: "", reviewUser: "", currentFeaturedCount: 0 })
+        }
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <AlertCircle className="h-5 w-5 mr-2 text-orange-500" />
+              Featured Review Limit Reached
+            </DialogTitle>
+            <DialogDescription>
+              You can only feature up to 10 reviews at a time. You currently have{" "}
+              {featuredLimitDialog.currentFeaturedCount} featured reviews. To feature the review by{" "}
+              {featuredLimitDialog.reviewUser}, please unfeature another review first.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <h4 className="font-semibold text-orange-800 mb-2">Currently Featured Reviews:</h4>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {approvedReviews
+                  .filter((review) => review.is_featured)
+                  .map((review) => (
+                    <div key={review.id} className="flex items-center justify-between bg-white p-3 rounded border">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{review.users?.full_name || "Anonymous"}</p>
+                        <p className="text-xs text-gray-600 truncate">{review.review_text}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          handleToggleFeatured(review.id, false)
+                          setFeaturedLimitDialog({
+                            isOpen: false,
+                            reviewId: "",
+                            reviewUser: "",
+                            currentFeaturedCount: 0,
+                          })
+                        }}
+                        className="ml-2 text-orange-600 hover:text-orange-700"
+                      >
+                        Unfeature
+                      </Button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() =>
+                  setFeaturedLimitDialog({ isOpen: false, reviewId: "", reviewUser: "", currentFeaturedCount: 0 })
+                }
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Receipt Preview Dialog */}
       <Dialog open={isReceiptPreviewOpen} onOpenChange={setIsReceiptPreviewOpen}>
@@ -2141,21 +2270,6 @@ export default function AdminDashboard() {
                 src={
                   selectedUserForProfilePreview.profile_picture_url ||
                   "/placeholder.svg?height=300&width=300&query=user profile large" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
                   "/placeholder.svg" ||
                   "/placeholder.svg" ||
                   "/placeholder.svg" ||

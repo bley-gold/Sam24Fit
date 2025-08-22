@@ -54,6 +54,8 @@ export default function Dashboard() {
   const [reviewText, setReviewText] = useState("")
   const [reviewRating, setReviewRating] = useState(5)
   const [isSubmittingReview, setIsSubmittingReview] = useState(false)
+  const [canSubmitReview, setCanSubmitReview] = useState(true)
+  const [nextReviewDate, setNextReviewDate] = useState<string | null>(null)
   const [isWelcomeDialogOpen, setIsWelcomeDialogOpen] = useState(false)
   const [welcomeDialogStep, setWelcomeDialogStep] = useState(1)
   const [hasPdfDownloaded, setHasPdfDownloaded] = useState(false)
@@ -248,6 +250,21 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
       }
     }
   }, [user, authLoading, router])
+
+  useEffect(() => {
+    const checkReviewEligibility = async () => {
+      if (user) {
+        const { canUserSubmitReview } = await import("../actions/review-actions")
+        const result = await canUserSubmitReview(user.id)
+        if (result.success) {
+          setCanSubmitReview(result.canSubmit)
+          setNextReviewDate(result.nextSubmissionDate)
+        }
+      }
+    }
+
+    checkReviewEligibility()
+  }, [user])
 
   const checkJWTRole = async () => {
     const role = await getUserRoleFromJWT()
@@ -570,6 +587,11 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
         })
         setReviewText("")
         setReviewRating(5)
+        setCanSubmitReview(false)
+        const nextDate = new Date()
+        nextDate.setMonth(nextDate.getMonth() + 3)
+        setNextReviewDate(nextDate.toISOString())
+
         const reviewsResult = await getUserReviews(user.id)
         if (reviewsResult.success) {
           setUserReviews(reviewsResult.data)
@@ -871,6 +893,22 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
                   )}
 
                   <div className="space-y-3">
+                    {!canSubmitReview && nextReviewDate && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
+                        <p className="text-sm text-yellow-800">
+                          You can submit your next review on{" "}
+                          <strong>
+                            {new Date(nextReviewDate).toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })}
+                          </strong>
+                          . Reviews are limited to once every 3 months.
+                        </p>
+                      </div>
+                    )}
+
                     <div>
                       <label className="text-xs font-medium text-gray-700 mb-1 block">Rating</label>
                       <div className="flex space-x-1">
@@ -879,9 +917,12 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
                             key={star}
                             type="button"
                             onClick={() => setReviewRating(star)}
+                            disabled={!canSubmitReview}
                             className={`text-lg ${
                               star <= reviewRating ? "text-yellow-400" : "text-gray-300"
-                            } hover:text-yellow-400 transition-colors`}
+                            } hover:text-yellow-400 transition-colors ${
+                              !canSubmitReview ? "opacity-50 cursor-not-allowed" : ""
+                            }`}
                           >
                             ★
                           </button>
@@ -898,16 +939,21 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
                         rows={3}
                         maxLength={500}
+                        disabled={!canSubmitReview}
                       />
                       <p className="text-xs text-gray-500 mt-1">{reviewText.length}/500 characters</p>
                     </div>
 
                     <Button
                       onClick={handleSubmitReview}
-                      disabled={isSubmittingReview || !reviewText.trim()}
+                      disabled={isSubmittingReview || !reviewText.trim() || !canSubmitReview}
                       className="w-full bg-orange-600 hover:bg-orange-700 text-sm py-2"
                     >
-                      {isSubmittingReview ? "Submitting..." : "Submit Review"}
+                      {isSubmittingReview
+                        ? "Submitting..."
+                        : canSubmitReview
+                          ? "Submit Review"
+                          : "Review Submitted Recently"}
                     </Button>
                   </div>
                 </div>
@@ -917,79 +963,141 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
               </div>
             </CardContent>
           </Card>
-        </div>
 
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <FileText className="h-5 w-5 mr-2" />
-              Recent Receipts
-            </CardTitle>
-            <CardDescription>Your uploaded payment receipts</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loadingReceipts ? (
-              <div className="text-center py-8">
-                <LoadingSpinner size="md" text="Loading receipts..." />
+          <Card className="lg:col-span-3 mt-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+            <CardHeader>
+              <CardTitle className="flex items-center text-green-800">
+                <CreditCard className="h-5 w-5 mr-2" />
+                Payment Details - Bank Account Information
+              </CardTitle>
+              <CardDescription className="text-green-700">
+                Use these bank details to make your gym membership payments
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium text-green-800">Bank Name</label>
+                    <p className="text-gray-900 font-semibold">First National Bank (FNB)</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-green-800">Account Holder</label>
+                    <p className="text-gray-900 font-semibold">Sam24Fit Gym (Pty) Ltd</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-green-800">Account Number</label>
+                    <p className="text-gray-900 font-semibold text-lg">62847291056</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium text-green-800">Branch Code</label>
+                    <p className="text-gray-900 font-semibold">250655</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-green-800">Account Type</label>
+                    <p className="text-gray-900 font-semibold">Business Current Account</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-green-800">Reference</label>
+                    <p className="text-gray-900 font-semibold">Use your full name + membership</p>
+                  </div>
+                </div>
               </div>
-            ) : receipts.length === 0 ? (
-              <div className="text-center py-8">
-                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 mb-4">No receipts uploaded yet</p>
-                <Button onClick={() => router.push("/upload")}>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Your First Receipt
-                </Button>
+              <div className="mt-4 p-4 bg-green-100 rounded-lg">
+                <h4 className="font-medium text-green-900 mb-2">Payment Instructions:</h4>
+                <ul className="text-sm text-green-800 space-y-1">
+                  <li>
+                    • <strong>Membership Fee:</strong> R120 per month
+                  </li>
+                  <li>
+                    • <strong>Admin Fee:</strong> R50 (one-time for new members)
+                  </li>
+                  <li>
+                    • <strong>Reference:</strong> Use "{user?.full_name || "Your Name"} - Membership" as payment
+                    reference
+                  </li>
+                  <li>
+                    • <strong>After Payment:</strong> Upload your proof of payment using the "Upload Receipt" button
+                  </li>
+                </ul>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {receipts.map((receipt) => (
-                  <div key={receipt.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <FileText className="h-8 w-8 text-gray-400" />
-                      <div>
-                        <p className="font-medium text-gray-900">{receipt.filename}</p>
-                        <p className="text-sm text-gray-500">
-                          <Calendar className="h-4 w-4 inline mr-1" />
-                          {new Date(receipt.upload_date).toLocaleDateString()}
-                        </p>
-                        {receipt.description && <p className="text-sm text-gray-600">{receipt.description}</p>}
-                        {receipt.status === "rejected" && receipt.rejection_reason && (
-                          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
-                            <p className="text-sm font-medium text-red-800">Rejection Reason:</p>
-                            <p className="text-sm text-red-700">{receipt.rejection_reason}</p>
-                          </div>
-                        )}
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-3 mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <FileText className="h-5 w-5 mr-2" />
+                Recent Receipts
+              </CardTitle>
+              <CardDescription>Your uploaded payment receipts</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingReceipts ? (
+                <div className="text-center py-8">
+                  <LoadingSpinner size="md" text="Loading receipts..." />
+                </div>
+              ) : receipts.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500 mb-4">No receipts uploaded yet</p>
+                  <Button onClick={() => router.push("/upload")}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload Your First Receipt
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {receipts.map((receipt) => (
+                    <div key={receipt.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center space-x-4">
+                        <FileText className="h-8 w-8 text-gray-400" />
+                        <div>
+                          <p className="font-medium text-gray-900">{receipt.filename}</p>
+                          <p className="text-sm text-gray-500">
+                            <Calendar className="h-4 w-4 inline mr-1" />
+                            {new Date(receipt.upload_date).toLocaleDateString()}
+                          </p>
+                          {receipt.description && <p className="text-sm text-gray-600">{receipt.description}</p>}
+                          {receipt.status === "rejected" && receipt.rejection_reason && (
+                            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+                              <p className="text-sm font-medium text-red-800">Rejection Reason:</p>
+                              <p className="text-sm text-red-700">{receipt.rejection_reason}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <span className="font-medium text-gray-900">R{receipt.amount.toFixed(2)}</span>
+                        <Badge className={getStatusColor(receipt.status)}>
+                          {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
+                        </Badge>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handlePreviewReceipt(receipt)}
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDeleteReceipt(receipt)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-4">
-                      <span className="font-medium text-gray-900">R{receipt.amount.toFixed(2)}</span>
-                      <Badge className={getStatusColor(receipt.status)}>
-                        {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
-                      </Badge>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handlePreviewReceipt(receipt)}
-                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDeleteReceipt(receipt)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </main>
 
       <Dialog open={isWelcomeDialogOpen} onOpenChange={() => {}}>
@@ -1116,11 +1224,6 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
                 )}
                 {receiptToPreview.status === "rejected" && (
                   <div className="col-span-2">
-                    {console.log("[v0] Checking rejection reason display:", {
-                      status: receiptToPreview.status,
-                      rejection_reason: receiptToPreview.rejection_reason,
-                      shouldShow: receiptToPreview.status === "rejected" && receiptToPreview.rejection_reason,
-                    })}
                     {receiptToPreview.rejection_reason ? (
                       <div>
                         <label className="font-medium text-gray-500">Rejection Reason:</label>
