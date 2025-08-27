@@ -1,9 +1,8 @@
 "use client"
 
-import { createContext, useContext, useEffect, type ReactNode } from "react"
+import { createContext, useContext, type ReactNode } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import type { User } from "@/lib/supabase"
-import { useRouter } from "next/navigation"
 
 interface AuthContextType {
   user: User | null
@@ -33,20 +32,15 @@ interface AuthProviderProps {
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const authHook = useAuth()
-  const { user, loading } = authHook
-  const router = useRouter()
+  const { user, loading, refreshUser, refreshSession } = authHook
 
-  useEffect(() => {
-    if (user && user.role === "admin") {
-      router.push("/admin")
-    }
-  }, [user, router])
+  // Navigation logic should be handled in individual pages, not in the auth provider
 
   const contextValue = {
     user,
     loading,
-    refreshUser: async () => null,
-    refreshSession: async () => ({ user: null, error: null }),
+    refreshUser,
+    refreshSession,
   }
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
