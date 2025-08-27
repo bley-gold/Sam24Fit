@@ -12,7 +12,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { LoadingSpinner } from "@/components/loading-spinner"
 import { signIn, signUp, type SignUpData, type SignInData } from "@/lib/auth"
-import { supabase } from "@/lib/supabase"
 import {
   Dumbbell,
   Shield,
@@ -39,9 +38,6 @@ export default function AuthPage() {
   const [confirmationEmail, setConfirmationEmail] = useState("")
   const [forceShowAuth, setForceShowAuth] = useState(false)
   const redirectAttempted = useRef(false)
-  const [hasRedirected, setHasRedirected] = useState(false)
-  const [sessionCheckAttempts, setSessionCheckAttempts] = useState(0)
-  const maxSessionCheckAttempts = 3
 
   const [loginData, setLoginData] = useState<SignInData>({ email: "", password: "" })
   const [signupData, setSignupData] = useState<Omit<SignUpData, "profilePicture"> & { profilePicture: File | null }>({
@@ -65,29 +61,29 @@ export default function AuthPage() {
     const timeout = setTimeout(() => {
       console.log("AuthPage: Forcing auth form to show after timeout")
       setForceShowAuth(true)
-    }, 8000) // 8 second timeout
+    }, 5000) // Reduced to 5 seconds
 
     return () => clearTimeout(timeout)
   }, [])
 
-  // Effect to redirect if user is already logged in
   useEffect(() => {
-    console.log("AuthPage useEffect: authLoading =", authLoading, ", user =", user, ", hasRedirected =", hasRedirected)
+    console.log("AuthPage useEffect: authLoading =", authLoading, ", user =", user)
 
-    if (hasRedirected || redirectAttempted.current) {
+    if (redirectAttempted.current) {
       console.log("AuthPage: Redirect already attempted, skipping")
       return
     }
 
+    // Hide email confirmation if user is authenticated
     if (!authLoading && user && showEmailConfirmation) {
       console.log("AuthPage: User is authenticated, hiding email confirmation screen")
       setShowEmailConfirmation(false)
     }
 
+    // Redirect authenticated users
     if (!authLoading && user) {
       console.log("AuthPage: User logged in, checking role for redirect")
       redirectAttempted.current = true
-      setHasRedirected(true)
 
       // Check if user is admin and redirect accordingly
       if (user.role === "admin" || user.email === "goldstainmusic22@gmail.com") {
@@ -97,60 +93,8 @@ export default function AuthPage() {
         console.log("AuthPage: Regular user, redirecting to user dashboard")
         router.push("/dashboard")
       }
-    } else if (!authLoading && !user && !redirectAttempted.current && sessionCheckAttempts < maxSessionCheckAttempts) {
-      const checkAuthSession = async () => {
-        try {
-          console.log("AuthPage: Checking auth session, attempt", sessionCheckAttempts + 1)
-          setSessionCheckAttempts((prev) => prev + 1)
-
-          const {
-            data: { session },
-          } = await supabase.auth.getSession()
-
-          if (session && session.user && !redirectAttempted.current) {
-            console.log("AuthPage: Found authenticated session without user profile, attempting to refresh user data")
-
-            // Try to refresh user data from AuthContext
-            if (refreshUser) {
-              console.log("AuthPage: Attempting to refresh user data...")
-              await refreshUser()
-
-              // Give it a moment to update
-              setTimeout(() => {
-                if (!redirectAttempted.current) {
-                  console.log("AuthPage: User refresh completed, checking if user is now available")
-                  // The useEffect will run again and handle the redirect if user is now available
-                }
-              }, 1000)
-            } else {
-              console.log("AuthPage: No refreshUser function available, redirecting to dashboard")
-              redirectAttempted.current = true
-              setHasRedirected(true)
-              router.push("/dashboard")
-            }
-          }
-        } catch (error) {
-          console.error("Error checking auth session:", error)
-          setSessionCheckAttempts((prev) => prev + 1)
-        }
-      }
-      checkAuthSession()
-    } else if (sessionCheckAttempts >= maxSessionCheckAttempts && !user && !redirectAttempted.current) {
-      console.log("AuthPage: Max session check attempts reached, forcing logout due to profile sync issue")
-      toast({
-        title: "Authentication Issue",
-        description: "There was a problem loading your profile. Please try logging in again.",
-        variant: "destructive",
-      })
-
-      // Force logout to clear any stale session
-      supabase.auth.signOut().then(() => {
-        console.log("AuthPage: Forced logout completed")
-        setForceShowAuth(true)
-        setSessionCheckAttempts(0)
-      })
     }
-  }, [user, authLoading, router, hasRedirected, sessionCheckAttempts, refreshUser, toast])
+  }, [user, authLoading, router, showEmailConfirmation])
 
   const calculateAge = (birthDate: string) => {
     const today = new Date()
@@ -204,7 +148,6 @@ export default function AuthPage() {
         })
 
         redirectAttempted.current = true
-        setHasRedirected(true)
 
         // Redirect based on user role from JWT (more reliable than profile data)
         if (isAdmin) {
@@ -313,8 +256,8 @@ export default function AuthPage() {
     setTestEnvLoading(false)
   }
 
-  // Show loading spinner only if authentication is loading AND we haven't forced show yet AND haven't redirected
-  if (authLoading && !forceShowAuth && !hasRedirected) {
+  // Show loading spinner only if authentication is loading AND we haven't forced show yet
+  if (authLoading && !forceShowAuth) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
         <div className="text-center">

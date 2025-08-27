@@ -74,14 +74,14 @@ export default function LandingPage() {
   }
 
   const galleryImages = [
-    { id: 1, title: "State-of-the-art Equipment", category: "Equipment" },
-    { id: 2, title: "Spacious Workout Area", category: "Facility" },
-    { id: 3, title: "Cardio Zone", category: "Equipment" },
-    { id: 4, title: "Free Weights Section", category: "Equipment" },
-    { id: 5, title: "Group Training Area", category: "Classes" },
-    { id: 6, title: "Community Vibes", category: "Facility" },
-    { id: 7, title: "Functional Training", category: "Training" },
-    { id: 8, title: "Members in Action", category: "Community" },
+    { id: 1, title: "State-of-the-art Equipment", category: "Equipment", src: "/modern-gym.png" },
+    { id: 2, title: "Spacious Workout Area", category: "Facility", src: "/small-basic-gym.png" },
+    { id: 3, title: "Cardio Zone", category: "Equipment", src: "/modern-gym-tech.png" },
+    { id: 4, title: "Free Weights Section", category: "Equipment", src: "/socially-distanced-gym.png" },
+    { id: 5, title: "Group Training Area", category: "Classes", src: "/community-workout.png" },
+    { id: 6, title: "Community Vibes", category: "Facility", src: "/urban-fitness-graffiti.png" },
+    { id: 7, title: "Functional Training", category: "Training", src: "/modern-gym.png" },
+    { id: 8, title: "Members in Action", category: "Community", src: "/community-workout.png" },
   ]
 
   return (
@@ -365,6 +365,7 @@ export default function LandingPage() {
 
             {/* Bank Account Details */}
             <div className="lg:sticky lg:top-8">
+              {/* Business Account */}
               <Card className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 shadow-lg">
                 <CardHeader className="text-center pb-3 sm:pb-4 px-4 sm:px-6 pt-6">
                   <div className="bg-blue-600 rounded-full p-2.5 sm:p-3 w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4">
@@ -373,45 +374,25 @@ export default function LandingPage() {
                       <circle cx="6" cy="16" r="1" />
                     </svg>
                   </div>
-                  <CardTitle className="text-xl sm:text-2xl text-gray-900">Payment Details</CardTitle>
+                  <CardTitle className="text-xl sm:text-2xl text-gray-900">Business Account</CardTitle>
                   <CardDescription className="text-sm sm:text-base">
-                    Use these bank details to make your membership payment
+                    Primary payment account for memberships
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 sm:space-y-4 px-4 sm:px-6 pb-6">
                   <div className="bg-white rounded-lg p-3 sm:p-4 space-y-2 sm:space-y-3">
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
-                      <span className="text-gray-600 font-medium text-sm sm:text-base">Bank:</span>
-                      <span className="text-gray-900 font-semibold text-sm sm:text-base">
-                        First National Bank (FNB)
-                      </span>
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
                       <span className="text-gray-600 font-medium text-sm sm:text-base">Account Name:</span>
-                      <span className="text-gray-900 font-semibold text-sm sm:text-base">Sam24Fit Gym</span>
+                      <span className="text-gray-900 font-semibold text-sm sm:text-base">Sam24fit</span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
                       <span className="text-gray-600 font-medium text-sm sm:text-base">Account Number:</span>
-                      <span className="text-gray-900 font-semibold font-mono text-sm sm:text-base">62847291056</span>
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
-                      <span className="text-gray-600 font-medium text-sm sm:text-base">Branch Code:</span>
-                      <span className="text-gray-900 font-semibold font-mono text-sm sm:text-base">250655</span>
+                      <span className="text-gray-900 font-semibold font-mono text-sm sm:text-base">1052 6463 87</span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
                       <span className="text-gray-600 font-medium text-sm sm:text-base">Account Type:</span>
-                      <span className="text-gray-900 font-semibold text-sm sm:text-base">Business Cheque</span>
+                      <span className="text-gray-900 font-semibold text-sm sm:text-base">Transact</span>
                     </div>
-                  </div>
-
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4">
-                    <h4 className="font-semibold text-yellow-800 mb-2 text-sm sm:text-base">Payment Reference:</h4>
-                    <p className="text-yellow-700 text-xs sm:text-sm">
-                      Use your full name and phone number as reference
-                    </p>
-                    <p className="text-yellow-700 text-xs sm:text-sm font-mono break-all">
-                      Example: "John Smith 0821234567"
-                    </p>
                   </div>
 
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
@@ -421,6 +402,63 @@ export default function LandingPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Personal Account */}
+              <Card className="bg-gradient-to-br from-green-50 to-blue-50 border-2 border-green-200 shadow-lg mt-4">
+                <CardHeader className="text-center pb-3 sm:pb-4 px-4 sm:px-6 pt-6">
+                  <div className="bg-green-600 rounded-full p-2.5 sm:p-3 w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4">
+                    <svg className="h-7 w-7 sm:h-10 sm:w-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                    </svg>
+                  </div>
+                  <CardTitle className="text-xl sm:text-2xl text-gray-900">Personal Account</CardTitle>
+                  <CardDescription className="text-sm sm:text-base">Alternative payment option</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 sm:space-y-4 px-4 sm:px-6 pb-6">
+                  <div className="bg-white rounded-lg p-3 sm:p-4 space-y-2 sm:space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
+                      <span className="text-gray-600 font-medium text-sm sm:text-base">Bank:</span>
+                      <span className="text-gray-900 font-semibold text-sm sm:text-base">Capitec Bank</span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
+                      <span className="text-gray-600 font-medium text-sm sm:text-base">Account Name:</span>
+                      <span className="text-gray-900 font-semibold text-sm sm:text-base">MR SG NXUMALO</span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
+                      <span className="text-gray-600 font-medium text-sm sm:text-base">Account Number:</span>
+                      <span className="text-gray-900 font-semibold font-mono text-sm sm:text-base">1278512703</span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
+                      <span className="text-gray-600 font-medium text-sm sm:text-base">Account Type:</span>
+                      <span className="text-gray-900 font-semibold text-sm sm:text-base">Personal Debit</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-green-800 font-medium text-sm">Online Purchases:</span>
+                      <span className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-medium">
+                        ENABLED
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-green-800 font-medium text-sm">International:</span>
+                      <span className="bg-gray-400 text-white px-2 py-1 rounded-full text-xs font-medium">
+                        DISABLED
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Payment Instructions */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 mt-4">
+                <h4 className="font-semibold text-yellow-800 mb-2 text-sm sm:text-base">Payment Reference:</h4>
+                <p className="text-yellow-700 text-xs sm:text-sm">Use your full name and phone number as reference</p>
+                <p className="text-yellow-700 text-xs sm:text-sm font-mono break-all">
+                  Example: "John Smith 0821234567"
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -444,10 +482,13 @@ export default function LandingPage() {
                 key={image.id}
                 className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-gray-200 aspect-square hover:scale-105 transition-transform duration-300 cursor-pointer"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 opacity-80 group-hover:opacity-60 transition-opacity" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Camera className="h-8 w-8 sm:h-12 sm:w-12 text-white opacity-60" />
-                </div>
+                <Image
+                  src={image.src || "/placeholder.svg"}
+                  alt={image.title}
+                  fill
+                  className="object-cover group-hover:scale-110 transition-transform duration-300"
+                />
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/60 to-purple-600/60 group-hover:from-blue-500/40 group-hover:to-purple-600/40 transition-all duration-300" />
                 <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 text-white">
                   <Badge className="bg-white/20 text-white mb-1.5 sm:mb-2 text-xs px-2 py-1">{image.category}</Badge>
                   <h3 className="font-semibold text-xs sm:text-sm leading-tight">{image.title}</h3>
@@ -583,6 +624,8 @@ export default function LandingPage() {
                           src={
                             review.users?.profile_picture_url ||
                             "/placeholder.svg?height=32&width=32&query=user profile" ||
+                            "/placeholder.svg" ||
+                            "/placeholder.svg" ||
                             "/placeholder.svg" ||
                             "/placeholder.svg"
                           }
