@@ -20,12 +20,16 @@ const nextConfig = {
         }
       }
       
-      // Fallback domains for common Supabase patterns (in case env var is not available during build)
-      domains.push('*.supabase.co');
+      // Common Supabase domain patterns (without wildcards which Next.js doesn't support)
+      domains.push(
+        'cybjdyouocdxrcedtjkq.supabase.co',
+        'noidkepohqhgdalkvzze.supabase.co'
+      );
       
       return domains;
     })(),
     formats: ['image/webp', 'image/avif'],
+    unoptimized: false,
   },
 
   // Environment variables

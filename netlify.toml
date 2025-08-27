@@ -13,11 +13,6 @@
 [functions]
   node_bundler = "esbuild"
 
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
 # Environment variables for production
 [context.production.environment]
   NEXT_PUBLIC_SITE_URL = "https://sam24fit.netlify.app"
