@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { LoadingSpinner } from "@/components/loading-spinner"
 import { signIn, signUp, type SignUpData, type SignInData } from "@/lib/auth"
+import { supabase } from "@/lib/supabase"
 import {
   Dumbbell,
   Shield,
@@ -26,16 +27,21 @@ import {
   CheckCircle,
 } from "lucide-react"
 import { useAuthContext } from "@/components/auth-provider"
+import { testEnvironmentVariables } from "@/app/actions/test-env-action"
 
 export default function AuthPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [formSubmitting, setFormSubmitting] = useState(false)
-  const { user, loading: authLoading } = useAuthContext()
-
+  const { user, loading: authLoading, refreshUser } = useAuthContext()
+  const [testEnvLoading, setTestEnvLoading] = useState(false)
   const [showEmailConfirmation, setShowEmailConfirmation] = useState(false)
   const [confirmationEmail, setConfirmationEmail] = useState("")
   const [forceShowAuth, setForceShowAuth] = useState(false)
+  const redirectAttempted = useRef(false)
+  const [hasRedirected, setHasRedirected] = useState(false)
+  const [sessionCheckAttempts, setSessionCheckAttempts] = useState(0)
+  const maxSessionCheckAttempts = 3
 
   const [loginData, setLoginData] = useState<SignInData>({ email: "", password: "" })
   const [signupData, setSignupData] = useState<Omit<SignUpData, "profilePicture"> & { profilePicture: File | null }>({
@@ -52,7 +58,7 @@ export default function AuthPage() {
     idNumber: "",
   })
   const [ageError, setAgeError] = useState("")
-  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
 
   // Force show auth form after timeout
   useEffect(() => {
@@ -66,9 +72,22 @@ export default function AuthPage() {
 
   // Effect to redirect if user is already logged in
   useEffect(() => {
-    console.log("AuthPage useEffect: authLoading =", authLoading, ", user =", user)
+    console.log("AuthPage useEffect: authLoading =", authLoading, ", user =", user, ", hasRedirected =", hasRedirected)
+
+    if (hasRedirected || redirectAttempted.current) {
+      console.log("AuthPage: Redirect already attempted, skipping")
+      return
+    }
+
+    if (!authLoading && user && showEmailConfirmation) {
+      console.log("AuthPage: User is authenticated, hiding email confirmation screen")
+      setShowEmailConfirmation(false)
+    }
+
     if (!authLoading && user) {
       console.log("AuthPage: User logged in, checking role for redirect")
+      redirectAttempted.current = true
+      setHasRedirected(true)
 
       // Check if user is admin and redirect accordingly
       if (user.role === "admin" || user.email === "goldstainmusic22@gmail.com") {
@@ -78,8 +97,60 @@ export default function AuthPage() {
         console.log("AuthPage: Regular user, redirecting to user dashboard")
         router.push("/dashboard")
       }
+    } else if (!authLoading && !user && !redirectAttempted.current && sessionCheckAttempts < maxSessionCheckAttempts) {
+      const checkAuthSession = async () => {
+        try {
+          console.log("AuthPage: Checking auth session, attempt", sessionCheckAttempts + 1)
+          setSessionCheckAttempts((prev) => prev + 1)
+
+          const {
+            data: { session },
+          } = await supabase.auth.getSession()
+
+          if (session && session.user && !redirectAttempted.current) {
+            console.log("AuthPage: Found authenticated session without user profile, attempting to refresh user data")
+
+            // Try to refresh user data from AuthContext
+            if (refreshUser) {
+              console.log("AuthPage: Attempting to refresh user data...")
+              await refreshUser()
+
+              // Give it a moment to update
+              setTimeout(() => {
+                if (!redirectAttempted.current) {
+                  console.log("AuthPage: User refresh completed, checking if user is now available")
+                  // The useEffect will run again and handle the redirect if user is now available
+                }
+              }, 1000)
+            } else {
+              console.log("AuthPage: No refreshUser function available, redirecting to dashboard")
+              redirectAttempted.current = true
+              setHasRedirected(true)
+              router.push("/dashboard")
+            }
+          }
+        } catch (error) {
+          console.error("Error checking auth session:", error)
+          setSessionCheckAttempts((prev) => prev + 1)
+        }
+      }
+      checkAuthSession()
+    } else if (sessionCheckAttempts >= maxSessionCheckAttempts && !user && !redirectAttempted.current) {
+      console.log("AuthPage: Max session check attempts reached, forcing logout due to profile sync issue")
+      toast({
+        title: "Authentication Issue",
+        description: "There was a problem loading your profile. Please try logging in again.",
+        variant: "destructive",
+      })
+
+      // Force logout to clear any stale session
+      supabase.auth.signOut().then(() => {
+        console.log("AuthPage: Forced logout completed")
+        setForceShowAuth(true)
+        setSessionCheckAttempts(0)
+      })
     }
-  }, [user, authLoading, router])
+  }, [user, authLoading, router, hasRedirected, sessionCheckAttempts, refreshUser, toast])
 
   const calculateAge = (birthDate: string) => {
     const today = new Date()
@@ -132,7 +203,10 @@ export default function AuthPage() {
           description: "You have successfully logged in.",
         })
 
-        // Redirect based on user role
+        redirectAttempted.current = true
+        setHasRedirected(true)
+
+        // Redirect based on user role from JWT (more reliable than profile data)
         if (isAdmin) {
           console.log("AuthPage: Admin user detected, redirecting to admin dashboard")
           router.push("/admin")
@@ -155,6 +229,15 @@ export default function AuthPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (!acceptedTerms) {
+      toast({
+        title: "Terms and Conditions Required",
+        description: "Please accept the terms and conditions to continue.",
+        variant: "destructive",
+      })
+      return
+    }
+
     // Check age validation
     if (signupData.dateOfBirth) {
       const age = calculateAge(signupData.dateOfBirth)
@@ -168,15 +251,6 @@ export default function AuthPage() {
       toast({
         title: "Profile Picture Required",
         description: "Please upload a profile picture to continue.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (!termsAccepted) {
-      toast({
-        title: "Terms and Conditions Required",
-        description: "You must accept the terms and conditions to proceed.",
         variant: "destructive",
       })
       return
@@ -228,9 +302,19 @@ export default function AuthPage() {
     }
   }
 
+  const handleTestEnv = async () => {
+    setTestEnvLoading(true)
+    const result = await testEnvironmentVariables()
+    toast({
+      title: "Environment Test Result",
+      description: result.message,
+      variant: result.success ? "default" : "destructive",
+    })
+    setTestEnvLoading(false)
+  }
 
-  // Show loading spinner only if authentication is loading AND we haven't forced show yet
-  if (authLoading && !forceShowAuth) {
+  // Show loading spinner only if authentication is loading AND we haven't forced show yet AND haven't redirected
+  if (authLoading && !forceShowAuth && !hasRedirected) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
         <div className="text-center">
@@ -417,7 +501,6 @@ export default function AuthPage() {
                     {formSubmitting ? <LoadingSpinner size="sm" /> : "Login"}
                   </Button>
                 </form>
-
               </TabsContent>
 
               <TabsContent value="signup">
@@ -633,60 +716,35 @@ export default function AuthPage() {
                     </div>
                   </div>
 
-                  {/* Terms and Conditions Section */}
+                  {/* Terms and Conditions Checkbox */}
                   <div className="space-y-4 pt-4 border-t">
-                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                      <CheckCircle className="h-5 w-5 mr-2 text-orange-600" />
-                      Terms and Conditions
-                    </h3>
-
-                    <div className="p-4 bg-gray-50 rounded-lg border max-h-48 overflow-y-auto">
-                      <h4 className="font-semibold text-gray-900 mb-3">MEMBERSHIP AGREEMENT</h4>
-                      <p className="text-sm text-gray-700 mb-3 italic">
-                        (This is a legally binding document. Please read carefully.)
-                      </p>
-
-                      <div className="space-y-3 text-sm text-gray-700">
-                        <div>
-                          <h5 className="font-medium text-gray-900 mb-2">SHORT RULES OF THE GYM (HOUSE RULES)</h5>
-                          <ul className="list-disc list-inside space-y-1 ml-2 text-xs">
-                            <li>Train at your own risk.</li>
-                            <li>Arrange the equipment after use.</li>
-                            <li>Respect other members and staff.</li>
-                            <li>No inappropriate behavior or language.</li>
-                            <li>Proper gym attire is required.</li>
-                            <li>
-                              Report damaged equipment immediately. If you damage anything in the gym, you will pay.
-                            </li>
-                            <li>Management reserves the right to cancel membership due to rule violations.</li>
-                          </ul>
-                        </div>
-
-                        <div>
-                          <h5 className="font-medium text-gray-900 mb-2">DISCLAIMER / INDEMNITY</h5>
-                          <p className="text-xs text-gray-700 mb-2">
-                            I, the undersigned member, understand and acknowledge that I am voluntarily participating in
-                            physical activities at this gym at my own risk. The gym owners, staff, and affiliates are
-                            not liable for any injury, illness, death, or loss/damage to personal property. I have
-                            consulted a medical professional if necessary and am physically fit to train. I agree to
-                            follow the gym's rules and understand that violations may result in membership termination
-                            without refund.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
                     <div className="flex items-start space-x-3">
                       <input
+                        id="acceptTerms"
                         type="checkbox"
-                        id="termsAccepted"
-                        checked={termsAccepted}
-                        onChange={(e) => setTermsAccepted(e.target.checked)}
+                        checked={acceptedTerms}
+                        onChange={(e) => setAcceptedTerms(e.target.checked)}
                         className="mt-1 h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
                       />
-                      <label htmlFor="termsAccepted" className="text-sm text-gray-700 leading-relaxed">
-                        I have read, understood, and agree to the membership agreement, gym rules, and disclaimer above.
-                        I acknowledge that this is a legally binding document and that I am signing it voluntarily. *
+                      <label htmlFor="acceptTerms" className="text-sm text-gray-700 cursor-pointer">
+                        I accept the{" "}
+                        <a
+                          href="/terms"
+                          target="_blank"
+                          className="text-orange-600 hover:text-orange-700 underline"
+                          rel="noreferrer"
+                        >
+                          Terms and Conditions
+                        </a>{" "}
+                        and{" "}
+                        <a
+                          href="/privacy"
+                          target="_blank"
+                          className="text-orange-600 hover:text-orange-700 underline"
+                          rel="noreferrer"
+                        >
+                          Privacy Policy
+                        </a>
                       </label>
                     </div>
                   </div>
@@ -694,7 +752,7 @@ export default function AuthPage() {
                   <Button
                     type="submit"
                     className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 mt-6 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!!ageError || formSubmitting || !termsAccepted}
+                    disabled={!!ageError || formSubmitting || !acceptedTerms}
                   >
                     {formSubmitting ? (
                       <LoadingSpinner size="sm" />

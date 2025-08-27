@@ -27,6 +27,9 @@ import {
   CheckCircle,
   XCircle,
   X,
+  Download,
+  ChevronRight,
+  Settings,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { deleteReceipt } from "@/app/actions/receipt-actions"
@@ -42,7 +45,7 @@ export default function Dashboard() {
   const [jwtRole, setJwtRole] = useState<string>("")
   const [receiptToDelete, setReceiptToDelete] = useState<Receipt | null>(null)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(isDeleteDialogOpen)
   const [receiptToPreview, setReceiptToPreview] = useState<Receipt | null>(null)
   const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false)
   const [recentStatusChanges, setRecentStatusChanges] = useState<Receipt[]>([])
@@ -982,58 +985,138 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium text-green-800">Bank Name</label>
-                    <p className="text-gray-900 font-semibold">First National Bank (FNB)</p>
+              <div className="space-y-6">
+                {/* Business Account */}
+                <div className="bg-white rounded-lg p-6 border border-green-300">
+                  <div className="flex items-center mb-4">
+                    <div className="bg-green-600 text-white p-2 rounded-lg mr-3">
+                      <CreditCard className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Business Account</h3>
+                      <p className="text-sm text-gray-600">Primary payment method</p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-green-800">Account Holder</label>
-                    <p className="text-gray-900 font-semibold">Sam24Fit Gym (Pty) Ltd</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-green-800">Account Number</label>
-                    <p className="text-gray-900 font-semibold text-lg">62847291056</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium text-green-800">Account Nickname</label>
+                        <p className="text-gray-900 font-semibold">Sam24fit</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-green-800">Account Number</label>
+                        <p className="text-gray-900 font-semibold text-lg">1052 6463 87</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-green-800">Account Type</label>
+                        <p className="text-gray-900 font-semibold">Transact</p>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium text-green-800">Bank Name</label>
+                        <p className="text-gray-900 font-semibold">First National Bank (FNB)</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-green-800">Branch Code</label>
+                        <p className="text-gray-900 font-semibold">250655</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-green-800">Reference</label>
+                        <p className="text-gray-900 font-semibold">Use your full name + membership</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium text-green-800">Branch Code</label>
-                    <p className="text-gray-900 font-semibold">250655</p>
+
+                {/* Personal Account */}
+                <div className="bg-white rounded-lg p-6 border border-blue-300">
+                  <div className="flex items-center mb-4">
+                    <div className="bg-blue-600 text-white p-2 rounded-lg mr-3">
+                      <User className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Personal Account</h3>
+                      <p className="text-sm text-gray-600">Alternative payment method</p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-green-800">Account Type</label>
-                    <p className="text-gray-900 font-semibold">Business Current Account</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-green-800">Reference</label>
-                    <p className="text-gray-900 font-semibold">Use your full name + membership</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium text-blue-800">Account Holder</label>
+                        <p className="text-gray-900 font-semibold">MR SG NXUMALO</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-blue-800">Account Number</label>
+                        <p className="text-gray-900 font-semibold text-lg">1278512703</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-blue-800">Account Type</label>
+                        <p className="text-gray-900 font-semibold">Personal Debit</p>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium text-blue-800">Bank Name</label>
+                        <p className="text-gray-900 font-semibold">Capitec Bank</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-blue-800">Card Features</label>
+                        <div className="space-y-1">
+                          <div className="flex items-center text-sm">
+                            <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
+                            <span className="text-gray-700">Online purchases enabled</span>
+                          </div>
+                          <div className="flex items-center text-sm">
+                            <XCircle className="h-4 w-4 text-red-600 mr-2" />
+                            <span className="text-gray-700">International transactions disabled</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-blue-800">Reference</label>
+                        <p className="text-gray-900 font-semibold">Use your full name + membership</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="mt-4 p-4 bg-green-100 rounded-lg">
-                <h4 className="font-medium text-green-900 mb-2">Payment Instructions:</h4>
-                <ul className="text-sm text-green-800 space-y-1">
-                  <li>
-                    • <strong>Membership Fee:</strong> R120 per month
-                  </li>
-                  <li>
-                    • <strong>Admin Fee:</strong> R50 (one-time for new members)
-                  </li>
-                  <li>
-                    • <strong>Reference:</strong> Use "{user?.full_name || "Your Name"} - Membership" as payment
-                    reference
-                  </li>
-                  <li>
-                    • <strong>After Payment:</strong> Upload your proof of payment using the "Upload Receipt" button
-                  </li>
-                </ul>
+
+                {/* Payment Instructions */}
+                <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-lg p-6 border border-orange-200">
+                  <h4 className="font-semibold text-orange-900 mb-4 flex items-center">
+                    <Shield className="h-5 w-5 mr-2" />
+                    Payment Instructions & Fees
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h5 className="font-medium text-orange-800 mb-2">Monthly Fees:</h5>
+                      <ul className="text-sm text-orange-700 space-y-1">
+                        <li>
+                          • <strong>Membership Fee:</strong> R120 per month
+                        </li>
+                        <li>
+                          • <strong>Admin Fee:</strong> R50 (one-time for new members)
+                        </li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h5 className="font-medium text-orange-800 mb-2">Payment Process:</h5>
+                      <ul className="text-sm text-orange-700 space-y-1">
+                        <li>• Use either business or personal account above</li>
+                        <li>• Reference: "{user?.full_name || "Your Name"} - Membership"</li>
+                        <li>• Upload proof of payment after transfer</li>
+                        <li>• Allow 24-48 hours for verification</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-3">
+          <Card className="lg:col-span-1">
             <CardHeader>
               <CardTitle className="flex items-center text-base sm:text-lg">
                 <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
@@ -1115,6 +1198,96 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
           </Card>
         </div>
       </main>
+
+      <Dialog open={isWelcomeDialogOpen} onOpenChange={() => {}}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <Dumbbell className="h-6 w-6 mr-2 text-orange-600" />
+              Welcome to Sam24Fit!
+            </DialogTitle>
+          </DialogHeader>
+
+          {welcomeDialogStep === 1 ? (
+            <div className="space-y-6">
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Please Review Our Gym Rules & Agreement</h3>
+                <p className="text-sm text-gray-600">
+                  Before you start using our facilities, please take a moment to review our gym rules and membership
+                  agreement.
+                </p>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto border">
+                <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono leading-relaxed">
+                  {generateGymRules()}
+                </pre>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 justify-between">
+                <Button variant="outline" onClick={downloadGymRules} className="flex items-center bg-transparent">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Rules & Agreement
+                </Button>
+
+                <Button
+                  onClick={() => setWelcomeDialogStep(2)}
+                  disabled={!hasPdfDownloaded}
+                  className={`flex items-center ${
+                    hasPdfDownloaded ? "bg-orange-600 hover:bg-orange-700" : "bg-gray-300 cursor-not-allowed"
+                  }`}
+                >
+                  I Understand & Agree
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+
+                {!hasPdfDownloaded && (
+                  <div className="text-center">
+                    <p className="text-sm text-orange-600 font-medium">
+                      Please download the rules and agreement before proceeding
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Manage Your Profile</h3>
+                <p className="text-sm text-gray-600">
+                  You can update your profile information, change your profile picture, and manage your account settings
+                  anytime.
+                </p>
+              </div>
+
+              <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
+                <div className="flex items-start space-x-4">
+                  <div className="flex-shrink-0">
+                    <Settings className="h-8 w-8 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-blue-900 mb-2">Profile Management</h4>
+                    <ul className="text-sm text-blue-800 space-y-1">
+                      <li>
+                        • Update your profile picture by clicking on your current photo in the Account Info section
+                      </li>
+                      <li>• Your personal information can be viewed in the Account Info card on the left</li>
+                      <li>• Contact our staff if you need to update your contact details or membership information</li>
+                      <li>• Upload payment receipts using the "Upload Receipt" button in Quick Actions</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-center">
+                <Button onClick={handleWelcomeDialogComplete} className="bg-orange-600 hover:bg-orange-700 px-8">
+                  Got it, Let's Start!
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
         <DialogContent className="max-w-[95vw] md:max-w-4xl max-h-[90vh] overflow-auto">
