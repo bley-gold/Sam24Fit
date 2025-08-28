@@ -177,7 +177,7 @@ export const useAuth = () => {
         console.warn("useAuth: Loading timeout reached, setting loading to false")
         setLoading(false)
       }
-    }, 65000) // Extended loading timeout to 65 seconds to accommodate 60s profile fetch
+    }, 15000) // Reduced from 65 seconds to 15 seconds
 
     const restoreSupabaseSession = async () => {
       try {
@@ -251,6 +251,8 @@ export const useAuth = () => {
         if (restoredSession) {
           console.log("useAuth: Session found, fetching user profile...")
           setProfileStatus("loading")
+          setLoading(false)
+          clearTimeout(loadingTimeout)
 
           try {
             const currentUser = await getCurrentUser()
@@ -265,8 +267,6 @@ export const useAuth = () => {
                 setProfileStatus("unavailable")
                 setUser(null)
               }
-              setLoading(false)
-              clearTimeout(loadingTimeout)
             }
           } catch (error) {
             console.error("useAuth: Error getting user profile:", error)
@@ -275,8 +275,6 @@ export const useAuth = () => {
               console.log("useAuth: Profile fetch error but keeping session alive")
               setProfileStatus("unavailable")
               setUser(null)
-              setLoading(false)
-              clearTimeout(loadingTimeout)
             }
           }
         } else {

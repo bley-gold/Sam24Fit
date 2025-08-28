@@ -323,13 +323,20 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
 
   const handleLogout = async () => {
     try {
+      console.log("[v0] Logout button clicked")
       await signOut()
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("sam24fit_user_cache")
+        localStorage.removeItem("sam24fit_cache_expiry")
+        localStorage.removeItem("sam24fit_session_cache")
+      }
       toast({
         title: "Logged out",
         description: "You have been successfully logged out.",
       })
       router.push("/")
     } catch (error) {
+      console.error("[v0] Logout error:", error)
       toast({
         title: "Error",
         description: "Failed to log out. Please try again.",
@@ -720,7 +727,7 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
                   variant="outline"
                   size="sm"
                   onClick={handleLogout}
-                  className="text-xs sm:text-sm bg-transparent"
+                  className="text-xs sm:text-sm bg-transparent hover:bg-gray-100 border-gray-300 min-w-[80px] px-3 py-2"
                 >
                   <LogOut className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   Logout
@@ -1116,7 +1123,7 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-3">
+          <Card className="lg:col-span-1">
             <CardHeader>
               <CardTitle className="flex items-center text-base sm:text-lg">
                 <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
