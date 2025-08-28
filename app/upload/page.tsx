@@ -167,7 +167,7 @@ export default function UploadPage() {
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
         <Card className="max-w-md w-full text-center p-8">
           <User className="h-16 w-16 text-orange-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Profile Picture Required</h2>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Profile Picture Required</h2>
           <p className="text-gray-600 mb-6">Please upload a profile picture before you can upload receipts.</p>
           <Button onClick={() => router.push("/dashboard")} className="bg-orange-600 hover:bg-orange-700">
             Go to Dashboard
@@ -183,9 +183,11 @@ export default function UploadPage() {
         <Card className="max-w-md mx-auto">
           <CardContent className="text-center py-8">
             <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Upload Successful!</h2>
-            <p className="text-gray-600 mb-4">Your receipt has been uploaded and is pending verification.</p>
-            <p className="text-sm text-gray-500">Redirecting to dashboard...</p>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Upload Successful!</h2>
+            <p className="text-sm sm:text-base text-gray-600">
+              Your receipt has been uploaded and is pending verification.
+            </p>
+            <p className="text-xs text-gray-500">Redirecting to dashboard...</p>
           </CardContent>
         </Card>
       </div>
@@ -200,7 +202,7 @@ export default function UploadPage() {
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 space-y-3 sm:space-y-0">
             <div className="flex items-center space-x-2">
               <Dumbbell className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600" />
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Sam24Fit</h1>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Sam24Fit</h1>
             </div>
             <Button variant="outline" onClick={() => router.push("/dashboard")} className="self-start sm:self-auto">
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -230,22 +232,66 @@ export default function UploadPage() {
                 <CreditCard className="h-4 w-4 mr-2" />
                 Bank Account Details for Payments
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium text-green-800">Bank:</span> First National Bank (FNB)
+              <div className="space-y-4">
+                {/* Business Account */}
+                <div className="bg-white rounded-lg p-4 border border-green-300">
+                  <div className="flex items-center mb-3">
+                    <div className="bg-green-600 text-white p-1.5 rounded mr-2">
+                      <CreditCard className="h-3 w-3" />
+                    </div>
+                    <h4 className="font-semibold text-green-900">Business Account (Primary)</h4>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="font-medium text-green-800">Account Nickname:</span>
+                      <div className="text-gray-900">Sam24fit</div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-green-800">Account Number:</span>
+                      <div className="text-gray-900 font-semibold">1052 6463 87</div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-green-800">Bank:</span>
+                      <div className="text-gray-900">First National Bank (FNB)</div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-green-800">Account Type:</span>
+                      <div className="text-gray-900">Transact</div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="font-medium text-green-800">Account:</span> 62847291056
-                </div>
-                <div>
-                  <span className="font-medium text-green-800">Branch Code:</span> 250655
-                </div>
-                <div>
-                  <span className="font-medium text-green-800">Account Holder:</span> Sam24Fit Gym (Pty) Ltd
+
+                {/* Personal Account */}
+                <div className="bg-white rounded-lg p-4 border border-blue-300">
+                  <div className="flex items-center mb-3">
+                    <div className="bg-blue-600 text-white p-1.5 rounded mr-2">
+                      <User className="h-3 w-3" />
+                    </div>
+                    <h4 className="font-semibold text-blue-900">Personal Account (Alternative)</h4>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="font-medium text-blue-800">Account Holder:</span>
+                      <div className="text-gray-900">MR SG NXUMALO</div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-blue-800">Account Number:</span>
+                      <div className="text-gray-900 font-semibold">1278512703</div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-blue-800">Bank:</span>
+                      <div className="text-gray-900">Capitec Bank</div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-blue-800">Account Type:</span>
+                      <div className="text-gray-900">Personal Debit</div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <p className="text-xs text-green-700 mt-2">
-                <strong>Reference:</strong> Use "{user?.full_name || "Your Name"} - Membership" when making payment
+              <p className="text-xs text-green-700 mt-3">
+                <strong>Reference:</strong> Use "{user?.full_name || "Your Name"} - Membership" when making payment to
+                either account
               </p>
             </div>
 

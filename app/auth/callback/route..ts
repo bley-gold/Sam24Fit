@@ -27,19 +27,17 @@ export async function GET(request: NextRequest) {
     try {
       const { error } = await supabase.auth.exchangeCodeForSession(code)
       if (!error) {
-        const forwardedHost = request.headers.get("x-forwarded-host")
-        const forwardedProto = request.headers.get("x-forwarded-proto") || "https"
-
-        if (forwardedHost) {
-          return NextResponse.redirect(`${forwardedProto}://${forwardedHost}${next}`)
-        } else {
-          return NextResponse.redirect(`${origin}${next}`)
-        }
+        console.log(`Auth callback success: redirecting to ${origin}${next}`)
+        return NextResponse.redirect(`${origin}${next}`)
+      } else {
+        console.error("Session exchange error:", error)
+        return NextResponse.redirect(`${origin}/auth?error=session_error&message=Failed to establish session`)
       }
     } catch (error) {
       console.error("Auth callback error:", error)
+      return NextResponse.redirect(`${origin}/auth?error=callback_error&message=Authentication callback failed`)
     }
   }
 
-  return NextResponse.redirect(`${origin}/auth?error=callback_error&message=Authentication callback failed`)
+  return NextResponse.redirect(`${origin}/auth?error=callback_error&message=No authorization code provided`)
 }
