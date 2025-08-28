@@ -210,6 +210,8 @@ export const useAuth = () => {
           console.log("useAuth: Using cached user while verifying session")
           setLoading(false)
           clearTimeout(loadingTimeout)
+          isInitializing = false
+          return
         }
 
         const currentUser = await getCurrentUser()
@@ -374,7 +376,7 @@ export const useAuth = () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange)
       subscription.unsubscribe()
     }
-  }, [refreshSession, setUserWithCache, user])
+  }, [refreshSession, setUserWithCache])
 
   return { user, loading, refreshUser, refreshSession }
 }
