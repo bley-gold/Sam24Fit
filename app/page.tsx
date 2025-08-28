@@ -25,11 +25,16 @@ import { useEffect, useState } from "react"
 
 export default function LandingPage() {
   const [reviews, setReviews] = useState<any[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(true)
 
   useEffect(() => {
     const fetchReviews = async () => {
       console.log("[v0] Starting to fetch reviews...")
+      setReviewsLoading(true)
+
       try {
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+
         const result = await getApprovedReviews()
         console.log("[v0] getApprovedReviews result:", result)
 
@@ -42,11 +47,16 @@ export default function LandingPage() {
           setReviews(result.data || [])
         } else {
           console.log("[v0] Failed to fetch reviews:", result.error)
+          setReviews([])
         }
       } catch (error) {
         console.log("[v0] Error in fetchReviews:", error)
+        setReviews([])
+      } finally {
+        setReviewsLoading(false)
       }
     }
+
     fetchReviews()
   }, [])
 
@@ -533,6 +543,15 @@ export default function LandingPage() {
 
           <div className="relative h-64 sm:h-80 md:h-96">
             {(() => {
+              if (reviewsLoading) {
+                return (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <p className="ml-3 text-gray-500 text-base sm:text-lg">Loading reviews...</p>
+                  </div>
+                )
+              }
+
               const featuredReviews = reviews.filter((review) => review.is_featured === true)
               const displayReviews = featuredReviews
 
@@ -550,7 +569,10 @@ export default function LandingPage() {
               if (displayReviews.length === 0) {
                 return (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <p className="text-gray-500 text-base sm:text-lg">No reviews available yet</p>
+                    <div className="text-center">
+                      <p className="text-gray-500 text-base sm:text-lg mb-2">No reviews available yet</p>
+                      <p className="text-gray-400 text-sm">Be the first to share your experience!</p>
+                    </div>
                   </div>
                 )
               }
@@ -624,9 +646,6 @@ export default function LandingPage() {
                           src={
                             review.users?.profile_picture_url ||
                             "/placeholder.svg?height=32&width=32&query=user profile" ||
-                            "/placeholder.svg" ||
-                            "/placeholder.svg" ||
-                            "/placeholder.svg" ||
                             "/placeholder.svg"
                           }
                           alt={review.users?.full_name || "User"}

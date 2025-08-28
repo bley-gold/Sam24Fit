@@ -182,6 +182,11 @@ export const useAuth = () => {
     const restoreSupabaseSession = async () => {
       try {
         console.log("useAuth: Restoring Supabase session from storage...")
+
+        console.log("Testing Supabase connection...")
+        const connectionTest = await supabase.auth.getUser()
+        console.log("Supabase connection test result:", connectionTest.error ? "Failed" : "Success")
+
         const {
           data: { session },
           error,

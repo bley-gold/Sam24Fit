@@ -1,9 +1,9 @@
 import { createClient } from "@supabase/supabase-js"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://noidkepohqhgdalkvzze.supabase.co"
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://cybjdyouocdxrcedtjkq.supabase.co"
 const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vaWRrZXBvaHFoZ2RhbGt2enplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMTE4MTYsImV4cCI6MjA2OTg4NzgxNn0.sPoMpbSuSFgwvs_HbqBMhOWLU1PnM4EMm0psMQxhLLM"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN5YmpkeW91b2NkeHJjZWR0amtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM5NDk5MzYsImV4cCI6MjA2OTUyNTkzNn0.r9IKLpAOd74eeoyXRk5kDgAxVA4Pd-E0qL1TtR053eA"
 
 let supabaseServiceKey: string | undefined
 
@@ -11,7 +11,7 @@ if (typeof window === "undefined") {
   // Server-side only - safe to access service role key
   supabaseServiceKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vaWRrZXBvaHFoZ2RhbGt2enplIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDMxMTgxNiwiZXhwIjoyMDY5ODg3ODE2fQ.dXqkt5LDLdCctvZeiOLqKUOguzZkeUB-ojZh2dshJtk"
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN5YmpkeW91b2NkeHJjZWR0amtxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1Mzk0OTkzNiwiZXhwIjoyMDY5NTI1OTM2fQ.vvDIsj14Ii6xKyNS0EpWRTjGdhZtEBwwwoXuUctTlxA"
 }
 
 export const isSupabaseConfigured = (): boolean => {
@@ -25,156 +25,14 @@ export const isSupabaseAdminConfigured = (): boolean => {
 
 let supabase: ReturnType<typeof createClient>
 
-try {
-  if (isSupabaseConfigured()) {
-    supabase = createClient(supabaseUrl!, supabaseAnonKey!)
-  } else {
-    throw new Error("Supabase environment variables not configured")
-  }
-} catch (error) {
-  console.warn("Supabase client creation failed:", error)
-  // Create a mock client that provides helpful error messages
-  supabase = {
-    auth: {
-      signUp: () =>
-        Promise.resolve({
-          data: { user: null, session: null },
-          error: new Error(
-            "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
-          ),
-        }),
-      signInWithPassword: () =>
-        Promise.resolve({
-          data: { user: null, session: null },
-          error: new Error(
-            "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
-          ),
-        }),
-      signOut: () =>
-        Promise.resolve({
-          error: new Error(
-            "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
-          ),
-        }),
-      getUser: () =>
-        Promise.resolve({
-          data: { user: null },
-          error: new Error(
-            "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
-          ),
-        }),
-      getSession: () =>
-        Promise.resolve({
-          data: { session: null },
-          error: new Error(
-            "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
-          ),
-        }),
-      refreshSession: () =>
-        Promise.resolve({
-          data: { user: null, session: null },
-          error: new Error(
-            "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
-          ),
-        }),
-      exchangeCodeForSession: () =>
-        Promise.resolve({
-          data: { user: null, session: null },
-          error: new Error(
-            "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
-          ),
-        }),
-      onAuthStateChange: (callback: (event: string, session: any) => void) => {
-        console.warn("Supabase not configured: onAuthStateChange will not work properly")
-        // Return a mock subscription object
-        return {
-          data: {
-            subscription: {
-              unsubscribe: () => {
-                console.warn("Mock subscription unsubscribed")
-              },
-            },
-          },
-        }
-      },
-    },
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          single: () =>
-            Promise.resolve({
-              data: null,
-              error: new Error(
-                "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
-              ),
-            }),
-          order: () =>
-            Promise.resolve({
-              data: null,
-              error: new Error(
-                "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
-              ),
-            }),
-        }),
-        order: () =>
-          Promise.resolve({
-            data: null,
-            error: new Error(
-              "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
-            ),
-          }),
-      }),
-      insert: () =>
-        Promise.resolve({
-          data: null,
-          error: new Error(
-            "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
-          ),
-        }),
-      update: () => ({
-        eq: () =>
-          Promise.resolve({
-            error: new Error(
-              "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
-            ),
-          }),
-      }),
-      delete: () => ({
-        eq: () =>
-          Promise.resolve({
-            error: new Error(
-              "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
-            ),
-          }),
-      }),
-    }),
-    storage: {
-      from: () => ({
-        upload: () =>
-          Promise.resolve({
-            data: null,
-            error: new Error(
-              "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
-            ),
-          }),
-        getPublicUrl: () => ({ data: { publicUrl: "" } }),
-        remove: () =>
-          Promise.resolve({
-            data: null,
-            error: new Error(
-              "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
-            ),
-          }),
-      }),
-    },
-    rpc: () =>
-      Promise.resolve({
-        data: null,
-        error: new Error(
-          "Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Project Settings",
-        ),
-      }),
-  } as any
+if (isSupabaseConfigured()) {
+  supabase = createClient(supabaseUrl!, supabaseAnonKey!)
+  console.log("✅ Supabase client initialized successfully")
+} else {
+  console.error("❌ Supabase configuration missing - check environment variables")
+  throw new Error(
+    "Supabase environment variables not configured. Please add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your environment variables.",
+  )
 }
 
 let supabaseAdmin: ReturnType<typeof createClient> | null
