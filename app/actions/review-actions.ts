@@ -5,14 +5,24 @@ function validateSupabaseConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  if (!url || !key || url === "undefined" || key === "undefined") {
+  if (!url || !key) {
+    console.error("Missing Supabase environment variables:", {
+      url: url ? "present" : "missing",
+      key: key ? "present" : "missing",
+    })
+    return false
+  }
+
+  if (url === "undefined" || key === "undefined") {
+    console.error("Supabase environment variables are set to 'undefined'")
     return false
   }
 
   try {
-    new URL(url) // Test if URL is valid
+    new URL(url)
     return true
   } catch {
+    console.error("Invalid Supabase URL format:", url)
     return false
   }
 }
@@ -117,9 +127,11 @@ export async function createReview(userId: string, reviewText: string, rating: n
 
 export async function getApprovedReviews() {
   try {
+    console.log("[v0] Starting to fetch reviews...")
+
     if (!validateSupabaseConfig()) {
       console.error("Supabase configuration is invalid or missing")
-      return { success: false, data: [] }
+      return { success: false, data: [], error: "Database configuration error" }
     }
 
     const { createClient } = await import("@supabase/supabase-js")
@@ -130,46 +142,76 @@ export async function getApprovedReviews() {
       },
     })
 
-    const { data: reviews, error: reviewsError } = await serviceClient
+    const reviewsPromise = serviceClient
       .from("reviews")
       .select("*")
       .eq("status", "approved")
       .order("created_at", { ascending: false })
 
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Reviews fetch timeout")), 10000)
+    })
+
+    const { data: reviews, error: reviewsError } = await Promise.race([reviewsPromise, timeoutPromise])
+
     if (reviewsError) {
       console.error("Error fetching reviews:", reviewsError)
-      return { success: false, data: [] }
+      return { success: false, data: [], error: reviewsError.message }
     }
 
+    console.log("[v0] All reviews:", reviews || [])
+
     if (!reviews || reviews.length === 0) {
+      console.log("[v0] No reviews found")
       return { success: true, data: [] }
     }
 
     const reviewsWithUsers = await Promise.all(
       reviews.map(async (review) => {
-        const { data: userData, error: userError } = await serviceClient
-          .from("users")
-          .select("full_name, profile_picture_url")
-          .eq("id", review.user_id)
-          .single()
+        try {
+          const userPromise = serviceClient
+            .from("users")
+            .select("full_name, profile_picture_url")
+            .eq("id", review.user_id)
+            .single()
 
-        return {
-          id: review.id,
-          review_text: review.review_text,
-          rating: review.rating,
-          created_at: review.created_at,
-          status: review.status,
-          is_featured: review.is_featured || false,
-          rejection_reason: review.rejection_reason,
-          users: userError ? { full_name: "Anonymous", profile_picture_url: null } : userData,
+          const userTimeoutPromise = new Promise((resolve) => {
+            setTimeout(() => resolve({ data: null, error: { message: "User fetch timeout" } }), 3000)
+          })
+
+          const { data: userData, error: userError } = await Promise.race([userPromise, userTimeoutPromise])
+
+          return {
+            id: review.id,
+            review_text: review.review_text,
+            rating: review.rating,
+            created_at: review.created_at,
+            status: review.status,
+            is_featured: review.is_featured || false,
+            rejection_reason: review.rejection_reason,
+            users: userError ? { full_name: "Anonymous", profile_picture_url: null } : userData,
+          }
+        } catch (error) {
+          console.error("Error fetching user data for review:", error)
+          return {
+            id: review.id,
+            review_text: review.review_text,
+            rating: review.rating,
+            created_at: review.created_at,
+            status: review.status,
+            is_featured: review.is_featured || false,
+            rejection_reason: review.rejection_reason,
+            users: { full_name: "Anonymous", profile_picture_url: null },
+          }
         }
       }),
     )
 
+    console.log("[v0] Reviews with users processed successfully")
     return { success: true, data: reviewsWithUsers }
   } catch (error) {
     console.error("Exception in getApprovedReviews:", error)
-    return { success: false, data: [] }
+    return { success: false, data: [], error: "An unexpected error occurred" }
   }
 }
 

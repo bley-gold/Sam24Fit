@@ -127,13 +127,14 @@ const isSessionValid = (): boolean => {
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(() => getCachedUser())
   const [loading, setLoading] = useState(true)
+  const [profileStatus, setProfileStatus] = useState<"loading" | "available" | "unavailable">("loading")
 
   const setUserWithCache = useCallback((newUser: User | null) => {
     setUser(newUser)
     setCachedUser(newUser)
+    setProfileStatus(newUser ? "available" : "unavailable")
   }, [])
 
-  // Function to manually refresh user data
   const refreshUser = useCallback(async () => {
     try {
       console.log("useAuth: Refreshing user data...")
@@ -151,7 +152,6 @@ export const useAuth = () => {
     }
   }, [setUserWithCache])
 
-  // Function to refresh session and user data
   const refreshSession = useCallback(async () => {
     try {
       const { user: refreshedUser, error } = await refreshUserSession()
@@ -177,66 +177,123 @@ export const useAuth = () => {
         console.warn("useAuth: Loading timeout reached, setting loading to false")
         setLoading(false)
       }
-    }, 20000) // Extended loading timeout to 20 seconds
+    }, 65000) // Extended loading timeout to 65 seconds to accommodate 60s profile fetch
 
-    // Get initial session
+    const restoreSupabaseSession = async () => {
+      try {
+        console.log("useAuth: Restoring Supabase session from storage...")
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession()
+
+        if (error) {
+          console.error("useAuth: Error restoring session:", error)
+          return null
+        }
+
+        if (session) {
+          console.log("useAuth: Supabase session restored successfully")
+          return session
+        }
+
+        console.log("useAuth: No stored session found")
+        return null
+      } catch (error) {
+        console.error("useAuth: Error during session restoration:", error)
+        return null
+      }
+    }
+
     const getInitialSession = async () => {
       if (isInitializing) {
         console.log("useAuth: Already initializing, skipping...")
         return
       }
 
-      if (!canRetry()) {
-        console.log("useAuth: Max retries reached, using cached data only")
-        const cachedUser = getCachedUser()
-        if (cachedUser && mounted) {
-          setUser(cachedUser)
-          setLoading(false)
-          clearTimeout(loadingTimeout)
-        } else if (mounted) {
-          setLoading(false)
-          clearTimeout(loadingTimeout)
-        }
-        return
-      }
-
       isInitializing = true
+
       try {
         console.log("useAuth: Getting initial session...")
+
+        const restoredSession = await restoreSupabaseSession()
 
         const cachedUser = getCachedUser()
         if (cachedUser && mounted && isSessionValid()) {
           setUser(cachedUser)
+          setProfileStatus("available")
           console.log("useAuth: Using cached user while verifying session")
           setLoading(false)
           clearTimeout(loadingTimeout)
+
+          if (restoredSession) {
+            try {
+              const currentUser = await getCurrentUser()
+              if (mounted && currentUser) {
+                setUserWithCache(currentUser)
+                console.log("useAuth: Background profile refresh successful")
+                clearRetryInfo()
+              }
+            } catch (error) {
+              console.log("useAuth: Background profile refresh failed, keeping cached user")
+            }
+          }
+
           isInitializing = false
           return
         }
 
-        const currentUser = await getCurrentUser()
+        if (restoredSession) {
+          console.log("useAuth: Session found, fetching user profile...")
+          setProfileStatus("loading")
 
-        if (mounted) {
-          setUserWithCache(currentUser)
-          console.log("useAuth: Initial session loaded. User:", currentUser)
-          setLoading(false)
-          clearTimeout(loadingTimeout)
-          clearRetryInfo()
+          try {
+            const currentUser = await getCurrentUser()
+
+            if (mounted) {
+              if (currentUser) {
+                setUserWithCache(currentUser)
+                console.log("useAuth: Initial session loaded with profile. User:", currentUser)
+                clearRetryInfo()
+              } else {
+                console.log("useAuth: Profile fetch failed but keeping session alive")
+                setProfileStatus("unavailable")
+                setUser(null)
+              }
+              setLoading(false)
+              clearTimeout(loadingTimeout)
+            }
+          } catch (error) {
+            console.error("useAuth: Error getting user profile:", error)
+
+            if (mounted) {
+              console.log("useAuth: Profile fetch error but keeping session alive")
+              setProfileStatus("unavailable")
+              setUser(null)
+              setLoading(false)
+              clearTimeout(loadingTimeout)
+            }
+          }
+        } else {
+          if (mounted) {
+            setUserWithCache(null)
+            setProfileStatus("unavailable")
+            setLoading(false)
+            clearTimeout(loadingTimeout)
+          }
         }
       } catch (error) {
-        console.error("useAuth: Error getting initial session:", error)
-
-        const retryInfo = getRetryInfo()
-        updateRetryInfo(retryInfo.count + 1)
+        console.error("useAuth: Error in initial session setup:", error)
 
         if (mounted) {
           const cachedUser = getCachedUser()
           if (cachedUser && isSessionValid()) {
-            // Keep using cached user if session is still valid
             setUser(cachedUser)
-            console.log("useAuth: Using cached user due to fetch error")
-          } else if (!cachedUser || !isSessionValid()) {
+            setProfileStatus("available")
+            console.log("useAuth: Using cached user due to initialization error")
+          } else {
             setUserWithCache(null)
+            setProfileStatus("unavailable")
           }
           setLoading(false)
           clearTimeout(loadingTimeout)
@@ -275,50 +332,35 @@ export const useAuth = () => {
       if (!document.hidden && mounted) {
         console.log("useAuth: Tab became visible, checking session...")
 
-        if (!canRetry()) {
-          console.log("useAuth: Max retries reached, skipping visibility refresh")
-          return
-        }
-
         try {
-          const {
-            data: { session },
-            error,
-          } = await supabase.auth.getSession()
+          const restoredSession = await restoreSupabaseSession()
 
-          if (error) {
-            console.error("useAuth: Error getting session on tab focus:", error)
-            if (!isSessionValid()) {
-              setUserWithCache(null)
-            }
-            return
-          }
-
-          if (session) {
+          if (restoredSession) {
             console.log("useAuth: Valid session found after tab focus")
             if (!user || !isSessionValid()) {
               try {
-                const timeoutPromise = new Promise<null>((resolve) => {
-                  setTimeout(() => resolve(null), 10000) // Extended timeout to 10 seconds
-                })
-
-                const getUserPromise = getCurrentUser()
-                const currentUser = await Promise.race([getUserPromise, timeoutPromise])
+                setProfileStatus("loading")
+                const currentUser = await getCurrentUser()
 
                 if (currentUser && mounted) {
                   setUserWithCache(currentUser)
                   console.log("useAuth: User data refreshed after tab focus")
                   clearRetryInfo()
+                } else if (mounted) {
+                  console.log("useAuth: Profile fetch failed after tab focus, keeping session")
+                  setProfileStatus("unavailable")
                 }
               } catch (error) {
                 console.error("useAuth: Error refreshing user on tab focus:", error)
-                const retryInfo = getRetryInfo()
-                updateRetryInfo(retryInfo.count + 1)
+                if (mounted) {
+                  setProfileStatus("unavailable")
+                }
               }
             }
           } else {
             console.log("useAuth: No session found after tab focus")
             setUserWithCache(null)
+            setProfileStatus("unavailable")
           }
         } catch (error) {
           console.error("useAuth: Error checking session on tab focus:", error)
@@ -326,12 +368,6 @@ export const useAuth = () => {
       }
     }
 
-    getInitialSession()
-    setupSessionRefresh()
-
-    document.addEventListener("visibilitychange", handleVisibilityChange)
-
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -340,22 +376,28 @@ export const useAuth = () => {
       if (event === "SIGNED_OUT" || (event === "TOKEN_REFRESHED" && !session)) {
         if (mounted) {
           setUserWithCache(null)
-          clearRetryInfo() // Clear retry info on sign out
+          setProfileStatus("unavailable")
+          clearRetryInfo()
           console.log("useAuth: User explicitly signed out")
         }
       } else if (session?.user && event !== "TOKEN_REFRESHED" && event !== "INITIAL_SESSION") {
-        if (canRetry()) {
-          try {
-            const currentUser = await getCurrentUser()
-            if (mounted) {
+        try {
+          setProfileStatus("loading")
+          const currentUser = await getCurrentUser()
+          if (mounted) {
+            if (currentUser) {
               setUserWithCache(currentUser)
               console.log("useAuth: Auth state changed. Current user:", currentUser)
               clearRetryInfo()
+            } else {
+              console.log("useAuth: Profile fetch failed during auth state change, keeping session")
+              setProfileStatus("unavailable")
             }
-          } catch (error) {
-            console.error("useAuth: Error in auth state change:", error)
-            const retryInfo = getRetryInfo()
-            updateRetryInfo(retryInfo.count + 1)
+          }
+        } catch (error) {
+          console.error("useAuth: Error in auth state change:", error)
+          if (mounted) {
+            setProfileStatus("unavailable")
           }
         }
       }
@@ -366,6 +408,11 @@ export const useAuth = () => {
         console.log("useAuth: Loading state set to false.")
       }
     })
+
+    getInitialSession()
+    setupSessionRefresh()
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
 
     return () => {
       mounted = false
@@ -378,5 +425,5 @@ export const useAuth = () => {
     }
   }, [refreshSession, setUserWithCache])
 
-  return { user, loading, refreshUser, refreshSession }
+  return { user, loading, profileStatus, refreshUser, refreshSession }
 }

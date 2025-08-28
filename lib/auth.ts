@@ -16,7 +16,6 @@ export interface SignUpData {
   emergencyContactNumber: string
   profilePicture?: File
   idNumber: string
-  acceptedTerms: boolean
 }
 
 export interface SignInData {
@@ -164,7 +163,6 @@ export const signUp = async (data: SignUpData) => {
       data.emergencyContactNumber,
       profilePictureData,
       data.idNumber,
-      data.acceptedTerms,
     )
 
     if (!result.success) {
@@ -313,6 +311,36 @@ export const signOut = async () => {
   return { error }
 }
 
+export const resetPassword = async (email: string) => {
+  try {
+    if (!isSupabaseConfigured()) {
+      throw new Error("Supabase is not properly configured. Please check your environment variables.")
+    }
+
+    console.log("Client: Attempting to send password reset email...")
+
+    const redirectUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/auth/callback?type=recovery`
+        : `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/callback?type=recovery`
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectUrl,
+    })
+
+    if (error) {
+      console.error("Client: Password reset error:", error)
+      throw error
+    }
+
+    console.log("Client: Password reset email sent successfully")
+    return { error: null, message: "Password reset email sent successfully" }
+  } catch (error) {
+    console.error("Reset password error:", error)
+    return { error: error as Error, message: null }
+  }
+}
+
 export const refreshUserSession = async () => {
   try {
     if (!isSupabaseConfigured()) {
@@ -356,9 +384,8 @@ export const getCurrentUser = async (): Promise<User | null> => {
       return null
     }
 
-    // Add timeout to prevent hanging
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error("getCurrentUser timeout")), 5000)
+      setTimeout(() => reject(new Error("getCurrentUser timeout")), 60000)
     })
 
     const getUserPromise = supabase.auth.getUser()
@@ -379,26 +406,105 @@ export const getCurrentUser = async (): Promise<User | null> => {
 
     console.log("Auth user found:", authUser.email)
 
-    // Try to get profile with timeout
-    const profilePromise = getUserProfileById(authUser.id)
-    const profileTimeoutPromise = new Promise<null>((resolve) => {
-      setTimeout(() => {
-        console.warn("Profile fetch timeout, returning null")
-        resolve(null)
-      }, 3000)
-    })
+    const fetchProfileWithRetry = async (retries = 3): Promise<any> => {
+      for (let attempt = 0; attempt < retries; attempt++) {
+        try {
+          const profilePromise = getUserProfileById(authUser.id)
+          const profileTimeoutPromise = new Promise<null>((resolve) => {
+            setTimeout(() => {
+              resolve(null)
+            }, 60000)
+          })
 
-    const profile = await Promise.race([profilePromise, profileTimeoutPromise])
+          const profile = await Promise.race([profilePromise, profileTimeoutPromise])
 
-    if (!profile) {
-      console.warn(`User profile for ${authUser.id} not found in public.users via server action.`)
+          if (profile) {
+            console.log("User profile found:", profile.email)
+            return profile
+          }
+
+          if (attempt < retries - 1) {
+            const delay = Math.pow(2, attempt) * 1000
+            console.log(`Profile fetch attempt ${attempt + 1} failed, retrying in ${delay}ms...`)
+            await new Promise((resolve) => setTimeout(resolve, delay))
+            continue
+          }
+
+          return null
+        } catch (profileError) {
+          console.error(`Profile fetch attempt ${attempt + 1} error:`, profileError)
+
+          if (attempt < retries - 1) {
+            const delay = Math.pow(2, attempt) * 1000
+            console.log(`Retrying profile fetch in ${delay}ms...`)
+            await new Promise((resolve) => setTimeout(resolve, delay))
+            continue
+          }
+
+          console.error("All profile fetch retries exhausted")
+          return null
+        }
+      }
       return null
     }
 
-    console.log("User profile found:", profile.email)
+    const profile = await fetchProfileWithRetry(3)
+
+    if (!profile) {
+      console.log("Profile fetch failed after retries, using auth user data as fallback")
+      return {
+        id: authUser.id,
+        email: authUser.email!,
+        password_hash: null,
+        full_name: authUser.user_metadata?.full_name || authUser.email!,
+        phone: authUser.user_metadata?.phone || "",
+        date_of_birth: null,
+        gender: null,
+        street_address: null,
+        emergency_contact_name: null,
+        emergency_contact_number: null,
+        profile_picture_url: null,
+        membership_status: "active",
+        created_at: authUser.created_at,
+        updated_at: new Date().toISOString(),
+        id_number: null,
+        last_payment_date: null,
+        accepted_terms: true,
+      }
+    }
+
     return profile
   } catch (error) {
     console.error("Get current user unexpected error:", error)
+    try {
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser()
+      if (authUser) {
+        console.log("Returning basic auth user data due to profile fetch error")
+        return {
+          id: authUser.id,
+          email: authUser.email!,
+          password_hash: null,
+          full_name: authUser.user_metadata?.full_name || authUser.email!,
+          phone: authUser.user_metadata?.phone || "",
+          date_of_birth: null,
+          gender: null,
+          street_address: null,
+          emergency_contact_name: null,
+          emergency_contact_number: null,
+          profile_picture_url: null,
+          membership_status: "active",
+          created_at: authUser.created_at,
+          updated_at: new Date().toISOString(),
+          id_number: null,
+          last_payment_date: null,
+          accepted_terms: true,
+        }
+      }
+    } catch (fallbackError) {
+      console.error("Fallback auth user fetch also failed:", fallbackError)
+    }
     return null
   }
 }
