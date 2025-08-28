@@ -7,7 +7,8 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get("error")
   const errorCode = searchParams.get("error_code")
   const errorDescription = searchParams.get("error_description")
-  const next = searchParams.get("next") ?? "/dashboard"
+  const type = searchParams.get("type")
+  const next = searchParams.get("next") ?? (type === "recovery" ? "/dashboard" : "/auth")
 
   if (error) {
     console.error("Auth callback error:", { error, errorCode, errorDescription })
@@ -28,6 +29,19 @@ export async function GET(request: NextRequest) {
       const { error } = await supabase.auth.exchangeCodeForSession(code)
       if (!error) {
         console.log(`Auth callback success: redirecting to ${origin}${next}`)
+
+        if (type !== "recovery") {
+          return NextResponse.redirect(
+            `${origin}/auth?confirmed=true&message=Email confirmed successfully! You can now log in.`,
+          )
+        }
+
+        if (type === "recovery") {
+          return NextResponse.redirect(
+            `${origin}/dashboard?recovery=true&message=Password reset successful! Welcome back.`,
+          )
+        }
+
         return NextResponse.redirect(`${origin}${next}`)
       } else {
         console.error("Session exchange error:", error)

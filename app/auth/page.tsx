@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { LoadingSpinner } from "@/components/loading-spinner"
-import { signIn, signUp, type SignUpData, type SignInData } from "@/lib/auth"
+import { signIn, signUp, resetPassword, type SignUpData, type SignInData } from "@/lib/auth"
 import {
   Dumbbell,
   Shield,
@@ -24,6 +24,7 @@ import {
   AlertCircle,
   Mail,
   CheckCircle,
+  KeyRound,
 } from "lucide-react"
 import { useAuthContext } from "@/components/auth-provider"
 import { testEnvironmentVariables } from "@/app/actions/test-env-action"
@@ -38,11 +39,21 @@ export default function AuthPage() {
   const [confirmationEmail, setConfirmationEmail] = useState("")
   const [forceShowAuth, setForceShowAuth] = useState(false)
   const redirectAttempted = useRef(false)
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("")
+  const [forgotPasswordSubmitting, setForgotPasswordSubmitting] = useState(false)
+  const [ageError, setAgeError] = useState("")
+  const [passwordError, setPasswordError] = useState("")
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [showGymRules, setShowGymRules] = useState(false)
 
   const [loginData, setLoginData] = useState<SignInData>({ email: "", password: "" })
-  const [signupData, setSignupData] = useState<Omit<SignUpData, "profilePicture"> & { profilePicture: File | null }>({
+  const [signupData, setSignupData] = useState<
+    Omit<SignUpData, "profilePicture"> & { profilePicture: File | null; confirmPassword: string }
+  >({
     email: "",
     password: "",
+    confirmPassword: "",
     fullName: "",
     phone: "",
     dateOfBirth: "",
@@ -53,15 +64,35 @@ export default function AuthPage() {
     profilePicture: null,
     idNumber: "",
   })
-  const [ageError, setAgeError] = useState("")
-  const [acceptedTerms, setAcceptedTerms] = useState(false)
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const confirmed = urlParams.get("confirmed")
+    const message = urlParams.get("message")
+    const error = urlParams.get("error")
+
+    if (confirmed === "true" && message) {
+      toast({
+        title: "Email Confirmed! ✅",
+        description: message,
+      })
+      window.history.replaceState({}, document.title, window.location.pathname)
+    } else if (error && message) {
+      toast({
+        title: "Authentication Error",
+        description: message,
+        variant: "destructive",
+      })
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }, [toast])
 
   // Force show auth form after timeout
   useEffect(() => {
     const timeout = setTimeout(() => {
       console.log("AuthPage: Forcing auth form to show after timeout")
       setForceShowAuth(true)
-    }, 5000) // Reduced to 5 seconds
+    }, 15000) // Extended timeout from 5 to 15 seconds to reduce premature warnings
 
     return () => clearTimeout(timeout)
   }, [])
@@ -181,6 +212,16 @@ export default function AuthPage() {
       return
     }
 
+    if (signupData.password !== signupData.confirmPassword) {
+      setPasswordError("Passwords do not match")
+      toast({
+        title: "Password Mismatch",
+        description: "Please ensure both password fields match.",
+        variant: "destructive",
+      })
+      return
+    }
+
     // Check age validation
     if (signupData.dateOfBirth) {
       const age = calculateAge(signupData.dateOfBirth)
@@ -245,6 +286,40 @@ export default function AuthPage() {
     }
   }
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setForgotPasswordSubmitting(true)
+
+    try {
+      const { error, message } = await resetPassword(forgotPasswordEmail)
+
+      if (error) {
+        toast({
+          title: "Password Reset Failed",
+          description: error.message,
+          variant: "destructive",
+        })
+        return
+      }
+
+      toast({
+        title: "Password Reset Email Sent",
+        description: "Please check your email for password reset instructions.",
+      })
+
+      setShowForgotPassword(false)
+      setForgotPasswordEmail("")
+    } catch (error) {
+      toast({
+        title: "Password Reset Failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setForgotPasswordSubmitting(false)
+    }
+  }
+
   const handleTestEnv = async () => {
     setTestEnvLoading(true)
     const result = await testEnvironmentVariables()
@@ -254,6 +329,38 @@ export default function AuthPage() {
       variant: result.success ? "default" : "destructive",
     })
     setTestEnvLoading(false)
+  }
+
+  const generateGymRules = () => {
+    const currentDate = new Date()
+    const formattedDate = currentDate.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    })
+
+    return `MEMBERSHIP AGREEMENT
+(This is a legally binding document. Please read carefully.)
+
+SHORT RULES OF THE GYM (HOUSE RULES)
+• Train at your own risk.
+• Arrange the equipment after use.
+• Respect other members and staff.
+• No inappropriate behavior or language.
+• Proper gym attire is required.
+• Report damaged equipment immediately. If you damage anything in the gym, you will pay.
+• Management reserves the right to cancel membership due to rule violations.
+
+DISCLAIMER / INDEMNITY
+I, the undersigned member, understand and acknowledge that:
+I am voluntarily participating in physical activities at this gym, and I do so entirely at my own risk.
+The owner(s), staff, and affiliates of the gym are not liable for any injury, illness, death, or loss/damage to personal property that may occur on the premises, including but not limited to use of equipment, facilities, or participation in training activities.
+I have consulted a medical professional (if necessary), and I am physically fit to train.
+I agree to follow the gym's rules and understand that a violation may result in the termination of my membership without refund.
+
+Agreement Date: ${formattedDate}
+
+This agreement will be digitally accepted through the Sam24Fit registration system.`
   }
 
   // Show loading spinner only if authentication is loading AND we haven't forced show yet
@@ -355,6 +462,97 @@ export default function AuthPage() {
     )
   }
 
+  // Show forgot password screen
+  if (showForgotPassword) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
+        {/* Header */}
+        <header className="bg-white/95 backdrop-blur-sm shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+              <div className="flex items-center space-x-2">
+                <div className="bg-gradient-to-r from-orange-600 to-red-600 p-2 rounded-lg">
+                  <Dumbbell className="h-6 w-6 text-white" />
+                </div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+                  Sam24Fit
+                </h1>
+              </div>
+              <Button
+                variant="outline"
+                className="hover:bg-orange-50 bg-transparent"
+                onClick={() => setShowForgotPassword(false)}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Login
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Forgot Password Content */}
+        <main className="max-w-md mx-auto pt-16 px-4">
+          <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
+                <KeyRound className="h-8 w-8 text-orange-600" />
+              </div>
+              <CardTitle className="text-2xl">Reset Your Password</CardTitle>
+              <CardDescription className="text-lg">
+                Enter your email address and we'll send you a link to reset your password
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="forgot-email">Email Address</Label>
+                  <Input
+                    id="forgot-email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={forgotPasswordEmail}
+                    onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                    required
+                    className="focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 shadow-lg"
+                  disabled={forgotPasswordSubmitting}
+                >
+                  {forgotPasswordSubmitting ? (
+                    <LoadingSpinner size="sm" />
+                  ) : (
+                    <>
+                      <Mail className="h-4 w-4 mr-2" />
+                      Send Reset Link
+                    </>
+                  )}
+                </Button>
+              </form>
+
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-start space-x-3">
+                  <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium mb-1">What happens next?</p>
+                    <ul className="space-y-1 text-blue-700">
+                      <li>• We'll send a password reset link to your email</li>
+                      <li>• Click the link to create a new password</li>
+                      <li>• Use your new password to log in</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
       {/* Header */}
@@ -436,6 +634,17 @@ export default function AuthPage() {
                       className="focus:ring-orange-500 focus:border-orange-500"
                     />
                   </div>
+
+                  <div className="flex justify-end mb-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPassword(true)}
+                      className="text-sm text-orange-600 hover:text-orange-700 underline font-medium"
+                    >
+                      Forgot your password?
+                    </button>
+                  </div>
+
                   <Button
                     type="submit"
                     className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 shadow-lg"
@@ -645,22 +854,90 @@ export default function AuthPage() {
                       Account Security
                     </h3>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-password">Password *</Label>
-                      <Input
-                        id="signup-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={signupData.password}
-                        onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
-                        required
-                        className="focus:ring-orange-500 focus:border-orange-500"
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-password">Password *</Label>
+                        <Input
+                          id="signup-password"
+                          type="password"
+                          placeholder="••••••••"
+                          value={signupData.password}
+                          onChange={(e) => {
+                            setSignupData({ ...signupData, password: e.target.value })
+                            if (passwordError) setPasswordError("")
+                          }}
+                          required
+                          className="focus:ring-orange-500 focus:border-orange-500"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="confirm-password">Confirm Password *</Label>
+                        <Input
+                          id="confirm-password"
+                          type="password"
+                          placeholder="••••••••"
+                          value={signupData.confirmPassword}
+                          onChange={(e) => {
+                            setSignupData({ ...signupData, confirmPassword: e.target.value })
+                            if (passwordError) setPasswordError("")
+                          }}
+                          required
+                          className={
+                            passwordError
+                              ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+                              : "focus:ring-orange-500 focus:border-orange-500"
+                          }
+                        />
+                        {passwordError && (
+                          <p className="text-sm text-red-600 flex items-center mt-1">
+                            <AlertCircle className="h-4 w-4 mr-1" />
+                            {passwordError}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-sm text-blue-800">
+                        <strong>Password Requirements:</strong> Use a strong password with at least 8 characters for
+                        better security.
+                      </p>
                     </div>
                   </div>
 
                   {/* Terms and Conditions Checkbox */}
                   <div className="space-y-4 pt-4 border-t">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold text-gray-900">Gym Rules & Agreement</h3>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowGymRules(!showGymRules)}
+                          className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                        >
+                          {showGymRules ? "Hide Rules" : "View Rules"}
+                        </Button>
+                      </div>
+
+                      {showGymRules && (
+                        <div className="bg-gray-50 rounded-lg p-4 max-h-80 overflow-y-auto border border-gray-200">
+                          <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono leading-relaxed">
+                            {generateGymRules()}
+                          </pre>
+                        </div>
+                      )}
+
+                      <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
+                        <p className="text-sm text-orange-800">
+                          <strong>Important:</strong> Please review the gym rules and membership agreement above before
+                          proceeding with registration.
+                        </p>
+                      </div>
+                    </div>
+
                     <div className="flex items-start space-x-3">
                       <input
                         id="acceptTerms"
@@ -670,15 +947,14 @@ export default function AuthPage() {
                         className="mt-1 h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
                       />
                       <label htmlFor="acceptTerms" className="text-sm text-gray-700 cursor-pointer">
-                        I accept the{" "}
-                        <a
-                          href="/terms"
-                          target="_blank"
+                        I have read and accept the gym rules and membership agreement above, as well as the{" "}
+                        <button
+                          type="button"
+                          onClick={() => setShowGymRules(true)}
                           className="text-orange-600 hover:text-orange-700 underline"
-                          rel="noreferrer"
                         >
                           Terms and Conditions
-                        </a>{" "}
+                        </button>{" "}
                         and{" "}
                         <a
                           href="/privacy"
@@ -695,7 +971,7 @@ export default function AuthPage() {
                   <Button
                     type="submit"
                     className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 mt-6 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!!ageError || formSubmitting || !acceptedTerms}
+                    disabled={!!ageError || !!passwordError || formSubmitting || !acceptedTerms}
                   >
                     {formSubmitting ? (
                       <LoadingSpinner size="sm" />
