@@ -7,7 +7,11 @@ import { getCurrentUser, refreshUserSession } from "@/lib/auth"
 const USER_CACHE_KEY = "sam24fit_user_cache"
 const CACHE_EXPIRY_KEY = "sam24fit_cache_expiry"
 const SESSION_CACHE_KEY = "sam24fit_session_cache"
-const CACHE_DURATION = 4 * 60 * 60 * 1000 // 4 hours (was 2 hours)
+const CACHE_DURATION = 4 * 60 * 60 * 1000 // 4 hours
+
+const RETRY_CACHE_KEY = "sam24fit_retry_cache"
+const MAX_RETRIES = 3
+const RETRY_COOLDOWN = 5 * 60 * 1000 // 5 minutes cooldown after max retries
 
 const getCachedUser = (): User | null => {
   if (typeof window === "undefined") return null
@@ -58,6 +62,50 @@ const setCachedUser = (user: User | null) => {
   }
 }
 
+const getRetryInfo = () => {
+  if (typeof window === "undefined") return { count: 0, lastAttempt: 0 }
+
+  try {
+    const retryData = localStorage.getItem(RETRY_CACHE_KEY)
+    if (retryData) {
+      return JSON.parse(retryData)
+    }
+  } catch (error) {
+    console.error("useAuth: Error reading retry cache:", error)
+  }
+
+  return { count: 0, lastAttempt: 0 }
+}
+
+const updateRetryInfo = (count: number) => {
+  if (typeof window === "undefined") return
+
+  try {
+    const retryData = { count, lastAttempt: Date.now() }
+    localStorage.setItem(RETRY_CACHE_KEY, JSON.stringify(retryData))
+  } catch (error) {
+    console.error("useAuth: Error updating retry cache:", error)
+  }
+}
+
+const clearRetryInfo = () => {
+  if (typeof window === "undefined") return
+  localStorage.removeItem(RETRY_CACHE_KEY)
+}
+
+const canRetry = (): boolean => {
+  const retryInfo = getRetryInfo()
+  const now = Date.now()
+
+  // Reset retry count if cooldown period has passed
+  if (retryInfo.count >= MAX_RETRIES && now - retryInfo.lastAttempt > RETRY_COOLDOWN) {
+    clearRetryInfo()
+    return true
+  }
+
+  return retryInfo.count < MAX_RETRIES
+}
+
 const isSessionValid = (): boolean => {
   if (typeof window === "undefined") return false
 
@@ -92,6 +140,7 @@ export const useAuth = () => {
       const currentUser = await getCurrentUser()
       setUserWithCache(currentUser)
       console.log("useAuth: User data refreshed successfully. User:", currentUser)
+      clearRetryInfo()
       return currentUser
     } catch (error) {
       console.error("useAuth: Error refreshing user:", error)
@@ -109,6 +158,7 @@ export const useAuth = () => {
       if (!error && refreshedUser) {
         setUserWithCache(refreshedUser)
         console.log("useAuth: Session refreshed. User:", refreshedUser)
+        clearRetryInfo()
       }
       return { user: refreshedUser, error }
     } catch (error) {
@@ -127,12 +177,26 @@ export const useAuth = () => {
         console.warn("useAuth: Loading timeout reached, setting loading to false")
         setLoading(false)
       }
-    }, 15000) // Extended loading timeout from 10 to 15 seconds
+    }, 20000) // Extended loading timeout to 20 seconds
 
     // Get initial session
     const getInitialSession = async () => {
       if (isInitializing) {
         console.log("useAuth: Already initializing, skipping...")
+        return
+      }
+
+      if (!canRetry()) {
+        console.log("useAuth: Max retries reached, using cached data only")
+        const cachedUser = getCachedUser()
+        if (cachedUser && mounted) {
+          setUser(cachedUser)
+          setLoading(false)
+          clearTimeout(loadingTimeout)
+        } else if (mounted) {
+          setLoading(false)
+          clearTimeout(loadingTimeout)
+        }
         return
       }
 
@@ -155,12 +219,21 @@ export const useAuth = () => {
           console.log("useAuth: Initial session loaded. User:", currentUser)
           setLoading(false)
           clearTimeout(loadingTimeout)
+          clearRetryInfo()
         }
       } catch (error) {
         console.error("useAuth: Error getting initial session:", error)
+
+        const retryInfo = getRetryInfo()
+        updateRetryInfo(retryInfo.count + 1)
+
         if (mounted) {
           const cachedUser = getCachedUser()
-          if (!cachedUser || !isSessionValid()) {
+          if (cachedUser && isSessionValid()) {
+            // Keep using cached user if session is still valid
+            setUser(cachedUser)
+            console.log("useAuth: Using cached user due to fetch error")
+          } else if (!cachedUser || !isSessionValid()) {
             setUserWithCache(null)
           }
           setLoading(false)
@@ -193,12 +266,18 @@ export const useAuth = () => {
           }
         },
         5 * 60 * 1000,
-      ) // Keep session refresh check at 5 minutes for better reliability
+      )
     }
 
     const handleVisibilityChange = async () => {
       if (!document.hidden && mounted) {
         console.log("useAuth: Tab became visible, checking session...")
+
+        if (!canRetry()) {
+          console.log("useAuth: Max retries reached, skipping visibility refresh")
+          return
+        }
+
         try {
           const {
             data: { session },
@@ -218,7 +297,7 @@ export const useAuth = () => {
             if (!user || !isSessionValid()) {
               try {
                 const timeoutPromise = new Promise<null>((resolve) => {
-                  setTimeout(() => resolve(null), 8000) // Extended timeout from 5 to 8 seconds
+                  setTimeout(() => resolve(null), 10000) // Extended timeout to 10 seconds
                 })
 
                 const getUserPromise = getCurrentUser()
@@ -227,9 +306,12 @@ export const useAuth = () => {
                 if (currentUser && mounted) {
                   setUserWithCache(currentUser)
                   console.log("useAuth: User data refreshed after tab focus")
+                  clearRetryInfo()
                 }
               } catch (error) {
                 console.error("useAuth: Error refreshing user on tab focus:", error)
+                const retryInfo = getRetryInfo()
+                updateRetryInfo(retryInfo.count + 1)
               }
             }
           } else {
@@ -256,17 +338,23 @@ export const useAuth = () => {
       if (event === "SIGNED_OUT" || (event === "TOKEN_REFRESHED" && !session)) {
         if (mounted) {
           setUserWithCache(null)
+          clearRetryInfo() // Clear retry info on sign out
           console.log("useAuth: User explicitly signed out")
         }
       } else if (session?.user && event !== "TOKEN_REFRESHED" && event !== "INITIAL_SESSION") {
-        try {
-          const currentUser = await getCurrentUser()
-          if (mounted) {
-            setUserWithCache(currentUser)
-            console.log("useAuth: Auth state changed. Current user:", currentUser)
+        if (canRetry()) {
+          try {
+            const currentUser = await getCurrentUser()
+            if (mounted) {
+              setUserWithCache(currentUser)
+              console.log("useAuth: Auth state changed. Current user:", currentUser)
+              clearRetryInfo()
+            }
+          } catch (error) {
+            console.error("useAuth: Error in auth state change:", error)
+            const retryInfo = getRetryInfo()
+            updateRetryInfo(retryInfo.count + 1)
           }
-        } catch (error) {
-          console.error("useAuth: Error in auth state change:", error)
         }
       }
 
