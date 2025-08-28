@@ -18,6 +18,7 @@ import {
   Star,
   BookOpen,
   MessageCircle,
+  AlertCircle,
 } from "lucide-react"
 import Image from "next/image"
 import { getApprovedReviews } from "@/app/actions/review-actions"
@@ -26,11 +27,13 @@ import { useEffect, useState } from "react"
 export default function LandingPage() {
   const [reviews, setReviews] = useState<any[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(true)
+  const [reviewsError, setReviewsError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchReviews = async () => {
       console.log("[v0] Starting to fetch reviews...")
       setReviewsLoading(true)
+      setReviewsError(null)
 
       try {
         await new Promise((resolve) => setTimeout(resolve, 1000))
@@ -47,10 +50,16 @@ export default function LandingPage() {
           setReviews(result.data || [])
         } else {
           console.log("[v0] Failed to fetch reviews:", result.error)
+          if (result.error === "Database configuration error") {
+            setReviewsError("database_config")
+          } else {
+            setReviewsError(result.error || "Failed to load reviews")
+          }
           setReviews([])
         }
       } catch (error) {
         console.log("[v0] Error in fetchReviews:", error)
+        setReviewsError("network_error")
         setReviews([])
       } finally {
         setReviewsLoading(false)
@@ -96,6 +105,20 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-white">
+      {reviewsError === "database_config" && (
+        <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-3">
+          <div className="max-w-7xl mx-auto flex items-center justify-center space-x-2">
+            <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
+            <p className="text-sm text-yellow-800">
+              <strong>Setup Required:</strong> Database configuration needed for full functionality.
+              <a href="#setup-instructions" className="underline ml-1">
+                View setup instructions
+              </a>
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-white shadow-sm border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -400,8 +423,8 @@ export default function LandingPage() {
                       <span className="text-gray-900 font-semibold font-mono text-sm sm:text-base">1052 6463 87</span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
-                      <span className="text-gray-600 font-medium text-sm sm:text-base">Account Type:</span>
-                      <span className="text-gray-900 font-semibold text-sm sm:text-base">Transact</span>
+                      <span className="text-gray-600 font-medium text-sm:text-base">Account Type:</span>
+                      <span className="text-gray-900 font-semibold text-sm:text-base">Transact</span>
                     </div>
                   </div>
 
@@ -427,20 +450,20 @@ export default function LandingPage() {
                 <CardContent className="space-y-3 sm:space-y-4 px-4 sm:px-6 pb-6">
                   <div className="bg-white rounded-lg p-3 sm:p-4 space-y-2 sm:space-y-3">
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
-                      <span className="text-gray-600 font-medium text-sm sm:text-base">Bank:</span>
-                      <span className="text-gray-900 font-semibold text-sm sm:text-base">Capitec Bank</span>
+                      <span className="text-gray-600 font-medium text-sm:text-base">Bank:</span>
+                      <span className="text-gray-900 font-semibold text-sm:text-base">Capitec Bank</span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
-                      <span className="text-gray-600 font-medium text-sm sm:text-base">Account Name:</span>
-                      <span className="text-gray-900 font-semibold text-sm sm:text-base">MR SG NXUMALO</span>
+                      <span className="text-gray-600 font-medium text-sm:text-base">Account Name:</span>
+                      <span className="text-gray-900 font-semibold text-sm:text-base">MR SG NXUMALO</span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
-                      <span className="text-gray-600 font-medium text-sm sm:text-base">Account Number:</span>
-                      <span className="text-gray-900 font-semibold font-mono text-sm sm:text-base">1278512703</span>
+                      <span className="text-gray-600 font-medium text-sm:text-base">Account Number:</span>
+                      <span className="text-gray-900 font-semibold font-mono text-sm:text-base">1278512703</span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
-                      <span className="text-gray-600 font-medium text-sm sm:text-base">Account Type:</span>
-                      <span className="text-gray-900 font-semibold text-sm sm:text-base">Personal Debit</span>
+                      <span className="text-gray-600 font-medium text-sm:text-base">Account Type:</span>
+                      <span className="text-gray-900 font-semibold text-sm:text-base">Personal Debit</span>
                     </div>
                   </div>
 
@@ -552,6 +575,38 @@ export default function LandingPage() {
                 )
               }
 
+              if (reviewsError) {
+                if (reviewsError === "database_config") {
+                  return (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-lg">
+                        <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Database Setup Required</h3>
+                        <p className="text-gray-600 text-sm mb-4">
+                          Reviews will appear here once your Supabase database is configured.
+                        </p>
+                        <div className="text-left bg-gray-50 rounded p-3 text-xs">
+                          <p className="font-medium mb-1">Quick Setup:</p>
+                          <p>1. Create a Supabase project</p>
+                          <p>2. Add environment variables to Netlify</p>
+                          <p>3. Run the database scripts</p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }
+
+                return (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center">
+                      <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500 text-base sm:text-lg">Unable to load reviews</p>
+                      <p className="text-gray-400 text-sm">Please try again later</p>
+                    </div>
+                  </div>
+                )
+              }
+
               const featuredReviews = reviews.filter((review) => review.is_featured === true)
               const displayReviews = featuredReviews
 
@@ -577,6 +632,7 @@ export default function LandingPage() {
                 )
               }
 
+              // ... existing review display code ...
               const generatePositions = (count: number) => {
                 if (count === 0) return []
                 if (count === 1) return [{ top: "50%", left: "50%", transform: "translate(-50%, -50%)" }]
@@ -646,6 +702,7 @@ export default function LandingPage() {
                           src={
                             review.users?.profile_picture_url ||
                             "/placeholder.svg?height=32&width=32&query=user profile" ||
+                            "/placeholder.svg" ||
                             "/placeholder.svg"
                           }
                           alt={review.users?.full_name || "User"}
@@ -682,6 +739,85 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {reviewsError === "database_config" && (
+        <section id="setup-instructions" className="py-12 bg-yellow-50 border-t border-yellow-200">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Database Setup Instructions</h2>
+              <p className="text-gray-600">
+                Follow these steps to configure your Supabase database for full functionality
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="space-y-6">
+                <div className="flex items-start space-x-4">
+                  <div className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                    1
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-2">Create Supabase Project</h3>
+                    <p className="text-gray-600 text-sm">
+                      Go to{" "}
+                      <a
+                        href="https://supabase.com"
+                        target="_blank"
+                        className="text-blue-600 underline"
+                        rel="noreferrer"
+                      >
+                        supabase.com
+                      </a>{" "}
+                      and create a new project
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-4">
+                  <div className="bg-purple-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                    2
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-2">Get API Keys</h3>
+                    <p className="text-gray-600 text-sm">
+                      Copy your Project URL and anon/public key from Settings → API
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-4">
+                  <div className="bg-green-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                    3
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-2">Configure Netlify</h3>
+                    <p className="text-gray-600 text-sm">
+                      Add environment variables in Netlify Site Settings → Environment Variables:
+                    </p>
+                    <div className="mt-2 bg-gray-50 rounded p-3 text-xs font-mono">
+                      <p>NEXT_PUBLIC_SUPABASE_URL=your_project_url</p>
+                      <p>NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key</p>
+                      <p>SUPABASE_SERVICE_ROLE_KEY=your_service_role_key</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-4">
+                  <div className="bg-orange-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                    4
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-2">Run Database Scripts</h3>
+                    <p className="text-gray-600 text-sm">
+                      Execute the SQL scripts in your Supabase SQL editor to set up tables and policies
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Operating Hours */}
       <section className="py-12 sm:py-16 md:py-20 bg-gray-50">
