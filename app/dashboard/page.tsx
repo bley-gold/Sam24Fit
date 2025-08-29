@@ -43,6 +43,7 @@ export default function DashboardPage() {
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [loadingReceipts, setLoadingReceipts] = useState(true)
   const [jwtRole, setJwtRole] = useState<string>("")
+  const [jwtRoleLoading, setJwtRoleLoading] = useState(true)
   const [receiptToDelete, setReceiptToDelete] = useState<Receipt | null>(null)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(isDeleteDialogOpen)
@@ -268,12 +269,23 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
   }, [user])
 
   const checkJWTRole = async () => {
-    const role = await getUserRoleFromJWT()
-    setJwtRole(role)
-    console.log("JWT Role:", role, "Database Role:", user?.role)
+    setJwtRoleLoading(true)
+    console.log("[v0] Starting JWT role check for user:", user?.email)
 
-    if (user && role !== user.role) {
-      console.warn("JWT role mismatch! JWT:", role, "Database:", user.role)
+    try {
+      const role = await getUserRoleFromJWT()
+      setJwtRole(role)
+      console.log("[v0] JWT Role check complete - JWT:", role, "Database Role:", user?.role)
+
+      if (user && role !== user.role) {
+        console.warn("JWT role mismatch! JWT:", role, "Database:", user.role)
+      }
+    } catch (error) {
+      console.error("[v0] Error checking JWT role:", error)
+      setJwtRole(user?.role || "user")
+    } finally {
+      setJwtRoleLoading(false)
+      console.log("[v0] JWT role check completed")
     }
   }
 
@@ -440,6 +452,9 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
   }
 
   const getEffectiveRole = () => {
+    if (jwtRoleLoading) {
+      return user?.role || "user"
+    }
     return user?.role || "user"
   }
 
@@ -626,17 +641,27 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
     }
   }
 
-  if (authLoading) {
+  if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
-        <LoadingSpinner size="lg" text="Loading dashboard..." />
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
       </div>
     )
   }
 
-  if (!user) {
-    return null
-  }
+  console.log(
+    "[v0] Dashboard rendering - User:",
+    user?.email,
+    "Role:",
+    user?.role,
+    "JWT Role:",
+    jwtRole,
+    "JWT Loading:",
+    jwtRoleLoading,
+  )
 
   const effectiveRole = getEffectiveRole()
   const roleMatch = user.role === jwtRole
@@ -761,7 +786,7 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Dashboard</h2>
           <p className="text-gray-600 text-sm sm:text-base">Manage your gym payments and receipts</p>
 
-          {user.role === "admin" && jwtRole !== "admin" && (
+          {!jwtRoleLoading && user.role === "admin" && jwtRole !== "admin" && (
             <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
               <h3 className="text-sm font-medium text-yellow-800 mb-2">Admin Access Notice</h3>
               <p className="text-sm text-yellow-700 mb-3">
