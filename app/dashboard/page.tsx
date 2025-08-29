@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -36,7 +36,7 @@ import { deleteReceipt } from "@/app/actions/receipt-actions"
 import { createReview, getUserReviews, type Review } from "@/app/actions/review-actions"
 import { jsPDF } from "jspdf"
 
-export default function Dashboard() {
+export default function DashboardPage() {
   const { user, loading: authLoading, refreshUser, refreshSession } = useAuthContext()
   const router = useRouter()
   const { toast } = useToast()
@@ -50,6 +50,7 @@ export default function Dashboard() {
   const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false)
   const [recentStatusChanges, setRecentStatusChanges] = useState<Receipt[]>([])
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+  const notificationRef = useRef<HTMLDivElement>(null)
   const [userReviews, setUserReviews] = useState<Review[]>([])
   const [reviewText, setReviewText] = useState("")
   const [reviewRating, setReviewRating] = useState(5)
@@ -321,9 +322,26 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
     }
   }
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setIsNotificationOpen(false)
+      }
+    }
+
+    if (isNotificationOpen) {
+      document.addEventListener("mousedown", handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [isNotificationOpen])
+
   const handleLogout = async () => {
     try {
       console.log("[v0] Logout button clicked")
+      setIsNotificationOpen(false)
       await signOut()
       if (typeof window !== "undefined") {
         localStorage.removeItem("sam24fit_user_cache")
@@ -641,7 +659,7 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
                     Admin
                   </Badge>
                 )}
-                <div className="relative">
+                <div className="relative" ref={notificationRef}>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -657,7 +675,7 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
                   </Button>
 
                   {isNotificationOpen && (
-                    <div className="fixed sm:absolute top-16 sm:top-full right-2 sm:right-0 mt-2 w-[calc(100vw-1rem)] sm:w-96 max-w-sm sm:max-w-96 bg-white rounded-lg shadow-xl border z-[9999]">
+                    <div className="fixed sm:absolute top-16 sm:top-full right-2 sm:right-0 mt-2 w-[calc(100vw-1rem)] sm:w-96 max-w-sm sm:max-w-96 bg-white rounded-lg shadow-xl border z-50 sm:z-[100]">
                       <div className="p-3 sm:p-4 border-b">
                         <div className="flex items-center justify-between">
                           <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Notifications</h3>
@@ -727,7 +745,7 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
                   variant="outline"
                   size="sm"
                   onClick={handleLogout}
-                  className="text-xs sm:text-sm bg-transparent hover:bg-gray-100 border-gray-300 min-w-[80px] px-3 py-2"
+                  className="text-xs sm:text-sm bg-transparent hover:bg-gray-100 border-gray-300 min-w-[80px] px-3 py-2 relative z-[200]"
                 >
                   <LogOut className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   Logout
@@ -1123,7 +1141,7 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-1">
+          <Card className="lg:col-span-3">
             <CardHeader>
               <CardTitle className="flex items-center text-base sm:text-lg">
                 <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
