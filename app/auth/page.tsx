@@ -556,7 +556,7 @@ This agreement will be digitally accepted through the Sam24Fit registration syst
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
       {/* Header */}
-      <header className="bg-white/95 backdrop-blur-sm shadow-sm border-b">
+      <header className="bg-white shadow-sm border-b border-gray-200 relative z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-2">
@@ -567,7 +567,11 @@ This agreement will be digitally accepted through the Sam24Fit registration syst
                 Sam24Fit
               </h1>
             </div>
-            <Button variant="outline" className="hover:bg-orange-50 bg-transparent" onClick={() => router.push("/")}>
+            <Button
+              variant="outline"
+              className="hover:bg-orange-50 bg-transparent relative z-10"
+              onClick={() => router.push("/")}
+            >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Home
             </Button>
@@ -923,7 +927,7 @@ This agreement will be digitally accepted through the Sam24Fit registration syst
                       </div>
 
                       {showGymRules && (
-                        <div className="bg-gray-50 rounded-lg p-4 max-h-80 overflow-y-auto border border-gray-200">
+                        <div className="bg-gray-50 rounded-lg p-4 max-h-80 overflow-y-auto border border-gray-200 relative z-0">
                           <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono leading-relaxed">
                             {generateGymRules()}
                           </pre>

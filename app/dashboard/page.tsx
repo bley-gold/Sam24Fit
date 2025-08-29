@@ -32,8 +32,7 @@ import {
   Settings,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { deleteReceipt } from "@/app/actions/receipt-actions"
-import { createReview, getUserReviews, type Review } from "@/app/actions/review-actions"
+import { createReview, getUserReviews, type Review, canUserSubmitReview } from "@/app/actions/review-actions"
 import { jsPDF } from "jspdf"
 
 export default function DashboardPage() {
@@ -256,7 +255,6 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
   useEffect(() => {
     const checkReviewEligibility = async () => {
       if (user) {
-        const { canUserSubmitReview } = await import("../actions/review-actions")
         const result = await canUserSubmitReview(user.id)
         if (result.success) {
           setCanSubmitReview(result.canSubmit)
@@ -289,172 +287,7 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
     }
   }
 
-  const fetchReceipts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("receipts")
-        .select("*")
-        .eq("user_id", user?.id)
-        .order("created_at", { ascending: false })
-
-      if (error) throw error
-
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-
-      const recentChanges = (data || []).filter((receipt) => {
-        const updatedAt = new Date(receipt.updated_at || receipt.created_at)
-        return (receipt.status === "verified" || receipt.status === "rejected") && updatedAt > sevenDaysAgo
-      })
-
-      let filteredChanges = recentChanges
-      if (user?.id) {
-        const dismissedIds = getDismissedNotifications()
-        filteredChanges = recentChanges.filter((receipt) => !dismissedIds.includes(receipt.id))
-      }
-
-      setRecentStatusChanges(filteredChanges)
-      setReceipts(data || [])
-
-      if (user?.id) {
-        const reviewsResult = await getUserReviews(user.id)
-        if (reviewsResult.success) {
-          setUserReviews(reviewsResult.data)
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching receipts:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load receipts. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoadingReceipts(false)
-    }
-  }
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
-        setIsNotificationOpen(false)
-      }
-    }
-
-    if (isNotificationOpen) {
-      document.addEventListener("mousedown", handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [isNotificationOpen])
-
-  const handleLogout = async () => {
-    try {
-      console.log("[v0] Logout button clicked")
-      setIsNotificationOpen(false)
-      await signOut()
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("sam24fit_user_cache")
-        localStorage.removeItem("sam24fit_cache_expiry")
-        localStorage.removeItem("sam24fit_session_cache")
-      }
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out.",
-      })
-      router.push("/")
-    } catch (error) {
-      console.error("[v0] Logout error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to log out. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "verified":
-        return "bg-green-100 text-green-800"
-      case "rejected":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-yellow-100 text-yellow-800"
-    }
-  }
-
-  const handleProfileUpdate = async () => {
-    await refreshUser()
-  }
-
-  const handleDeleteReceipt = async (receipt: Receipt) => {
-    setReceiptToDelete(receipt)
-    setIsDeleteDialogOpen(true)
-  }
-
-  const handlePreviewReceipt = async (receipt: Receipt) => {
-    console.log("[v0] Receipt preview data:", {
-      id: receipt.id,
-      filename: receipt.filename,
-      status: receipt.status,
-      rejection_reason: receipt.rejection_reason,
-      hasRejectionReason: !!receipt.rejection_reason,
-      rejectionReasonType: typeof receipt.rejection_reason,
-    })
-    setReceiptToPreview(receipt)
-    setIsPreviewDialogOpen(true)
-  }
-
-  const confirmDeleteReceipt = async () => {
-    if (!receiptToDelete || !user) return
-
-    setIsDeleting(true)
-    try {
-      const { success, message } = await deleteReceipt(receiptToDelete.id, user.id)
-
-      if (success) {
-        toast({
-          title: "Receipt Deleted",
-          description: "Receipt has been successfully deleted.",
-        })
-        setReceipts((prev) => prev.filter((r) => r.id !== receiptToDelete.id))
-      } else {
-        toast({
-          title: "Delete Failed",
-          description: message || "Failed to delete receipt.",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      toast({
-        title: "Delete Failed",
-        description: "An unexpected error occurred while deleting the receipt.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsDeleting(false)
-      setIsDeleteDialogOpen(false)
-      setReceiptToDelete(null)
-    }
-  }
-
-  const dismissNotification = (receiptId: string) => {
-    if (user?.id) {
-      const currentDismissed = getDismissedNotifications()
-      const updatedDismissed = [...currentDismissed, receiptId]
-      saveDismissedNotifications(updatedDismissed)
-    }
-
-    setRecentStatusChanges((prev) => prev.filter((receipt) => receipt.id !== receiptId))
-  }
-
   const getEffectiveRole = () => {
-    if (jwtRoleLoading) {
-      return user?.role || "user"
-    }
     return user?.role || "user"
   }
 
@@ -639,6 +472,74 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
     } finally {
       setIsSubmittingReview(false)
     }
+  }
+
+  const fetchReceipts = async () => {
+    setLoadingReceipts(true)
+    try {
+      const { data, error } = await supabase
+        .from("receipts")
+        .select("*")
+        .eq("user_id", user?.id)
+        .order("upload_date", { ascending: false })
+
+      if (error) {
+        console.error("Error fetching receipts:", error)
+        toast({
+          title: "Error",
+          description: "Failed to fetch receipts. Please try again.",
+          variant: "destructive",
+        })
+      } else {
+        setReceipts(data || [])
+        const newStatusChanges = data?.filter(
+          (receipt) => receipt.status !== "pending" && !getDismissedNotifications().includes(receipt.id),
+        )
+        setRecentStatusChanges(newStatusChanges || [])
+      }
+    } finally {
+      setLoadingReceipts(false)
+    }
+  }
+
+  const dismissNotification = (receiptId: string) => {
+    const dismissed = getDismissedNotifications()
+    dismissed.push(receiptId)
+    saveDismissedNotifications(dismissed)
+    setRecentStatusChanges((prev) => prev.filter((receipt) => receipt.id !== receiptId))
+  }
+
+  const handleLogout = async () => {
+    await signOut()
+    router.push("/auth")
+  }
+
+  const handleProfileUpdate = async () => {
+    await refreshUser()
+    await refreshSession()
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800"
+      case "verified":
+        return "bg-green-100 text-green-800"
+      case "rejected":
+        return "bg-red-100 text-red-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const handlePreviewReceipt = (receipt: Receipt) => {
+    setReceiptToPreview(receipt)
+    setIsPreviewDialogOpen(true)
+  }
+
+  const handleDeleteReceipt = (receipt: Receipt) => {
+    setReceiptToDelete(receipt)
+    setIsDeleteDialogOpen(true)
   }
 
   if (authLoading || !user) {
