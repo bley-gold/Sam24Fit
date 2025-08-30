@@ -113,35 +113,8 @@ export const useAuth = () => {
 
   useEffect(() => {
     let mounted = true
-    let isInitializing = false
-
-    // Simplified session restoration without WebLocks
-    const restoreSupabaseSession = async () => {
-      try {
-        // Test connection first
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        if (error) {
-          console.error("useAuth: Error getting session:", error)
-          return null
-        }
-
-        if (session) {
-          console.log("useAuth: Supabase session restored successfully")
-          return session
-        }
-
-        return null
-      } catch (error) {
-        console.error("useAuth: Error during session restoration:", error)
-        return null
-      }
-    }
 
     const getInitialSession = async () => {
-      if (isInitializing) return
-      isInitializing = true
-
       try {
         // Check for cached user first for immediate UI response
         const cachedUser = getCachedUser()
@@ -149,94 +122,44 @@ export const useAuth = () => {
           setUser(cachedUser)
           setProfileStatus("available")
           setLoading(false)
-          
-          // Background verification without blocking UI
-          setTimeout(async () => {
-            try {
-              const session = await restoreSupabaseSession()
-              if (session && mounted) {
-                const currentUser = await getCurrentUser()
-                if (currentUser) {
-                  setUserWithCache(currentUser)
-                }
-              }
-            } catch (error) {
-              console.log("useAuth: Background verification failed, keeping cached user")
-            }
-          }, 100)
-          
-          isInitializing = false
           return
         }
 
-        // No valid cache, check for session
-        const session = await restoreSupabaseSession()
+        // Check for active session
+        const { data: { session }, error } = await supabase.auth.getSession()
         
-        if (session && mounted) {
+        if (error) {
+          console.error("useAuth: Error getting session:", error)
+          setUserWithCache(null)
           setLoading(false)
+          return
+        }
+
+        if (session && mounted) {
           setProfileStatus("loading")
-          
-          try {
-            const currentUser = await getCurrentUser()
-            if (currentUser && mounted) {
-              setUserWithCache(currentUser)
-            } else if (mounted) {
-              setProfileStatus("unavailable")
-              setUser(null)
-            }
-          } catch (error) {
-            console.error("useAuth: Error getting user profile:", error)
-            if (mounted) {
-              setProfileStatus("unavailable")
-              setUser(null)
-            }
+          const currentUser = await getCurrentUser()
+          if (currentUser && mounted) {
+            setUserWithCache(currentUser)
+          } else if (mounted) {
+            setProfileStatus("unavailable")
           }
         } else if (mounted) {
           setUserWithCache(null)
-          setProfileStatus("unavailable")
+        }
+        
+        if (mounted) {
           setLoading(false)
         }
       } catch (error) {
         console.error("useAuth: Error in initial session setup:", error)
         if (mounted) {
-          const cachedUser = getCachedUser()
-          if (cachedUser && isSessionValid()) {
-            setUser(cachedUser)
-            setProfileStatus("available")
-          } else {
-            setUserWithCache(null)
-            setProfileStatus("unavailable")
-          }
+          setUserWithCache(null)
           setLoading(false)
         }
-      } finally {
-        isInitializing = false
       }
     }
 
-    // Optimized page visibility handling for bfcache
-    const handlePageShow = (event: PageTransitionEvent) => {
-      if (event.persisted && mounted) {
-        console.log("useAuth: Page restored from bfcache, quick session check...")
-        
-        // Quick non-blocking session check
-        setTimeout(async () => {
-          try {
-            const session = await restoreSupabaseSession()
-            if (session && !isSessionValid() && mounted) {
-              const currentUser = await getCurrentUser()
-              if (currentUser) {
-                setUserWithCache(currentUser)
-              }
-            }
-          } catch (error) {
-            console.error("useAuth: Error in bfcache restore:", error)
-          }
-        }, 50)
-      }
-    }
-
-    // Auth state change handler - simplified
+    // Auth state change handler
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -246,21 +169,15 @@ export const useAuth = () => {
 
       if (event === "SIGNED_OUT" || (event === "TOKEN_REFRESHED" && !session)) {
         setUserWithCache(null)
-        setProfileStatus("unavailable")
-      } else if (session?.user && event !== "TOKEN_REFRESHED" && event !== "INITIAL_SESSION") {
+      } else if (session?.user && (event === "SIGNED_IN" || event === "TOKEN_REFRESHED")) {
         try {
           setProfileStatus("loading")
           const currentUser = await getCurrentUser()
           if (currentUser && mounted) {
             setUserWithCache(currentUser)
-          } else if (mounted) {
-            setProfileStatus("unavailable")
           }
         } catch (error) {
           console.error("useAuth: Error in auth state change:", error)
-          if (mounted) {
-            setProfileStatus("unavailable")
-          }
         }
       }
 
@@ -272,12 +189,8 @@ export const useAuth = () => {
     // Initialize session
     getInitialSession()
 
-    // Add page visibility listeners for bfcache
-    window.addEventListener("pageshow", handlePageShow, { passive: true })
-
     return () => {
       mounted = false
-      window.removeEventListener("pageshow", handlePageShow)
       subscription.unsubscribe()
     }
   }, [refreshSession, setUserWithCache])

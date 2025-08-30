@@ -77,16 +77,20 @@ export { createClient }
 export interface User {
   id: string
   email: string
+  password_hash?: string | null
   full_name: string
   phone: string
-  date_of_birth: string
-  gender: "male" | "female" | "other"
+  date_of_birth: string | null
+  gender: "male" | "female" | "other" | null
   street_address: string
   emergency_contact_name: string
   emergency_contact_number: string
   role: "user" | "admin"
   membership_status: "active" | "inactive" | "suspended"
   profile_picture_url?: string
+  id_number?: string | null
+  joining_fee_paid?: boolean
+  accepted_terms?: boolean
   last_payment_date?: string
   created_at: string
   updated_at: string

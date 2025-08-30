@@ -14,7 +14,7 @@ export async function createUserProfile(
   emergencyContactNumber: string,
   profilePictureData: { base64: string; name: string; type: string } | null,
   idNumber: string,
-  acceptedTerms: boolean,
+  acceptedTerms: boolean = true,
 ): Promise<{ success: boolean; message: string }> {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -90,6 +90,7 @@ export async function createUserProfile(
       accepted_terms: acceptedTerms,
       role: "user",
       membership_status: "active",
+      joining_fee_paid: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
