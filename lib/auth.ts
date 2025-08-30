@@ -365,6 +365,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
       return null
     }
 
+    console.log("getCurrentUser: Fetching authenticated user...")
     const {
       data: { user: authUser },
       error: authUserError,
@@ -382,6 +383,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
     console.log("Auth user found:", authUser.email)
 
     try {
+      console.log("getCurrentUser: Fetching user profile...")
       const profile = await getUserProfileById(authUser.id)
       
       if (profile) {
@@ -390,6 +392,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
       }
     } catch (profileError) {
       console.error("Error fetching user profile:", profileError)
+      // Continue to fallback instead of returning null
     }
 
     // Fallback to auth user data if profile fetch fails

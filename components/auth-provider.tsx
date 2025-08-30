@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, type ReactNode } from "react"
+import { createContext, useContext, useEffect, type ReactNode } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import type { User } from "@/lib/supabase"
 
@@ -34,6 +34,30 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const authHook = useAuth()
   const { user, loading, refreshUser, refreshSession } = authHook
 
+  // Handle page refresh by checking for stale sessions
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user) {
+        console.log("AuthProvider: Page became visible, refreshing user session...")
+        refreshUser().catch(console.error)
+      }
+    }
+
+    const handleFocus = () => {
+      if (user) {
+        console.log("AuthProvider: Window focused, refreshing user session...")
+        refreshUser().catch(console.error)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [user, refreshUser])
   const contextValue = {
     user,
     loading,
