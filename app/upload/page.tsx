@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -129,14 +127,14 @@ export default function UploadPage() {
           description: "Your receipt has been uploaded and is pending verification.",
         })
 
-        // Reset form after 2 seconds
+        // Reset form and redirect immediately for better UX
         setTimeout(() => {
           setUploadSuccess(false)
           setFile(null)
           setPaymentType("membership")
           setDescription("Gym membership fee")
           router.push("/dashboard")
-        }, 2000)
+        }, 1500)
       }
     } catch (error) {
       toast({

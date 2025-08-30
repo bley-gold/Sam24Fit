@@ -11,7 +11,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Sam24Fit Payment Gateway",
   description: "Manage your gym payments securely and efficiently.",
-    generator: 'v0.dev'
+  generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -21,7 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={inter.className} suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           <AuthProvider>{children}</AuthProvider>
           <Toaster />

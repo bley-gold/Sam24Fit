@@ -23,7 +23,7 @@ export interface SignInData {
   password: string
 }
 
-const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3, baseDelay = 1000): Promise<any> => {
+const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 2, baseDelay = 500): Promise<any> => {
   let lastError: Error
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -55,22 +55,11 @@ const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3, baseDela
 
       // Wait before retrying with exponential backoff
       const delay = baseDelay * Math.pow(2, attempt)
-      console.log(`Network error detected, retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries})`)
       await new Promise((resolve) => setTimeout(resolve, delay))
     }
   }
 
   throw lastError!
-}
-
-const testSupabaseConnection = async (): Promise<boolean> => {
-  try {
-    const { data, error } = await supabase.auth.getSession()
-    return !error
-  } catch (error) {
-    console.error("Supabase connection test failed:", error)
-    return false
-  }
 }
 
 export const signUp = async (data: SignUpData) => {
@@ -214,14 +203,6 @@ export const signIn = async (data: SignInData) => {
 
     console.log("Client: Attempting to sign in...")
 
-    console.log("Testing Supabase connection...")
-    const connectionOk = await testSupabaseConnection()
-    if (!connectionOk) {
-      throw new Error(
-        "Unable to connect to authentication service. Please check your internet connection and try again.",
-      )
-    }
-
     const authResult = await retryWithBackoff(
       async () => {
         return await supabase.auth.signInWithPassword({
@@ -229,8 +210,8 @@ export const signIn = async (data: SignInData) => {
           password: data.password,
         })
       },
-      3,
-      1000,
+      2,
+      500,
     )
 
     const { data: authData, error } = authResult

@@ -79,6 +79,7 @@ const nextConfig = {
   // Experimental features
   experimental: {
     optimizePackageImports: ['lucide-react'],
+    webVitalsAttribution: ['CLS', 'LCP'],
   },
 
   // ESLint and TypeScript configurations
@@ -87,6 +88,17 @@ const nextConfig = {
   },
   typescript: {
     ignoreBuildErrors: true,
+  },
+
+  // Optimize for back/forward cache
+  poweredByHeader: false,
+  compress: true,
+  
+  // Reduce JavaScript bundle size to improve bfcache eligibility
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn']
+    } : false,
   },
 }
 

@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -90,38 +88,31 @@ export default function AuthPage() {
   // Force show auth form after timeout
   useEffect(() => {
     const timeout = setTimeout(() => {
-      console.log("AuthPage: Forcing auth form to show after timeout")
       setForceShowAuth(true)
-    }, 15000) // Extended timeout from 5 to 15 seconds to reduce premature warnings
+    }, 8000) // Reduced timeout for better UX
 
     return () => clearTimeout(timeout)
   }, [])
 
   useEffect(() => {
-    console.log("AuthPage useEffect: authLoading =", authLoading, ", user =", user)
 
     if (redirectAttempted.current) {
-      console.log("AuthPage: Redirect already attempted, skipping")
       return
     }
 
     // Hide email confirmation if user is authenticated
     if (!authLoading && user && showEmailConfirmation) {
-      console.log("AuthPage: User is authenticated, hiding email confirmation screen")
       setShowEmailConfirmation(false)
     }
 
     // Redirect authenticated users
     if (!authLoading && user) {
-      console.log("AuthPage: User logged in, checking role for redirect")
       redirectAttempted.current = true
 
       // Check if user is admin and redirect accordingly
       if (user.role === "admin" || user.email === "goldstainmusic22@gmail.com") {
-        console.log("AuthPage: Admin user detected, redirecting to admin dashboard")
         router.push("/admin")
       } else {
-        console.log("AuthPage: Regular user, redirecting to user dashboard")
         router.push("/dashboard")
       }
     }

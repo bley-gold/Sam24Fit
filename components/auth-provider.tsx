@@ -34,8 +34,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const authHook = useAuth()
   const { user, loading, refreshUser, refreshSession } = authHook
 
-  // Navigation logic should be handled in individual pages, not in the auth provider
-
   const contextValue = {
     user,
     loading,
