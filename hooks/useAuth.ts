@@ -9,10 +9,6 @@ const CACHE_EXPIRY_KEY = "sam24fit_cache_expiry"
 const SESSION_CACHE_KEY = "sam24fit_session_cache"
 const CACHE_DURATION = 4 * 60 * 60 * 1000 // 4 hours
 
-const RETRY_CACHE_KEY = "sam24fit_retry_cache"
-const MAX_RETRIES = 3
-const RETRY_COOLDOWN = 5 * 60 * 1000 // 5 minutes cooldown after max retries
-
 const getCachedUser = (): User | null => {
   if (typeof window === "undefined") return null
 
@@ -62,50 +58,6 @@ const setCachedUser = (user: User | null) => {
   }
 }
 
-const getRetryInfo = () => {
-  if (typeof window === "undefined") return { count: 0, lastAttempt: 0 }
-
-  try {
-    const retryData = localStorage.getItem(RETRY_CACHE_KEY)
-    if (retryData) {
-      return JSON.parse(retryData)
-    }
-  } catch (error) {
-    console.error("useAuth: Error reading retry cache:", error)
-  }
-
-  return { count: 0, lastAttempt: 0 }
-}
-
-const updateRetryInfo = (count: number) => {
-  if (typeof window === "undefined") return
-
-  try {
-    const retryData = { count, lastAttempt: Date.now() }
-    localStorage.setItem(RETRY_CACHE_KEY, JSON.stringify(retryData))
-  } catch (error) {
-    console.error("useAuth: Error updating retry cache:", error)
-  }
-}
-
-const clearRetryInfo = () => {
-  if (typeof window === "undefined") return
-  localStorage.removeItem(RETRY_CACHE_KEY)
-}
-
-const canRetry = (): boolean => {
-  const retryInfo = getRetryInfo()
-  const now = Date.now()
-
-  // Reset retry count if cooldown period has passed
-  if (retryInfo.count >= MAX_RETRIES && now - retryInfo.lastAttempt > RETRY_COOLDOWN) {
-    clearRetryInfo()
-    return true
-  }
-
-  return retryInfo.count < MAX_RETRIES
-}
-
 const isSessionValid = (): boolean => {
   if (typeof window === "undefined") return false
 
@@ -141,7 +93,6 @@ export const useAuth = () => {
       const currentUser = await getCurrentUser()
       setUserWithCache(currentUser)
       console.log("useAuth: User data refreshed successfully. User:", currentUser)
-      clearRetryInfo()
       return currentUser
     } catch (error) {
       console.error("useAuth: Error refreshing user:", error)
@@ -158,7 +109,6 @@ export const useAuth = () => {
       if (!error && refreshedUser) {
         setUserWithCache(refreshedUser)
         console.log("useAuth: Session refreshed. User:", refreshedUser)
-        clearRetryInfo()
       }
       return { user: refreshedUser, error }
     } catch (error) {
@@ -169,7 +119,6 @@ export const useAuth = () => {
 
   useEffect(() => {
     let mounted = true
-    let sessionRefreshInterval: NodeJS.Timeout
     let isInitializing = false
 
     const loadingTimeout = setTimeout(() => {
@@ -177,7 +126,7 @@ export const useAuth = () => {
         console.warn("useAuth: Loading timeout reached, setting loading to false")
         setLoading(false)
       }
-    }, 15000) // Reduced from 65 seconds to 15 seconds
+    }, 10000) // Reduced timeout
 
     const restoreSupabaseSession = async () => {
       try {
@@ -237,7 +186,6 @@ export const useAuth = () => {
               if (mounted && currentUser) {
                 setUserWithCache(currentUser)
                 console.log("useAuth: Background profile refresh successful")
-                clearRetryInfo()
               }
             } catch (error) {
               console.log("useAuth: Background profile refresh failed, keeping cached user")
@@ -261,7 +209,6 @@ export const useAuth = () => {
               if (currentUser) {
                 setUserWithCache(currentUser)
                 console.log("useAuth: Initial session loaded with profile. User:", currentUser)
-                clearRetryInfo()
               } else {
                 console.log("useAuth: Profile fetch failed but keeping session alive")
                 setProfileStatus("unavailable")
@@ -306,42 +253,6 @@ export const useAuth = () => {
       }
     }
 
-    const setupSessionRefresh = () => {
-      const checkSessionExpiry = async () => {
-        try {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession()
-          if (session) {
-            const expiresAt = session.expires_at
-            const now = Math.floor(Date.now() / 1000)
-            const timeUntilExpiry = expiresAt - now
-
-            if (timeUntilExpiry < 900) {
-              console.log("useAuth: Auto-refreshing session to prevent timeout")
-              await refreshSession()
-            }
-          }
-        } catch (error) {
-          console.error("useAuth: Error in session expiry check:", error)
-        }
-      }
-
-      const handleUserInteraction = () => {
-        checkSessionExpiry()
-      }
-
-      document.addEventListener("click", handleUserInteraction, { passive: true, once: true })
-      document.addEventListener("keydown", handleUserInteraction, { passive: true, once: true })
-      document.addEventListener("scroll", handleUserInteraction, { passive: true, once: true })
-
-      return () => {
-        document.removeEventListener("click", handleUserInteraction)
-        document.removeEventListener("keydown", handleUserInteraction)
-        document.removeEventListener("scroll", handleUserInteraction)
-      }
-    }
-
     const handlePageShow = async (event: PageTransitionEvent) => {
       if (event.persisted && mounted) {
         console.log("useAuth: Page restored from bfcache, checking session...")
@@ -349,32 +260,25 @@ export const useAuth = () => {
         try {
           const restoredSession = await restoreSupabaseSession()
 
-          if (restoredSession) {
+          if (restoredSession && !isSessionValid()) {
             console.log("useAuth: Valid session found after bfcache restore")
-            if (!user || !isSessionValid()) {
-              try {
-                setProfileStatus("loading")
-                const currentUser = await getCurrentUser()
+            try {
+              setProfileStatus("loading")
+              const currentUser = await getCurrentUser()
 
-                if (currentUser && mounted) {
-                  setUserWithCache(currentUser)
-                  console.log("useAuth: User data refreshed after bfcache restore")
-                  clearRetryInfo()
-                } else if (mounted) {
-                  console.log("useAuth: Profile fetch failed after bfcache restore, keeping session")
-                  setProfileStatus("unavailable")
-                }
-              } catch (error) {
-                console.error("useAuth: Error refreshing user after bfcache restore:", error)
-                if (mounted) {
-                  setProfileStatus("unavailable")
-                }
+              if (currentUser && mounted) {
+                setUserWithCache(currentUser)
+                console.log("useAuth: User data refreshed after bfcache restore")
+              } else if (mounted) {
+                console.log("useAuth: Profile fetch failed after bfcache restore, keeping session")
+                setProfileStatus("unavailable")
+              }
+            } catch (error) {
+              console.error("useAuth: Error refreshing user after bfcache restore:", error)
+              if (mounted) {
+                setProfileStatus("unavailable")
               }
             }
-          } else {
-            console.log("useAuth: No session found after bfcache restore")
-            setUserWithCache(null)
-            setProfileStatus("unavailable")
           }
         } catch (error) {
           console.error("useAuth: Error checking session after bfcache restore:", error)
@@ -382,14 +286,9 @@ export const useAuth = () => {
       }
     }
 
-    const handlePageHide = (event: PageTransitionEvent) => {
-      if (event.persisted) {
-        console.log("useAuth: Page being stored in bfcache, cleaning up...")
-        clearTimeout(loadingTimeout)
-        if (sessionRefreshInterval) {
-          clearInterval(sessionRefreshInterval)
-        }
-      }
+    const handlePageHide = () => {
+      console.log("useAuth: Page being stored in bfcache, cleaning up...")
+      clearTimeout(loadingTimeout)
     }
 
     const {
@@ -401,7 +300,6 @@ export const useAuth = () => {
         if (mounted) {
           setUserWithCache(null)
           setProfileStatus("unavailable")
-          clearRetryInfo()
           console.log("useAuth: User explicitly signed out")
         }
       } else if (session?.user && event !== "TOKEN_REFRESHED" && event !== "INITIAL_SESSION") {
@@ -412,7 +310,6 @@ export const useAuth = () => {
             if (currentUser) {
               setUserWithCache(currentUser)
               console.log("useAuth: Auth state changed. Current user:", currentUser)
-              clearRetryInfo()
             } else {
               console.log("useAuth: Profile fetch failed during auth state change, keeping session")
               setProfileStatus("unavailable")
@@ -434,18 +331,13 @@ export const useAuth = () => {
     })
 
     getInitialSession()
-    const cleanupSessionRefresh = setupSessionRefresh()
 
-    window.addEventListener("pageshow", handlePageShow)
-    window.addEventListener("pagehide", handlePageHide)
+    window.addEventListener("pageshow", handlePageShow, { passive: true })
+    window.addEventListener("pagehide", handlePageHide, { passive: true })
 
     return () => {
       mounted = false
       clearTimeout(loadingTimeout)
-      if (sessionRefreshInterval) {
-        clearInterval(sessionRefreshInterval)
-      }
-      cleanupSessionRefresh()
       window.removeEventListener("pageshow", handlePageShow)
       window.removeEventListener("pagehide", handlePageHide)
       subscription.unsubscribe()
