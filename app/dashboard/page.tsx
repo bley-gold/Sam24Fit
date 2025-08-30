@@ -1,238 +1,114 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LoadingSpinner } from "@/components/loading-spinner"
 import { ProfilePictureUpload } from "@/components/profile-picture-upload"
 import { useAuthContext } from "@/components/auth-provider"
-import { signOut, getUserRoleFromJWT } from "@/lib/auth"
+import { signOut } from "@/lib/auth"
 import { supabase, type Receipt } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import {
   Dumbbell,
+  LogOut,
   Upload,
   FileText,
-  LogOut,
-  User,
   Calendar,
-  CreditCard,
-  Shield,
-  Trash2,
-  Eye,
-  Bell,
+  DollarSign,
   CheckCircle,
+  Clock,
   XCircle,
-  X,
-  Download,
-  ChevronRight,
-  Settings,
+  User,
+  RefreshCw,
+  CreditCard,
 } from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { createReview, getUserReviews, type Review, canUserSubmitReview } from "@/app/actions/review-actions"
-import { jsPDF } from "jspdf"
 
 export default function DashboardPage() {
   const { user, loading: authLoading, refreshUser } = useAuthContext()
   const router = useRouter()
   const { toast } = useToast()
+
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [loadingReceipts, setLoadingReceipts] = useState(true)
-  const [receiptToDelete, setReceiptToDelete] = useState<Receipt | null>(null)
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(isDeleteDialogOpen)
-  const [receiptToPreview, setReceiptToPreview] = useState<Receipt | null>(null)
-  const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false)
-  const [recentStatusChanges, setRecentStatusChanges] = useState<Receipt[]>([])
-  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
-  const notificationRef = useRef<HTMLDivElement>(null)
-  const [userReviews, setUserReviews] = useState<Review[]>([])
-  const [reviewText, setReviewText] = useState("")
-  const [reviewRating, setReviewRating] = useState(5)
-  const [isSubmittingReview, setIsSubmittingReview] = useState(false)
-  const [canSubmitReview, setCanSubmitReview] = useState(true)
-  const [nextReviewDate, setNextReviewDate] = useState<string | null>(null)
-  const [isWelcomeDialogOpen, setIsWelcomeDialogOpen] = useState(false)
-  const [welcomeDialogStep, setWelcomeDialogStep] = useState(1)
-  const [hasPdfDownloaded, setHasPdfDownloaded] = useState(false)
-  const [jwtRole, setJwtRole] = useState<string | null>(null)
-  const [jwtRoleLoading, setJwtRoleLoading] = useState(true)
+  const [refreshingReceipts, setRefreshingReceipts] = useState(false)
+  const [receiptError, setReceiptError] = useState<string | null>(null)
+  const mountedRef = useRef(true)
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const generateGymRules = () => {
-    const currentDate = new Date()
-    const formattedDate = currentDate.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    })
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current)
+      }
+    }
+  }, [])
 
-    return `MEMBERSHIP AGREEMENT
-(This is a legally binding document. Please read carefully.)
+  const fetchReceipts = useCallback(async () => {
+    if (!user?.id || !mountedRef.current) {
+      return
+    }
 
-MEMBER DETAILS
-Full Name: ${user?.full_name || ""}
-ID Number/Passport: ${user?.id_number || ""}
-Residential Address: ${user?.street_address || ""}
-Cell Number: ${user?.phone || ""}
-Email: ${user?.email || ""}
-
-SHORT RULES OF THE GYM (HOUSE RULES)
-• Train at your own risk.
-• Arrange the equipment after use.
-• Respect other members and staff.
-• No inappropriate behavior or language.
-• Proper gym attire is required.
-• Report damaged equipment immediately. If you damage anything in the gym, you will pay.
-• Management reserves the right to cancel membership due to rule violations.
-
-DISCLAIMER / INDEMNITY
-I, the undersigned member, understand and acknowledge that:
-I am voluntarily participating in physical activities at this gym, and I do so entirely at my own risk.
-The owner(s), staff, and affiliates of the gym are not liable for any injury, illness, death, or loss/damage to personal property that may occur on the premises, including but not limited to use of equipment, facilities, or participation in training activities.
-I have consulted a medical professional (if necessary), and I am physically fit to train.
-I agree to follow the gym's rules and understand that a violation may result in the termination of my membership without refund.
-
-Agreement Date: ${formattedDate}
-
-This agreement has been digitally accepted through the Sam24Fit registration system.`
-  }
-
-  const downloadGymRules = async () => {
     try {
-      const doc = new jsPDF()
-      const pageWidth = doc.internal.pageSize.width
-      const margin = 20
-      const maxWidth = pageWidth - margin * 2
+      if (!refreshingReceipts) {
+        setLoadingReceipts(true)
+      }
+      setReceiptError(null)
 
-      doc.setFillColor(234, 88, 12) // Orange color
-      doc.rect(0, 0, pageWidth, 30, "F")
+      const { data, error: fetchError } = await supabase
+        .from("receipts")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("upload_date", { ascending: false })
 
-      doc.setTextColor(255, 255, 255)
-      doc.setFontSize(24)
-      doc.setFont("helvetica", "bold")
-      doc.text("Sam24Fit", margin, 20)
-
-      doc.setFontSize(12)
-      doc.setFont("helvetica", "normal")
-      doc.text("Membership Agreement & Gym Rules", margin, 26)
-
-      doc.setTextColor(0, 0, 0)
-      let yPosition = 45
-
-      const rulesText = generateGymRules()
-      const lines = doc.splitTextToSize(rulesText, maxWidth)
-
-      doc.setFontSize(10)
-      doc.setFont("helvetica", "normal")
-
-      lines.forEach((line: string) => {
-        if (yPosition > 270) {
-          // Check if we need a new page
-          doc.addPage()
-          yPosition = 20
-        }
-
-        if (
-          line.includes("MEMBERSHIP AGREEMENT") ||
-          line.includes("MEMBER DETAILS") ||
-          line.includes("SHORT RULES") ||
-          line.includes("DISCLAIMER")
-        ) {
-          doc.setFont("helvetica", "bold")
-          doc.setFontSize(12)
-        } else {
-          doc.setFont("helvetica", "normal")
-          doc.setFontSize(10)
-        }
-
-        doc.text(line, margin, yPosition)
-        yPosition +=
-          line.includes("MEMBERSHIP AGREEMENT") ||
-          line.includes("MEMBER DETAILS") ||
-          line.includes("SHORT RULES") ||
-          line.includes("DISCLAIMER")
-            ? 8
-            : 5
-      })
-
-      const pageCount = doc.getNumberOfPages()
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i)
-        doc.setFontSize(8)
-        doc.setTextColor(128, 128, 128)
-        doc.text(`Sam24Fit - Page ${i} of ${pageCount}`, pageWidth - margin - 30, 285)
-        doc.text("Generated on: " + new Date().toLocaleDateString(), margin, 285)
+      if (fetchError) {
+        throw fetchError
       }
 
-      doc.save(`Sam24Fit_Membership_Agreement_${user?.full_name?.replace(/\s+/g, "_") || "Member"}.pdf`)
-
-      setHasPdfDownloaded(true)
-
-      toast({
-        title: "Download Complete",
-        description: "Your personalized membership agreement has been downloaded.",
-      })
+      if (mountedRef.current) {
+        setReceipts(data || [])
+        setReceiptError(null)
+      }
     } catch (error) {
-      console.error("Error generating PDF:", error)
-      toast({
-        title: "Download Error",
-        description: "Failed to generate PDF. Please try again.",
-        variant: "destructive",
-      })
+      console.error("Error fetching receipts:", error)
+      if (mountedRef.current) {
+        const errorMessage = error instanceof Error ? error.message : "Failed to load receipts"
+        setReceiptError(errorMessage)
+        
+        // Only show toast for non-initial loads
+        if (!loadingReceipts) {
+          toast({
+            title: "Error",
+            description: "Failed to refresh receipts. Please try again.",
+            variant: "destructive",
+          })
+        }
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoadingReceipts(false)
+        setRefreshingReceipts(false)
+      }
     }
-  }
+  }, [user?.id, toast, refreshingReceipts, loadingReceipts])
 
-  const shouldShowWelcomeDialog = () => {
-    if (typeof window === "undefined" || !user?.id) return false
-    const key = `welcome_dialog_shown_${user.id}`
-    return !localStorage.getItem(key)
-  }
+  const handleRefreshReceipts = useCallback(async () => {
+    if (refreshingReceipts || !user?.id) return
+    
+    setRefreshingReceipts(true)
+    await fetchReceipts()
+  }, [fetchReceipts, refreshingReceipts, user?.id])
 
-  const markWelcomeDialogShown = () => {
-    if (typeof window === "undefined" || !user?.id) return
-    const key = `welcome_dialog_shown_${user.id}`
-    localStorage.setItem(key, "true")
-  }
-
-  const getDismissedNotifications = (): string[] => {
-    if (typeof window === "undefined" || !user?.id) return []
-    const key = `dismissed_notifications_${user.id}`
-    try {
-      const dismissed = localStorage.getItem(key)
-      return dismissed ? JSON.parse(dismissed) : []
-    } catch (error) {
-      console.error("Error reading dismissed notifications:", error)
-      return []
-    }
-  }
-
-  const saveDismissedNotifications = (dismissedIds: string[]) => {
-    if (typeof window === "undefined" || !user?.id) return
-    const key = `dismissed_notifications_${user.id}`
-    try {
-      localStorage.setItem(key, JSON.stringify(dismissedIds))
-    } catch (error) {
-      console.error("Error saving dismissed notifications:", error)
-    }
-  }
-
-  const clearDismissedNotifications = () => {
-    if (typeof window === "undefined") return
-    try {
-      const keys = Object.keys(localStorage).filter((key) => key.startsWith("dismissed_notifications_"))
-      keys.forEach((key) => localStorage.removeItem(key))
-    } catch (error) {
-      console.error("Error clearing dismissed notifications:", error)
-    }
-  }
-
-  const handleWelcomeDialogComplete = async () => {
-    markWelcomeDialogShown()
-    setIsWelcomeDialogOpen(false)
-  }
+  const handleRetryReceipts = useCallback(async () => {
+    setReceiptError(null)
+    setLoadingReceipts(true)
+    await fetchReceipts()
+  }, [fetchReceipts])
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -242,289 +118,63 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
 
     if (user) {
       fetchReceipts()
-      if (shouldShowWelcomeDialog()) {
-        setIsWelcomeDialogOpen(true)
-      }
     }
-  }, [user, authLoading, router])
-
-  useEffect(() => {
-    const checkReviewEligibility = async () => {
-      if (user) {
-        const result = await canUserSubmitReview(user.id)
-        if (result.success) {
-          setCanSubmitReview(result.canSubmit)
-          setNextReviewDate(result.nextSubmissionDate)
-        }
-      }
-    }
-
-    checkReviewEligibility()
-  }, [user])
-
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      setJwtRoleLoading(true)
-      try {
-        if (user?.email) {
-          const token = await user.getIdToken()
-          const role = getUserRoleFromJWT(token)
-          setJwtRole(role)
-        }
-      } catch (error) {
-        console.error("Error fetching user role:", error)
-        toast({
-          title: "Error",
-          description: "Failed to fetch user role. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setJwtRoleLoading(false)
-      }
-    }
-
-    if (user) {
-      fetchUserRole()
-    }
-  }, [user])
-
-  const getEffectiveRole = () => {
-    return user?.role || "user"
-  }
-
-  const isAdmin = () => {
-    return user?.role === "admin"
-  }
-
-  const getFileType = (filename: string) => {
-    const extension = filename.toLowerCase().split(".").pop()
-    if (["jpg", "jpeg", "png", "gif", "webp"].includes(extension || "")) {
-      return "image"
-    } else if (extension === "pdf") {
-      return "pdf"
-    }
-    return "unknown"
-  }
-
-  const calculateStreakData = () => {
-    const months: any[] = []
-    const now = new Date()
-
-    // Generate the last 24 months
-    for (let i = 23; i >= 0; i--) {
-      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, "0")}`
-
-      const hasPayment = receipts.some((receipt) => {
-        if (receipt.status !== "verified") return false
-        const receiptDate = new Date(receipt.upload_date)
-        const receiptMonthKey = `${receiptDate.getFullYear()}-${String(receiptDate.getMonth() + 1).padStart(2, "0")}`
-        return receiptMonthKey === monthKey
-      })
-
-      months.push({
-        date: monthDate,
-        hasPayment,
-        monthKey,
-        monthName: monthDate.toLocaleDateString("en-US", { month: "short" }),
-        year: monthDate.getFullYear(),
-        monthIndex: monthDate.getMonth(),
-      })
-    }
-
-    return months
-  }
-
-  const groupByYear = (months: any[]) => {
-    const grouped: Record<number, (any | null)[]> = {}
-
-    months.forEach((m) => {
-      if (!grouped[m.year]) grouped[m.year] = new Array(12).fill(null)
-      grouped[m.year][m.monthIndex] = m
-    })
-
-    return grouped
-  }
-
-  const calculateCurrentStreak = () => {
-    const streakData = calculateStreakData()
-    let streak = 0
-
-    for (let i = streakData.length - 1; i >= 0; i--) {
-      if (streakData[i].hasPayment) {
-        streak++
-      } else {
-        break
-      }
-    }
-
-    return streak
-  }
-
-  const StreakGraphic = () => {
-    const streakData = calculateStreakData()
-    const currentStreak = calculateCurrentStreak()
-    const grouped = groupByYear(streakData)
-
-    // Sort years ascending
-    const years = Object.keys(grouped)
-      .map(Number)
-      .sort((a, b) => a - b)
-
-    const now = new Date()
-    const currentMonth = now.getMonth()
-
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-900">Gym Attendance Streak</h3>
-          <div className="text-xs text-gray-600">
-            Current streak: <span className="font-semibold text-green-600">{currentStreak} months</span>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          {/* Month labels */}
-          <div className="flex">
-            <div className="w-12 mr-3"></div>
-            <div className="grid grid-cols-12 gap-1 flex-1 text-xs text-gray-600 text-center">
-              {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((month) => (
-                <div key={month} className="text-[10px]">
-                  {month}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Year rows */}
-          {years.map((year) => (
-            <div key={year} className="flex items-center">
-              <div className="w-12 mr-3 text-xs text-gray-600 text-right font-medium">{year}</div>
-              <div className="grid grid-cols-12 gap-1 flex-1">
-                {grouped[year].map((month, index) => {
-                  // Hide future months for the current year
-                  if (year === now.getFullYear() && index > currentMonth) return null
-
-                  // Determine if this is the last month of the current streak
-                  const streakStartIndex = streakData.length - currentStreak
-                  const isLastStreakMonth =
-                    month && streakData.findIndex((m) => m.monthKey === month.monthKey) === streakStartIndex
-
-                  return (
-                    <div
-                      key={`${year}-${index}`}
-                      className={`w-4 h-4 rounded-sm border ${
-                        month?.hasPayment ? "bg-green-500 border-green-600" : "bg-gray-200 border-gray-300"
-                      } ${isLastStreakMonth ? "ring-2 ring-green-400" : ""}`} // subtle highlight
-                      title={
-                        month
-                          ? `${month.monthName} ${month.year}: ${
-                              month.hasPayment ? "Attendance recorded" : "No attendance"
-                            }`
-                          : "No data"
-                      }
-                    />
-                  )
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  const handleSubmitReview = async () => {
-    if (!user || !reviewText.trim()) return
-
-    setIsSubmittingReview(true)
-    try {
-      const result = await createReview(user.id, reviewText.trim(), reviewRating)
-
-      if (result.success) {
-        toast({
-          title: "Review Submitted",
-          description: "Thank you for your review! It will be reviewed by our team before being published.",
-        })
-        setReviewText("")
-        setReviewRating(5)
-        setCanSubmitReview(false)
-        const nextDate = new Date()
-        nextDate.setMonth(nextDate.getMonth() + 3)
-        setNextReviewDate(nextDate.toISOString())
-
-        const reviewsResult = await getUserReviews(user.id)
-        if (reviewsResult.success) {
-          setUserReviews(reviewsResult.data)
-        }
-      } else {
-        toast({
-          title: "Error",
-          description: result.message || "Failed to submit review.",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred while submitting your review.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSubmittingReview(false)
-    }
-  }
-
-  const fetchReceipts = async () => {
-    setLoadingReceipts(true)
-    try {
-      const { data, error } = await supabase
-        .from("receipts")
-        .select("*")
-        .eq("user_id", user?.id)
-        .order("upload_date", { ascending: false })
-
-      if (error) {
-        console.error("Error fetching receipts:", error)
-        toast({
-          title: "Error",
-          description: "Failed to fetch receipts. Please try again.",
-          variant: "destructive",
-        })
-      } else {
-        setReceipts(data || [])
-        const newStatusChanges = data?.filter(
-          (receipt) => receipt.status !== "pending" && !getDismissedNotifications().includes(receipt.id),
-        )
-        setRecentStatusChanges(newStatusChanges || [])
-      }
-    } finally {
-      setLoadingReceipts(false)
-    }
-  }
-
-  const dismissNotification = (receiptId: string) => {
-    const dismissed = getDismissedNotifications()
-    dismissed.push(receiptId)
-    saveDismissedNotifications(dismissed)
-    setRecentStatusChanges((prev) => prev.filter((receipt) => receipt.id !== receiptId))
-  }
+  }, [user, authLoading, router, fetchReceipts])
 
   const handleLogout = async () => {
-    await signOut()
-    router.push("/auth")
+    try {
+      await signOut()
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out.",
+      })
+      router.push("/")
+    } catch (error) {
+      console.error("Logout error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
-  const handleProfileUpdate = async () => {
-    await refreshUser()
+  const handleProfileRefresh = async () => {
+    try {
+      await refreshUser()
+      toast({
+        title: "Profile refreshed",
+        description: "Your profile has been updated.",
+      })
+    } catch (error) {
+      console.error("Profile refresh error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to refresh profile. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "verified":
+        return <CheckCircle className="h-4 w-4 text-green-600" />
+      case "pending":
+        return <Clock className="h-4 w-4 text-yellow-600" />
+      case "rejected":
+        return <XCircle className="h-4 w-4 text-red-600" />
+      default:
+        return <Clock className="h-4 w-4 text-gray-600" />
+    }
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800"
       case "verified":
         return "bg-green-100 text-green-800"
+      case "pending":
+        return "bg-yellow-100 text-yellow-800"
       case "rejected":
         return "bg-red-100 text-red-800"
       default:
@@ -532,43 +182,21 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
     }
   }
 
-  const handlePreviewReceipt = (receipt: Receipt) => {
-    setReceiptToPreview(receipt)
-    setIsPreviewDialogOpen(true)
-  }
-
-  const handleDeleteReceipt = (receipt: Receipt) => {
-    setReceiptToDelete(receipt)
-    setIsDeleteDialogOpen(true)
-  }
-
-  if (authLoading || !user) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
-        </div>
+        <LoadingSpinner size="lg" text="Loading dashboard..." />
       </div>
     )
   }
 
-  console.log(
-    "[v0] Dashboard rendering - User:",
-    user?.email,
-    "Role:",
-    user?.role,
-    "JWT Role:",
-    jwtRole,
-    "JWT Loading:",
-    jwtRoleLoading,
-  )
-
-  const effectiveRole = getEffectiveRole()
-  const roleMatch = user.role === jwtRole
+  if (!user) {
+    return null // Will be redirected by useEffect
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
+      {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 gap-3 sm:gap-0">
@@ -576,744 +204,281 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
               <Dumbbell className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600" />
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Sam24Fit</h1>
             </div>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-              <span className="text-sm sm:text-base font-medium text-gray-700 truncate">Welcome, {user.full_name}</span>
-              <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-                {isAdmin() && (
-                  <Badge className="bg-red-100 text-red-800 text-xs">
-                    <Shield className="h-3 w-3 mr-1" />
-                    Admin
-                  </Badge>
-                )}
-                <div className="relative" ref={notificationRef}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-                    className="relative"
-                  >
-                    <Bell className="h-4 w-4" />
-                    {recentStatusChanges.length > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {recentStatusChanges.length}
-                      </span>
-                    )}
-                  </Button>
-
-                  {isNotificationOpen && (
-                    <div className="fixed sm:absolute top-16 sm:top-full right-2 sm:right-0 mt-2 w-[calc(100vw-1rem)] sm:w-96 max-w-sm sm:max-w-96 bg-white rounded-lg shadow-xl border z-50 sm:z-[100]">
-                      <div className="p-3 sm:p-4 border-b">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Notifications</h3>
-                          <Button variant="ghost" size="sm" onClick={() => setIsNotificationOpen(false)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="max-h-64 overflow-y-auto">
-                        {recentStatusChanges.length === 0 ? (
-                          <div className="p-4 text-center text-gray-500 text-sm">No recent notifications</div>
-                        ) : (
-                          <div className="space-y-1">
-                            {recentStatusChanges.map((receipt) => (
-                              <div
-                                key={receipt.id}
-                                className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 hover:bg-gray-50 gap-2 sm:gap-0"
-                              >
-                                <div className="flex items-start space-x-3 flex-1 min-w-0">
-                                  {receipt.status === "verified" ? (
-                                    <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
-                                  ) : (
-                                    <XCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-                                  )}
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-900">
-                                      Receipt {receipt.status === "verified" ? "Approved" : "Rejected"}
-                                    </p>
-                                    <p className="text-xs text-gray-500 break-all">
-                                      {receipt.filename} - R{receipt.amount.toFixed(2)}
-                                    </p>
-                                    {receipt.status === "rejected" && receipt.rejection_reason && (
-                                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
-                                        <p className="text-xs font-medium text-red-800">Rejection Reason:</p>
-                                        <p className="text-xs text-red-700 break-words">{receipt.rejection_reason}</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => dismissNotification(receipt.id)}
-                                  className="flex-shrink-0 h-6 w-6 p-0 self-start sm:self-center"
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                {isAdmin() && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.push("/admin")}
-                    className="text-xs sm:text-sm whitespace-nowrap"
-                  >
-                    Admin Panel
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleLogout}
-                  className="text-xs sm:text-sm bg-transparent hover:bg-gray-100 border-gray-300 min-w-[80px] px-3 py-2"
-                >
-                  <LogOut className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  Logout
-                </Button>
-              </div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+              <span className="text-xs sm:text-sm text-gray-600 truncate">Welcome, {user.full_name}</span>
+              <Button variant="outline" size="sm" onClick={handleLogout} className="w-full sm:w-auto bg-transparent">
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto py-6 sm:py-8 px-4">
+      <main className="max-w-7xl mx-auto py-6 sm:py-8 px-4">
+        {/* Welcome Section */}
         <div className="mb-6 sm:mb-8">
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Dashboard</h2>
-          <p className="text-gray-600 text-sm sm:text-base">Manage your gym payments and receipts</p>
+          <p className="text-sm sm:text-base text-gray-600">Manage your membership and payments</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle className="flex items-center text-base sm:text-lg">
-                <User className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                Account Info
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-center mb-4">
-                <div className="relative">
-                  <Image
-                    src={user.profile_picture_url || "/placeholder.svg?height=96&width=96&query=user profile"}
-                    alt="Profile Picture"
-                    width={80}
-                    height={80}
-                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-2 border-orange-500"
-                  />
-                  <ProfilePictureUpload user={user} onProfileUpdate={handleProfileUpdate} isAdmin={isAdmin()} />
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-500">Name</label>
-                <p className="text-gray-900">{user.full_name}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-500">Email</label>
-                <p className="text-gray-900">{user.email}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-500">ID Number</label>
-                <p className="text-gray-900">{user.id_number || "Not provided"}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-500">Role</label>
-                <div className="flex items-center space-x-2">
-                  <Badge
-                    className={effectiveRole === "admin" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"}
-                  >
-                    {effectiveRole}
-                  </Badge>
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-500">Member Since</label>
-                <p className="text-gray-900">{new Date(user.created_at).toLocaleDateString()}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-500">Membership</label>
-                <Badge
-                  className={
-                    user.membership_status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                  }
-                >
-                  {user.membership_status}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="text-base sm:text-lg">Quick Actions</CardTitle>
-              <CardDescription className="text-sm">Upload receipts and manage your payments</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <Button
-                  className="h-16 sm:h-20 bg-orange-600 hover:bg-orange-700 text-sm sm:text-base"
-                  onClick={() => router.push("/upload")}
-                >
-                  <div className="text-center">
-                    <Upload className="h-5 w-5 sm:h-6 sm:w-6 mx-auto mb-1 sm:mb-2" />
-                    <span>Upload Receipt</span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+          {/* Profile Section */}
+          <div className="lg:col-span-1">
+            <Card>
+              <CardHeader className="px-4 sm:px-6">
+                <CardTitle className="flex items-center text-lg sm:text-xl">
+                  <User className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  Your Profile
+                </CardTitle>
+                <CardDescription className="text-sm">Your membership information</CardDescription>
+              </CardHeader>
+              <CardContent className="px-4 sm:px-6">
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className="relative">
+                    <Avatar className="h-20 w-20 sm:h-24 sm:w-24">
+                      <AvatarImage 
+                        src={user.profile_picture_url || undefined} 
+                        alt={user.full_name}
+                        onError={(e) => {
+                          console.warn("Profile picture failed to load:", user.profile_picture_url)
+                          e.currentTarget.style.display = 'none'
+                        }}
+                      />
+                      <AvatarFallback className="bg-orange-100 text-orange-600 text-lg sm:text-xl font-semibold">
+                        {user.full_name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <ProfilePictureUpload user={user} onProfileUpdate={handleProfileRefresh} />
                   </div>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-16 sm:h-20 bg-transparent text-sm sm:text-base"
-                  onClick={() => router.push("/payments")}
-                >
-                  <div className="text-center">
-                    <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 mx-auto mb-1 sm:mb-2" />
-                    <span>Payment History</span>
+                  <div className="space-y-2">
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900">{user.full_name}</h3>
+                    <p className="text-xs sm:text-sm text-gray-600">{user.email}</p>
+                    <Badge
+                      className={`text-xs ${
+                        user.membership_status === "active"
+                          ? "bg-green-100 text-green-800"
+                          : user.membership_status === "inactive"
+                          ? "bg-red-100 text-red-800"
+                          : "bg-yellow-100 text-yellow-800"
+                      }`}
+                    >
+                      {user.membership_status?.charAt(0).toUpperCase() + user.membership_status?.slice(1)}
+                    </Badge>
                   </div>
-                </Button>
-                {isAdmin() && (
-                  <Button
-                    variant="outline"
-                    className="h-16 sm:h-20 bg-red-50 border-red-200 hover:bg-red-100 text-sm sm:text-base sm:col-span-2"
-                    onClick={() => router.push("/admin")}
-                  >
-                    <div className="text-center">
-                      <Shield className="h-5 w-5 sm:h-6 sm:w-6 mx-auto mb-1 sm:mb-2 text-red-600" />
-                      <span className="text-red-600">Admin Panel</span>
+                  <div className="w-full pt-4 border-t space-y-2">
+                    <div className="flex justify-between text-xs sm:text-sm">
+                      <span className="text-gray-600">Phone:</span>
+                      <span className="font-medium">{user.phone}</span>
                     </div>
-                  </Button>
-                )}
-              </div>
-
-              <div className="mt-6 pt-6 border-t">
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-gray-900">Share Your Experience</h3>
-
-                  {userReviews.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-xs text-gray-600 mb-2">Your previous reviews:</p>
-                      <div className="space-y-2">
-                        {userReviews.map((review) => (
-                          <div key={review.id} className="bg-gray-50 rounded-lg p-3">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <div className="flex">
-                                {[...Array(5)].map((_, i) => (
-                                  <span
-                                    key={i}
-                                    className={`text-sm ${i < review.rating ? "text-yellow-400" : "text-gray-300"}`}
-                                  >
-                                    ★
-                                  </span>
-                                ))}
-                              </div>
-                              <Badge
-                                className={
-                                  review.status === "approved"
-                                    ? "bg-green-100 text-green-800"
-                                    : review.status === "rejected"
-                                      ? "bg-red-100 text-red-800"
-                                      : "bg-yellow-100 text-yellow-800"
-                                }
-                              >
-                                {review.status === "approved"
-                                  ? "Approved"
-                                  : review.status === "rejected"
-                                    ? "Rejected"
-                                    : "Pending"}
-                              </Badge>
-                            </div>
-                            <p className="text-xs text-gray-700">{review.review_text}</p>
-                            {review.status === "rejected" && review.rejection_reason && (
-                              <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
-                                <p className="text-xs font-medium text-red-800">Rejection Reason:</p>
-                                <p className="text-xs text-red-700">{review.rejection_reason}</p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                    <div className="flex justify-between text-xs sm:text-sm">
+                      <span className="text-gray-600">Member since:</span>
+                      <span className="font-medium">{new Date(user.created_at).toLocaleDateString()}</span>
                     </div>
-                  )}
-
-                  <div className="space-y-3">
-                    {!canSubmitReview && nextReviewDate && (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
-                        <p className="text-sm text-yellow-800">
-                          You can submit your next review on{" "}
-                          <strong>
-                            {new Date(nextReviewDate).toLocaleDateString("en-US", {
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                            })}
-                          </strong>
-                          . Reviews are limited to once every 3 months.
-                        </p>
+                    {user.last_payment_date && (
+                      <div className="flex justify-between text-xs sm:text-sm">
+                        <span className="text-gray-600">Last payment:</span>
+                        <span className="font-medium">{new Date(user.last_payment_date).toLocaleDateString()}</span>
                       </div>
                     )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-                    <div>
-                      <label className="text-xs font-medium text-gray-700 mb-1 block">Rating</label>
-                      <div className="flex space-x-1">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            type="button"
-                            onClick={() => setReviewRating(star)}
-                            disabled={!canSubmitReview}
-                            className={`text-lg ${
-                              star <= reviewRating ? "text-yellow-400" : "text-gray-300"
-                            } hover:text-yellow-400 transition-colors ${
-                              !canSubmitReview ? "opacity-50 cursor-not-allowed" : ""
-                            }`}
-                          >
-                            ★
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-medium text-gray-700 mb-1 block">Your Review</label>
-                      <textarea
-                        value={reviewText}
-                        onChange={(e) => setReviewText(e.target.value)}
-                        placeholder="Share your experience with Sam24Fit..."
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
-                        rows={3}
-                        maxLength={500}
-                        disabled={!canSubmitReview}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">{reviewText.length}/500 characters</p>
-                    </div>
-
-                    <Button
-                      onClick={handleSubmitReview}
-                      disabled={isSubmittingReview || !reviewText.trim() || !canSubmitReview}
-                      className="w-full bg-orange-600 hover:bg-orange-700 text-sm py-2"
+          {/* Receipts Section */}
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader className="px-4 sm:px-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+                  <CardTitle className="flex items-center text-lg sm:text-xl">
+                    <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                    Your Receipts
+                  </CardTitle>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={handleRefreshReceipts} 
+                      size="sm" 
+                      variant="outline" 
+                      disabled={refreshingReceipts}
+                      className="bg-transparent"
                     >
-                      {isSubmittingReview
-                        ? "Submitting..."
-                        : canSubmitReview
-                          ? "Submit Review"
-                          : "Review Submitted Recently"}
+                      <RefreshCw className={`h-4 w-4 mr-2 ${refreshingReceipts ? 'animate-spin' : ''}`} />
+                      Refresh
+                    </Button>
+                    <Button onClick={() => router.push("/upload")} size="sm" className="bg-orange-600 hover:bg-orange-700 w-full sm:w-auto">
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload Receipt
                     </Button>
                   </div>
                 </div>
-              </div>
-              <div className="mt-6 pt-6 border-t">
-                <StreakGraphic />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="lg:col-span-3 mt-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-            <CardHeader>
-              <CardTitle className="flex items-center text-green-800">
-                <CreditCard className="h-5 w-5 mr-2" />
-                Payment Details - Bank Account Information
-              </CardTitle>
-              <CardDescription className="text-green-700">
-                Use these bank details to make your gym membership payments
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {/* Business Account */}
-                <div className="bg-white rounded-lg p-6 border border-green-300">
-                  <div className="flex items-center mb-4">
-                    <div className="bg-green-600 text-white p-2 rounded-lg mr-3">
-                      <CreditCard className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Business Account</h3>
-                      <p className="text-sm text-gray-600">Primary payment method</p>
-                    </div>
+                <CardDescription className="text-sm">Upload and track your payment receipts</CardDescription>
+              </CardHeader>
+              <CardContent className="px-4 sm:px-6">
+                {receiptError ? (
+                  <div className="text-center py-8">
+                    <XCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to Load Receipts</h3>
+                    <p className="text-gray-600 mb-4">{receiptError}</p>
+                    <Button onClick={handleRetryReceipts} className="bg-orange-600 hover:bg-orange-700">
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Try Again
+                    </Button>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-green-800">Account Nickname</label>
-                        <p className="text-gray-900 font-semibold">Sam24fit</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-green-800">Account Number</label>
-                        <p className="text-gray-900 font-semibold text-lg">1052 6463 87</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-green-800">Account Type</label>
-                        <p className="text-gray-900 font-semibold">Transact</p>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-green-800">Bank Name</label>
-                        <p className="text-gray-900 font-semibold">First National Bank (FNB)</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-green-800">Branch Code</label>
-                        <p className="text-gray-900 font-semibold">250655</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-green-800">Reference</label>
-                        <p className="text-gray-900 font-semibold">Use your full name + membership</p>
-                      </div>
-                    </div>
+                ) : loadingReceipts ? (
+                  <div className="text-center py-8">
+                    <LoadingSpinner size="md" text="Loading receipts..." />
                   </div>
-                </div>
-
-                {/* Personal Account */}
-                <div className="bg-white rounded-lg p-6 border border-blue-300">
-                  <div className="flex items-center mb-4">
-                    <div className="bg-blue-600 text-white p-2 rounded-lg mr-3">
-                      <User className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Personal Account</h3>
-                      <p className="text-sm text-gray-600">Alternative payment method</p>
-                    </div>
+                ) : receipts.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No receipts uploaded yet</h3>
+                    <p className="text-gray-600 mb-4">Upload your first payment receipt to get started.</p>
+                    <Button onClick={() => router.push("/upload")} className="w-full sm:w-auto bg-orange-600 hover:bg-orange-700">
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload Your First Receipt
+                    </Button>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-blue-800">Account Holder</label>
-                        <p className="text-gray-900 font-semibold">MR SG NXUMALO</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-blue-800">Account Number</label>
-                        <p className="text-gray-900 font-semibold text-lg">1278512703</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-blue-800">Account Type</label>
-                        <p className="text-gray-900 font-semibold">Personal Debit</p>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-blue-800">Bank Name</label>
-                        <p className="text-gray-900 font-semibold">Capitec Bank</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-blue-800">Card Features</label>
-                        <div className="space-y-1">
-                          <div className="flex items-center text-sm">
-                            <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
-                            <span className="text-gray-700">Online purchases enabled</span>
+                ) : (
+                  <div className="space-y-3 sm:space-y-4">
+                    {receipts.map((receipt) => (
+                      <div
+                        key={receipt.id}
+                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border rounded-lg hover:bg-gray-50 transition-colors gap-3 sm:gap-4"
+                      >
+                        <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 flex-1">
+                          <div className="flex-shrink-0">
+                            {getStatusIcon(receipt.status)}
                           </div>
-                          <div className="flex items-center text-sm">
-                            <XCircle className="h-4 w-4 text-red-600 mr-2" />
-                            <span className="text-gray-700">International transactions disabled</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-blue-800">Reference</label>
-                        <p className="text-gray-900 font-semibold">Use your full name + membership</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Payment Instructions */}
-                <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-lg p-6 border border-orange-200">
-                  <h4 className="font-semibold text-orange-900 mb-4 flex items-center">
-                    <Shield className="h-5 w-5 mr-2" />
-                    Payment Instructions & Fees
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <h5 className="font-medium text-orange-800 mb-2">Monthly Fees:</h5>
-                      <ul className="text-sm text-orange-700 space-y-1">
-                        <li>
-                          • <strong>Membership Fee:</strong> R120 per month
-                        </li>
-                        <li>
-                          • <strong>Admin Fee:</strong> R50 (one-time for new members)
-                        </li>
-                      </ul>
-                    </div>
-                    <div>
-                      <h5 className="font-medium text-orange-800 mb-2">Payment Process:</h5>
-                      <ul className="text-sm text-orange-700 space-y-1">
-                        <li>• Use either business or personal account above</li>
-                        <li>• Reference: "{user?.full_name || "Your Name"} - Membership"</li>
-                        <li>• Upload proof of payment after transfer</li>
-                        <li>• Allow 24-48 hours for verification</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle className="flex items-center text-base sm:text-lg">
-                <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                Recent Receipts
-              </CardTitle>
-              <CardDescription className="text-sm">Your uploaded payment receipts</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loadingReceipts ? (
-                <div className="text-center py-8">
-                  <LoadingSpinner size="md" text="Loading receipts..." />
-                </div>
-              ) : receipts.length === 0 ? (
-                <div className="text-center py-6 sm:py-8">
-                  <FileText className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500 mb-4 text-sm sm:text-base">No receipts uploaded yet</p>
-                  <Button onClick={() => router.push("/upload")} className="text-sm sm:text-base">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Your First Receipt
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-3 sm:space-y-4">
-                  {receipts.map((receipt) => (
-                    <div
-                      key={receipt.id}
-                      className="flex flex-col md:flex-row md:items-center p-4 border rounded-lg gap-4 hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex items-start space-x-4 flex-1 min-w-0">
-                        <FileText className="h-8 w-8 text-gray-400 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-900 text-base break-all">{receipt.filename}</p>
-                          <p className="text-sm text-gray-500 flex items-center mt-1">
-                            <Calendar className="h-4 w-4 inline mr-1 flex-shrink-0" />
-                            {new Date(receipt.upload_date).toLocaleDateString()}
-                          </p>
-                          {receipt.description && (
-                            <p className="text-sm text-gray-600 mt-1 break-words">{receipt.description}</p>
-                          )}
-                          {receipt.status === "rejected" && receipt.rejection_reason && (
-                            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
-                              <p className="text-xs font-medium text-red-800">Rejection Reason:</p>
-                              <p className="text-xs text-red-700 break-words">{receipt.rejection_reason}</p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
+                              <p className="font-medium text-gray-900 text-sm sm:text-base truncate">
+                                {receipt.filename}
+                              </p>
+                              <Badge className={`${getStatusColor(receipt.status)} text-xs`}>
+                                {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
+                              </Badge>
                             </div>
-                          )}
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-1">
+                              <p className="text-xs sm:text-sm text-gray-500 flex items-center">
+                                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 inline mr-1 flex-shrink-0" />
+                                {new Date(receipt.upload_date).toLocaleDateString()}
+                              </p>
+                              <p className="text-xs sm:text-sm text-gray-500 flex items-center">
+                                <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 inline mr-1 flex-shrink-0" />
+                                R{receipt.amount?.toFixed(2) || "0.00"}
+                              </p>
+                            </div>
+                            {receipt.description && (
+                              <p className="text-xs sm:text-sm text-gray-600 mt-1 break-words">
+                                {receipt.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              try {
+                                window.open(receipt.file_url, "_blank")
+                              } catch (error) {
+                                console.error("Error opening receipt:", error)
+                                toast({
+                                  title: "Error",
+                                  description: "Failed to open receipt. Please try again.",
+                                  variant: "destructive",
+                                })
+                              }
+                            }}
+                            className="text-xs sm:text-sm bg-transparent"
+                          >
+                            View Receipt
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between md:justify-end gap-4 flex-shrink-0">
-                        <div className="flex items-center gap-3">
-                          <span className="font-medium text-gray-900 text-base">R{receipt.amount.toFixed(2)}</span>
-                          <Badge className={`${getStatusColor(receipt.status)} text-xs whitespace-nowrap`}>
-                            {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
-                          </Badge>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handlePreviewReceipt(receipt)}
-                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDeleteReceipt(receipt)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mt-6 sm:mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push("/upload")}>
+            <CardContent className="p-4 sm:p-6 text-center">
+              <Upload className="h-8 w-8 sm:h-12 sm:w-12 text-orange-600 mx-auto mb-3 sm:mb-4" />
+              <h3 className="font-medium text-gray-900 mb-1 sm:mb-2 text-sm sm:text-base">Upload Receipt</h3>
+              <p className="text-xs sm:text-sm text-gray-600">Upload a new payment receipt</p>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push("/payments")}>
+            <CardContent className="p-4 sm:p-6 text-center">
+              <CreditCard className="h-8 w-8 sm:h-12 sm:w-12 text-blue-600 mx-auto mb-3 sm:mb-4" />
+              <h3 className="font-medium text-gray-900 mb-1 sm:mb-2 text-sm sm:text-base">Payment History</h3>
+              <p className="text-xs sm:text-sm text-gray-600">View your payment records</p>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="hover:shadow-lg transition-shadow cursor-pointer sm:col-span-2 lg:col-span-1"
+            onClick={() => router.push("/")}
+          >
+            <CardContent className="p-4 sm:p-6 text-center">
+              <Dumbbell className="h-8 w-8 sm:h-12 sm:w-12 text-purple-600 mx-auto mb-3 sm:mb-4" />
+              <h3 className="font-medium text-gray-900 mb-1 sm:mb-2 text-sm sm:text-base">Back to Home</h3>
+              <p className="text-xs sm:text-sm text-gray-600">Return to the main website</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Membership Status Summary */}
+        <div className="mt-6 sm:mt-8">
+          <Card>
+            <CardHeader className="px-4 sm:px-6">
+              <CardTitle className="text-lg sm:text-xl">Membership Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 sm:px-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="text-center p-3 sm:p-4 bg-green-50 rounded-lg">
+                  <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-green-600 mx-auto mb-2" />
+                  <p className="text-xs sm:text-sm font-medium text-green-900">
+                    {receipts.filter((r) => r.status === "verified").length}
+                  </p>
+                  <p className="text-xs text-green-700">Verified Receipts</p>
                 </div>
-              )}
+                <div className="text-center p-3 sm:p-4 bg-yellow-50 rounded-lg">
+                  <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-600 mx-auto mb-2" />
+                  <p className="text-xs sm:text-sm font-medium text-yellow-900">
+                    {receipts.filter((r) => r.status === "pending").length}
+                  </p>
+                  <p className="text-xs text-yellow-700">Pending Review</p>
+                </div>
+                <div className="text-center p-3 sm:p-4 bg-blue-50 rounded-lg">
+                  <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 mx-auto mb-2" />
+                  <p className="text-xs sm:text-sm font-medium text-blue-900">
+                    R
+                    {receipts
+                      .filter((r) => r.status === "verified")
+                      .reduce((sum, r) => sum + (r.amount || 0), 0)
+                      .toFixed(2)}
+                  </p>
+                  <p className="text-xs text-blue-700">Total Verified</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
       </main>
-
-      <Dialog open={isWelcomeDialogOpen} onOpenChange={() => {}}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center">
-              <Dumbbell className="h-6 w-6 mr-2 text-orange-600" />
-              Welcome to Sam24Fit!
-            </DialogTitle>
-          </DialogHeader>
-
-          {welcomeDialogStep === 1 ? (
-            <div className="space-y-6">
-              <div className="text-center">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Please Review Our Gym Rules & Agreement</h3>
-                <p className="text-sm text-gray-600">
-                  Before you start using our facilities, please take a moment to review our gym rules and membership
-                  agreement.
-                </p>
-              </div>
-
-              <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto border">
-                <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono leading-relaxed">
-                  {generateGymRules()}
-                </pre>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 justify-between">
-                <Button variant="outline" onClick={downloadGymRules} className="flex items-center bg-transparent">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Rules & Agreement
-                </Button>
-
-                <Button
-                  onClick={() => setWelcomeDialogStep(2)}
-                  disabled={!hasPdfDownloaded}
-                  className={`flex items-center ${
-                    hasPdfDownloaded ? "bg-orange-600 hover:bg-orange-700" : "bg-gray-300 cursor-not-allowed"
-                  }`}
-                >
-                  I Understand & Agree
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-
-                {!hasPdfDownloaded && (
-                  <div className="text-center">
-                    <p className="text-sm text-orange-600 font-medium">
-                      Please download the rules and agreement before proceeding
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="text-center">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Manage Your Profile</h3>
-                <p className="text-sm text-gray-600">
-                  You can update your profile information, change your profile picture, and manage your account settings
-                  anytime.
-                </p>
-              </div>
-
-              <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
-                <div className="flex items-start space-x-4">
-                  <div className="flex-shrink-0">
-                    <Settings className="h-8 w-8 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-blue-900 mb-2">Profile Management</h4>
-                    <ul className="text-sm text-blue-800 space-y-1">
-                      <li>
-                        • Update your profile picture by clicking on your current photo in the Account Info section
-                      </li>
-                      <li>• Your personal information can be viewed in the Account Info card on the left</li>
-                      <li>• Contact our staff if you need to update your contact details or membership information</li>
-                      <li>• Upload payment receipts using the "Upload Receipt" button in Quick Actions</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-center">
-                <Button onClick={handleWelcomeDialogComplete} className="bg-orange-600 hover:bg-orange-700 px-8">
-                  Got it, Let's Start!
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
-        <DialogContent className="max-w-[95vw] md:max-w-4xl max-h-[90vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle className="text-lg">Receipt Preview</DialogTitle>
-          </DialogHeader>
-          {receiptToPreview && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <label className="font-medium text-gray-500 text-sm">Filename:</label>
-                  <p className="text-gray-900 break-all">{receiptToPreview.filename}</p>
-                </div>
-                <div>
-                  <label className="font-medium text-gray-500 text-sm">Amount:</label>
-                  <p className="text-gray-900">R{receiptToPreview.amount.toFixed(2)}</p>
-                </div>
-                <div>
-                  <label className="font-medium text-gray-500 text-sm">Upload Date:</label>
-                  <p className="text-gray-900">{new Date(receiptToPreview.upload_date).toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <label className="font-medium text-gray-500 text-sm">Status:</label>
-                  <Badge className={`${getStatusColor(receiptToPreview.status)} text-xs`}>
-                    {receiptToPreview.status.charAt(0).toUpperCase() + receiptToPreview.status.slice(1)}
-                  </Badge>
-                </div>
-                {receiptToPreview.description && (
-                  <div className="md:col-span-2 lg:col-span-4">
-                    <label className="font-medium text-gray-500 text-sm">Description:</label>
-                    <p className="text-gray-900 break-words">{receiptToPreview.description}</p>
-                  </div>
-                )}
-                {receiptToPreview.status === "rejected" && (
-                  <div className="md:col-span-2 lg:col-span-4">
-                    {receiptToPreview.rejection_reason ? (
-                      <div>
-                        <label className="font-medium text-gray-500 text-sm">Rejection Reason:</label>
-                        <div className="mt-1 p-3 bg-red-50 border border-red-200 rounded-md">
-                          <p className="text-red-800 break-words">{receiptToPreview.rejection_reason}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <label className="font-medium text-gray-500 text-sm">Rejection Reason:</label>
-                        <div className="mt-1 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                          <p className="text-yellow-800">No rejection reason provided</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              <div className="border rounded-lg overflow-hidden">
-                {getFileType(receiptToPreview.filename) === "image" ? (
-                  <Image
-                    src={receiptToPreview.file_url || "/placeholder.svg"}
-                    alt={`Receipt: ${receiptToPreview.filename}`}
-                    width={800}
-                    height={600}
-                    className="w-full h-auto object-contain max-h-[50vh] sm:max-h-[60vh] lg:max-h-[70vh]"
-                    unoptimized
-                  />
-                ) : getFileType(receiptToPreview.filename) === "pdf" ? (
-                  <div className="w-full h-[50vh] sm:h-[60vh] lg:h-[70vh]">
-                    <iframe
-                      src={receiptToPreview.file_url}
-                      className="w-full h-full border-0"
-                      title={`Receipt: ${receiptToPreview.filename}`}
-                    />
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-48 sm:h-64 bg-gray-50">
-                    <FileText className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400 mb-4" />
-                    <p className="text-gray-600 mb-4 text-sm sm:text-base text-center px-4">
-                      Preview not available for this file type
-                    </p>
-                    <Button
-                      onClick={() => window.open(receiptToPreview.file_url, "_blank")}
-                      className="bg-orange-600 hover:bg-orange-700 text-sm sm:text-base"
-                    >
-                      Open in New Tab
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
