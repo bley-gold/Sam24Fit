@@ -307,39 +307,50 @@ export const useAuth = () => {
     }
 
     const setupSessionRefresh = () => {
-      sessionRefreshInterval = setInterval(
-        async () => {
-          try {
-            const {
-              data: { session },
-            } = await supabase.auth.getSession()
-            if (session) {
-              const expiresAt = session.expires_at
-              const now = Math.floor(Date.now() / 1000)
-              const timeUntilExpiry = expiresAt - now
+      const checkSessionExpiry = async () => {
+        try {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession()
+          if (session) {
+            const expiresAt = session.expires_at
+            const now = Math.floor(Date.now() / 1000)
+            const timeUntilExpiry = expiresAt - now
 
-              if (timeUntilExpiry < 900) {
-                console.log("useAuth: Auto-refreshing session to prevent timeout")
-                await refreshSession()
-              }
+            if (timeUntilExpiry < 900) {
+              console.log("useAuth: Auto-refreshing session to prevent timeout")
+              await refreshSession()
             }
-          } catch (error) {
-            console.error("useAuth: Error in auto session refresh:", error)
           }
-        },
-        5 * 60 * 1000,
-      )
+        } catch (error) {
+          console.error("useAuth: Error in session expiry check:", error)
+        }
+      }
+
+      const handleUserInteraction = () => {
+        checkSessionExpiry()
+      }
+
+      document.addEventListener("click", handleUserInteraction, { passive: true, once: true })
+      document.addEventListener("keydown", handleUserInteraction, { passive: true, once: true })
+      document.addEventListener("scroll", handleUserInteraction, { passive: true, once: true })
+
+      return () => {
+        document.removeEventListener("click", handleUserInteraction)
+        document.removeEventListener("keydown", handleUserInteraction)
+        document.removeEventListener("scroll", handleUserInteraction)
+      }
     }
 
-    const handleVisibilityChange = async () => {
-      if (!document.hidden && mounted) {
-        console.log("useAuth: Tab became visible, checking session...")
+    const handlePageShow = async (event: PageTransitionEvent) => {
+      if (event.persisted && mounted) {
+        console.log("useAuth: Page restored from bfcache, checking session...")
 
         try {
           const restoredSession = await restoreSupabaseSession()
 
           if (restoredSession) {
-            console.log("useAuth: Valid session found after tab focus")
+            console.log("useAuth: Valid session found after bfcache restore")
             if (!user || !isSessionValid()) {
               try {
                 setProfileStatus("loading")
@@ -347,26 +358,36 @@ export const useAuth = () => {
 
                 if (currentUser && mounted) {
                   setUserWithCache(currentUser)
-                  console.log("useAuth: User data refreshed after tab focus")
+                  console.log("useAuth: User data refreshed after bfcache restore")
                   clearRetryInfo()
                 } else if (mounted) {
-                  console.log("useAuth: Profile fetch failed after tab focus, keeping session")
+                  console.log("useAuth: Profile fetch failed after bfcache restore, keeping session")
                   setProfileStatus("unavailable")
                 }
               } catch (error) {
-                console.error("useAuth: Error refreshing user on tab focus:", error)
+                console.error("useAuth: Error refreshing user after bfcache restore:", error)
                 if (mounted) {
                   setProfileStatus("unavailable")
                 }
               }
             }
           } else {
-            console.log("useAuth: No session found after tab focus")
+            console.log("useAuth: No session found after bfcache restore")
             setUserWithCache(null)
             setProfileStatus("unavailable")
           }
         } catch (error) {
-          console.error("useAuth: Error checking session on tab focus:", error)
+          console.error("useAuth: Error checking session after bfcache restore:", error)
+        }
+      }
+    }
+
+    const handlePageHide = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        console.log("useAuth: Page being stored in bfcache, cleaning up...")
+        clearTimeout(loadingTimeout)
+        if (sessionRefreshInterval) {
+          clearInterval(sessionRefreshInterval)
         }
       }
     }
@@ -413,9 +434,10 @@ export const useAuth = () => {
     })
 
     getInitialSession()
-    setupSessionRefresh()
+    const cleanupSessionRefresh = setupSessionRefresh()
 
-    document.addEventListener("visibilitychange", handleVisibilityChange)
+    window.addEventListener("pageshow", handlePageShow)
+    window.addEventListener("pagehide", handlePageHide)
 
     return () => {
       mounted = false
@@ -423,7 +445,9 @@ export const useAuth = () => {
       if (sessionRefreshInterval) {
         clearInterval(sessionRefreshInterval)
       }
-      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      cleanupSessionRefresh()
+      window.removeEventListener("pageshow", handlePageShow)
+      window.removeEventListener("pagehide", handlePageHide)
       subscription.unsubscribe()
     }
   }, [refreshSession, setUserWithCache])
