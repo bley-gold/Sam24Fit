@@ -26,6 +26,53 @@ export default function UploadPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadSuccess, setUploadSuccess] = useState(false)
 
+  // Add session validation when component mounts or user changes
+  useEffect(() => {
+    const validateSession = async () => {
+      if (user) {
+        try {
+          const { data: { session }, error } = await supabase.auth.getSession()
+          if (error || !session) {
+            console.log("Upload page: Session invalid, redirecting to auth")
+            router.push("/auth")
+          }
+        } catch (error) {
+          console.error("Upload page: Session validation error:", error)
+        }
+      }
+    }
+
+    validateSession()
+  }, [user, router])
+
+  // Handle page visibility to ensure session is still valid
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user) {
+        // Quick session check when page becomes visible
+        setTimeout(async () => {
+          try {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session) {
+              console.log("Upload page: Session lost during tab switch")
+              toast({
+                title: "Session Expired",
+                description: "Please log in again to continue.",
+                variant: "destructive",
+              })
+              router.push("/auth")
+            }
+          } catch (error) {
+            console.error("Upload page: Error checking session on visibility change:", error)
+          }
+        }, 100)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [user, router, toast])
+
   useEffect(() => {
     switch (paymentType) {
       case "membership":
@@ -104,6 +151,28 @@ export default function UploadPage() {
   e.preventDefault()
   if (!file) return
 
+   // Validate session before upload
+   try {
+     const { data: { session }, error } = await supabase.auth.getSession()
+     if (error || !session) {
+       toast({
+         title: "Session Expired",
+         description: "Please log in again to upload receipts.",
+         variant: "destructive",
+       })
+       router.push("/auth")
+       return
+     }
+   } catch (error) {
+     console.error("Session validation error before upload:", error)
+     toast({
+       title: "Authentication Error",
+       description: "Please log in again to continue.",
+       variant: "destructive",
+     })
+     router.push("/auth")
+     return
+   }
   setIsUploading(true)
   let retries = 3;
 

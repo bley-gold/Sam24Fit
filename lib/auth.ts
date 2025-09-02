@@ -365,8 +365,34 @@ export const getCurrentUser = async (): Promise<User | null> => {
       return null;
     }
 
-    // Get auth user with timeout
-    const { data: { user: authUser }, error: authUserError } = await supabase.auth.getUser();
+    // Get auth user with timeout and retry logic
+    let authUser = null;
+    let authUserError = null;
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+      
+      const authResult = await supabase.auth.getUser();
+      clearTimeout(timeoutId);
+      
+      authUser = authResult.data.user;
+      authUserError = authResult.error;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.warn("Auth user fetch timed out, trying session fallback");
+        // Try session as fallback
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          authUser = session?.user || null;
+        } catch (sessionError) {
+          console.error("Session fallback also failed:", sessionError);
+          return null;
+        }
+      } else {
+        authUserError = error;
+      }
+    }
 
     if (authUserError) {
       console.error("Error fetching auth user:", authUserError);
@@ -445,9 +471,13 @@ export const uploadReceipt = async (file: File, amount: number, description?: st
       throw new Error("Supabase is not properly configured. Please check your environment variables.")
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // Validate session first
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError || !session) {
+      throw new Error("Your session has expired. Please log in again.")
+    }
+
+    const user = session.user
     if (!user) throw new Error("Not authenticated")
 
     const validation = validateFile(file)

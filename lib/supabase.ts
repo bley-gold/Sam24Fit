@@ -28,6 +28,23 @@ let supabase: ReturnType<typeof createClient>
 if (isSupabaseConfigured()) {
   supabase = createClient(supabaseUrl!, supabaseAnonKey!)
   console.log("✅ Supabase client initialized successfully")
+  
+  // Add global session refresh handler
+  if (typeof window !== "undefined") {
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'TOKEN_REFRESHED') {
+        console.log("✅ Supabase session token refreshed")
+      } else if (event === 'SIGNED_OUT') {
+        console.log("🔄 User signed out, clearing any cached data")
+        // Clear any cached data when user signs out
+        if (typeof localStorage !== "undefined") {
+          localStorage.removeItem("sam24fit_user_cache")
+          localStorage.removeItem("sam24fit_cache_expiry")
+          localStorage.removeItem("sam24fit_session_cache")
+        }
+      }
+    })
+  }
 } else {
   console.error("❌ Supabase configuration missing - check environment variables")
   throw new Error(

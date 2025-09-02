@@ -37,11 +37,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   // Handle page visibility changes for better session management
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && user) {
-        // Refresh session when page becomes visible again
+      if (document.visibilityState === 'visible') {
+        // Check session when page becomes visible again
         setTimeout(() => {
-          refreshSession().catch(console.error)
-        }, 100)
+          // Only refresh if we have a user but want to ensure session is still valid
+          if (user) {
+            refreshSession().catch((error) => {
+              console.error("AuthProvider: Session refresh failed on visibility change:", error)
+            })
+          }
+        }, 200)
       }
     }
 

@@ -315,6 +315,60 @@ export const useAuth = () => {
       }
     }
 
+    // Handle page visibility changes to maintain session
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && mounted) {
+        console.log("useAuth: Page became visible, checking session...")
+        
+        // Quick session validation without full refresh
+        setTimeout(async () => {
+          try {
+            const { data: { session }, error } = await supabase.auth.getSession()
+            
+            if (error) {
+              console.error("useAuth: Session check error on visibility change:", error)
+              return
+            }
+            
+            if (session && session.user && mounted) {
+              // Session exists, ensure user data is current
+              if (!user || user.id !== session.user.id) {
+                console.log("useAuth: Restoring user data after tab switch")
+                const currentUser = await getCurrentUser()
+                if (currentUser && mounted) {
+                  setUserWithCache(currentUser)
+                }
+              }
+            } else if (mounted && user) {
+              // Session lost, clear user
+              console.log("useAuth: Session lost during tab switch, clearing user")
+              setUserWithCache(null)
+            }
+          } catch (error) {
+            console.error("useAuth: Error checking session on visibility change:", error)
+          }
+        }, 100)
+      }
+    }
+
+    // Handle focus events for additional session validation
+    const handleFocus = () => {
+      if (mounted && user) {
+        // Validate session is still active when window regains focus
+        setTimeout(async () => {
+          try {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session && mounted) {
+              console.log("useAuth: Session expired during focus, clearing user")
+              setUserWithCache(null)
+            }
+          } catch (error) {
+            console.error("useAuth: Error validating session on focus:", error)
+          }
+        }, 50)
+      }
+    }
+
     // Simplified auth state change handler
     const {
       data: { subscription },
@@ -387,10 +441,14 @@ export const useAuth = () => {
 
     // Add page visibility listeners for bfcache
     window.addEventListener("pageshow", handlePageShow, { passive: true })
+    document.addEventListener("visibilitychange", handleVisibilityChange, { passive: true })
+    window.addEventListener("focus", handleFocus, { passive: true })
 
     return () => {
       mounted = false
       window.removeEventListener("pageshow", handlePageShow)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.removeEventListener("focus", handleFocus)
       subscription.unsubscribe()
     }
   }, [refreshSession, setUserWithCache])
