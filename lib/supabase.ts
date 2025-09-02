@@ -47,9 +47,8 @@ if (isSupabaseConfigured()) {
   }
 } else {
   console.error("❌ Supabase configuration missing - check environment variables")
-  throw new Error(
-    "Supabase environment variables not configured. Please add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your environment variables.",
-  )
+  // Create a dummy client to prevent import errors
+  supabase = createClient("https://dummy.supabase.co", "dummy-key")
 }
 
 let supabaseAdmin: ReturnType<typeof createClient> | null

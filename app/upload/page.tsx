@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { LoadingSpinner } from "@/components/loading-spinner"
 import { useAuthContext } from "@/components/auth-provider"
 import { uploadReceipt } from "@/lib/auth"
+import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { Dumbbell, Upload, ArrowLeft, FileText, CheckCircle, User, CreditCard } from "lucide-react"
 
