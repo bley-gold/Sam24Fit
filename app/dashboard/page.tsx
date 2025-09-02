@@ -34,6 +34,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { createReview, getUserReviews, type Review, canUserSubmitReview } from "@/app/actions/review-actions"
 import { jsPDF } from "jspdf"
+import ErrorBoundary from "@/components/error-boundary"
 
 export default function DashboardPage() {
   const { user, loading: authLoading, refreshUser } = useAuthContext()
@@ -288,13 +289,14 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
     }
   }, [user])
 
-  const getEffectiveRole = () => {
-    return user?.role || "user"
-  }
+    const getEffectiveRole = () => {
+  return jwtRole || user?.role || "user";
+}
 
-  const isAdmin = () => {
-    return user?.role === "admin"
-  }
+const isAdmin = () => {
+  const role = getEffectiveRole();
+  return role === "admin";
+}
 
   const getFileType = (filename: string) => {
     const extension = filename.toLowerCase().split(".").pop()
@@ -542,16 +544,41 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
     setIsDeleteDialogOpen(true)
   }
 
-  if (authLoading || !user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
-        </div>
+if (authLoading) {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
+      <div className="text-center">
+        <LoadingSpinner size="lg" text="Loading your dashboard..." />
+        <p className="mt-4 text-gray-600 text-sm">This should only take a moment</p>
+        <Button 
+          variant="outline" 
+          className="mt-4 bg-transparent" 
+          onClick={() => {
+            // Force refresh and continue anyway
+            refreshUser();
+          }}
+        >
+          Continue Anyway
+        </Button>
       </div>
-    )
-  }
+    </div>
+  );
+}
+
+if (!user) {
+  // Redirect to auth if no user after loading
+  useEffect(() => {
+    router.push("/auth");
+  }, [router]);
+  
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
+      <div className="text-center">
+        <LoadingSpinner size="lg" text="Redirecting to login..." />
+      </div>
+    </div>
+  );
+}
 
   console.log(
     "[v0] Dashboard rendering - User:",
@@ -567,7 +594,8 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
   const effectiveRole = getEffectiveRole()
   const roleMatch = user.role === jwtRole
 
-  return (
+return (
+  <ErrorBoundary>
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1315,5 +1343,6 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
         </DialogContent>
       </Dialog>
     </div>
+  </ErrorBoundary>
   )
 }

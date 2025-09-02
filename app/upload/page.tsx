@@ -100,24 +100,21 @@ export default function UploadPage() {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!file) return
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
+  if (!file) return
 
-    setIsUploading(true)
+  setIsUploading(true)
+  let retries = 3;
 
+  while (retries > 0) {
     try {
       const amount = getAmount(paymentType)
       const isAdminFee = paymentType === "admin" || paymentType === "both"
       const { receipt, error } = await uploadReceipt(file, amount, description, isAdminFee)
 
       if (error) {
-        toast({
-          title: "Upload Failed",
-          description: error.message,
-          variant: "destructive",
-        })
-        return
+        throw error;
       }
 
       if (receipt) {
@@ -135,18 +132,25 @@ export default function UploadPage() {
           setDescription("Gym membership fee")
           router.push("/dashboard")
         }, 1500)
+        return; // Success, exit the function
       }
     } catch (error) {
-      toast({
-        title: "Upload Failed",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsUploading(false)
+      retries--;
+      
+      if (retries === 0) {
+        toast({
+          title: "Upload Failed",
+          description: "Failed to upload receipt after multiple attempts. Please try again later.",
+          variant: "destructive",
+        })
+      } else {
+        // Wait before retrying with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, 1000 * (4 - retries)));
+      }
     }
   }
-
+  setIsUploading(false)
+}
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">

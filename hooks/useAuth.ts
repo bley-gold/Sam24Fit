@@ -85,18 +85,52 @@ export const useAuth = () => {
   }, [])
 
   const refreshUser = useCallback(async () => {
-    try {
-      const currentUser = await getCurrentUser()
-      setUserWithCache(currentUser)
-      return currentUser
-    } catch (error) {
-      console.error("useAuth: Error refreshing user:", error)
-      if (!isSessionValid()) {
-        setUserWithCache(null)
-      }
-      throw error
+  try {
+    // Use timeout to prevent hanging
+    const currentUser = await Promise.race([
+      getCurrentUser(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)) // 8 second timeout
+    ]);
+    
+    setUserWithCache(currentUser);
+    return currentUser;
+  } catch (error) {
+    console.error("useAuth: Error refreshing user:", error);
+    if (!isSessionValid()) {
+      setUserWithCache(null);
     }
-  }, [setUserWithCache])
+    
+    // Return fallback user if available
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        const fallbackUser: User = {
+          id: authUser.id,
+          email: authUser.email!,
+          full_name: authUser.user_metadata?.full_name || authUser.email!,
+          phone: authUser.user_metadata?.phone || "",
+          date_of_birth: "",
+          gender: "other",
+          street_address: "",
+          emergency_contact_name: "",
+          emergency_contact_number: "",
+          role: "user",
+          membership_status: "active",
+          profile_picture_url: null,
+          last_payment_date: undefined,
+          created_at: authUser.created_at,
+          updated_at: new Date().toISOString(),
+        };
+        setUserWithCache(fallbackUser);
+        return fallbackUser;
+      }
+    } catch (fallbackError) {
+      console.error("useAuth: Fallback user also failed:", fallbackError);
+    }
+    
+    throw error;
+  }
+}, [setUserWithCache]);
 
   const refreshSession = useCallback(async () => {
     try {
@@ -139,80 +173,140 @@ export const useAuth = () => {
     }
 
     const getInitialSession = async () => {
-      if (isInitializing) return
-      isInitializing = true
+  if (isInitializing) return;
+  isInitializing = true;
 
-      try {
-        // Check for cached user first for immediate UI response
-        const cachedUser = getCachedUser()
-        if (cachedUser && mounted && isSessionValid()) {
-          setUser(cachedUser)
-          setProfileStatus("available")
-          setLoading(false)
-          
-          // Background verification without blocking UI
-          setTimeout(async () => {
-            try {
-              const session = await restoreSupabaseSession()
-              if (session && mounted) {
-                const currentUser = await getCurrentUser()
-                if (currentUser) {
-                  setUserWithCache(currentUser)
-                }
-              }
-            } catch (error) {
-              console.log("useAuth: Background verification failed, keeping cached user")
-            }
-          }, 100)
-          
-          isInitializing = false
-          return
-        }
-
-        // No valid cache, check for session
-        const session = await restoreSupabaseSession()
-        
-        if (session && mounted) {
-          setLoading(false)
-          setProfileStatus("loading")
-          
-          try {
-            const currentUser = await getCurrentUser()
-            if (currentUser && mounted) {
-              setUserWithCache(currentUser)
-            } else if (mounted) {
-              setProfileStatus("unavailable")
-              setUser(null)
-            }
-          } catch (error) {
-            console.error("useAuth: Error getting user profile:", error)
-            if (mounted) {
-              setProfileStatus("unavailable")
-              setUser(null)
+  try {
+    // Check for cached user first for immediate UI response
+    const cachedUser = getCachedUser();
+    if (cachedUser && mounted && isSessionValid()) {
+      setUser(cachedUser);
+      setProfileStatus("available");
+      setLoading(false);
+      
+      // Background verification without blocking UI
+      setTimeout(async () => {
+        try {
+          const session = await restoreSupabaseSession();
+          if (session && mounted) {
+            const currentUser = await getCurrentUser();
+            if (currentUser) {
+              setUserWithCache(currentUser);
             }
           }
+        } catch (error) {
+          console.log("useAuth: Background verification failed, keeping cached user");
+        }
+      }, 100);
+      
+      isInitializing = false;
+      return;
+    }
+
+    // No valid cache, check for session with timeout
+    const session = await Promise.race([
+      restoreSupabaseSession(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)) // 8 second timeout
+    ]);
+    
+    if (session && mounted) {
+      setLoading(false);
+      setProfileStatus("loading");
+      
+      try {
+        // Get user with timeout
+        const currentUser = await Promise.race([
+          getCurrentUser(),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)) // 5 second timeout
+        ]);
+        
+        if (currentUser && mounted) {
+          setUserWithCache(currentUser);
         } else if (mounted) {
-          setUserWithCache(null)
-          setProfileStatus("unavailable")
-          setLoading(false)
+          // Fallback: use auth user data if profile fetch fails
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          if (authUser && mounted) {
+            const fallbackUser: User = {
+              id: authUser.id,
+              email: authUser.email!,
+              full_name: authUser.user_metadata?.full_name || authUser.email!,
+              phone: authUser.user_metadata?.phone || "",
+              date_of_birth: "",
+              gender: "other",
+              street_address: "",
+              emergency_contact_name: "",
+              emergency_contact_number: "",
+              role: "user",
+              membership_status: "active",
+              profile_picture_url: null,
+              last_payment_date: undefined,
+              created_at: authUser.created_at,
+              updated_at: new Date().toISOString(),
+            };
+            setUserWithCache(fallbackUser);
+          } else {
+            setProfileStatus("unavailable");
+            setUser(null);
+          }
         }
       } catch (error) {
-        console.error("useAuth: Error in initial session setup:", error)
+        console.error("useAuth: Error getting user profile:", error);
         if (mounted) {
-          const cachedUser = getCachedUser()
-          if (cachedUser && isSessionValid()) {
-            setUser(cachedUser)
-            setProfileStatus("available")
-          } else {
-            setUserWithCache(null)
-            setProfileStatus("unavailable")
+          // Try to get basic auth user as fallback
+          try {
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            if (authUser && mounted) {
+              const fallbackUser: User = {
+                id: authUser.id,
+                email: authUser.email!,
+                full_name: authUser.user_metadata?.full_name || authUser.email!,
+                phone: authUser.user_metadata?.phone || "",
+                date_of_birth: "",
+                gender: "other",
+                street_address: "",
+                emergency_contact_name: "",
+                emergency_contact_number: "",
+                role: "user",
+                membership_status: "active",
+                profile_picture_url: null,
+                last_payment_date: undefined,
+                created_at: authUser.created_at,
+                updated_at: new Date().toISOString(),
+              };
+              setUserWithCache(fallbackUser);
+            } else {
+              setProfileStatus("unavailable");
+              setUser(null);
+            }
+          } catch (fallbackError) {
+            console.error("useAuth: Fallback also failed:", fallbackError);
+            setProfileStatus("unavailable");
+            setUser(null);
           }
-          setLoading(false)
         }
-      } finally {
-        isInitializing = false
       }
+    } else if (mounted) {
+      setUserWithCache(null);
+      setProfileStatus("unavailable");
+      setLoading(false);
     }
+  } catch (error) {
+    console.error("useAuth: Error in initial session setup:", error);
+    if (mounted) {
+      const cachedUser = getCachedUser();
+      if (cachedUser && isSessionValid()) {
+        setUser(cachedUser);
+        setProfileStatus("available");
+      } else {
+        setUserWithCache(null);
+        setProfileStatus("unavailable");
+      }
+      setLoading(false);
+    }
+  } finally {
+    isInitializing = false;
+  }
+}
 
     // Optimized page visibility handling for bfcache
     const handlePageShow = (event: PageTransitionEvent) => {
