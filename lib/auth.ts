@@ -365,7 +365,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
       return null;
     }
 
-    // Get auth user
+    // Get auth user with timeout
     const { data: { user: authUser }, error: authUserError } = await supabase.auth.getUser();
 
     if (authUserError) {
@@ -382,23 +382,15 @@ export const getCurrentUser = async (): Promise<User | null> => {
 
     let profile: User | null = null;
     
-    // Try to get profile with a simple timeout approach
+    // Try to get profile with improved error handling
     try {
-      const profilePromise = getUserProfileById(authUser.id);
-      
-      // Create a timeout promise
-      const timeoutPromise = new Promise<null>((resolve) => {
-        setTimeout(() => resolve(null), 5000); // 5 second timeout
-      });
-
-      // Race between profile fetch and timeout
-      profile = await Promise.race([profilePromise, timeoutPromise]) as User | null;
+      profile = await getUserProfileById(authUser.id);
       
       if (profile) {
         console.log("User profile found:", profile.email);
         return profile;
       } else {
-        console.log("Profile fetch timed out or returned null");
+        console.log("Profile fetch returned null");
       }
     } catch (profileError) {
       console.error("Profile fetch error, using auth data as fallback:", profileError);

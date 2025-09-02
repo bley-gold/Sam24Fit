@@ -14,7 +14,7 @@ export async function createUserProfile(
   emergencyContactNumber: string,
   profilePictureData: { base64: string; name: string; type: string } | null,
   idNumber: string,
-  acceptedTerms: boolean,
+  acceptedTerms: boolean = true,
 ): Promise<{ success: boolean; message: string }> {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -74,7 +74,12 @@ export async function createUserProfile(
       }
     }
 
-    // Insert user profile into database
+    // Insert user profile into database with retry logic
+    let insertAttempts = 0
+    const maxAttempts = 3
+    
+    while (insertAttempts < maxAttempts) {
+      try {
     const { error: insertError } = await supabaseAdmin.from("users").insert({
       id: userId,
       email,
@@ -94,13 +99,32 @@ export async function createUserProfile(
       updated_at: new Date().toISOString(),
     })
 
-    if (insertError) {
-      console.error("Server Action: Error inserting user profile:", insertError)
-      return { success: false, message: `Failed to create user profile: ${insertError.message}` }
+        if (!insertError) {
+          console.log("Server Action: User profile created successfully for:", userId)
+          return { success: true, message: "User profile created successfully" }
+        }
+        
+        console.error(`Server Action: Error inserting user profile (attempt ${insertAttempts + 1}):`, insertError)
+        
+        // If it's a unique constraint violation, don't retry
+        if (insertError.code === '23505') {
+          return { success: false, message: "User profile already exists" }
+        }
+        
+        insertAttempts++
+        if (insertAttempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * insertAttempts))
+        }
+      } catch (error) {
+        console.error(`Server Action: Unexpected error on attempt ${insertAttempts + 1}:`, error)
+        insertAttempts++
+        if (insertAttempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * insertAttempts))
+        }
+      }
     }
 
-    console.log("Server Action: User profile created successfully for:", userId)
-    return { success: true, message: "User profile created successfully" }
+    return { success: false, message: "Failed to create user profile after multiple attempts" }
   } catch (error) {
     console.error("Server Action: createUserProfile unexpected error:", error)
     return { success: false, message: "An unexpected error occurred while creating user profile" }

@@ -1,9 +1,8 @@
 "use client"
 
-import { createContext, useContext, type ReactNode } from "react"
+import { createContext, useContext, useEffect, type ReactNode } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import type { User } from "@/lib/supabase"
-import { getCurrentUser } from "@/lib/auth";
 
 interface AuthContextType {
   user: User | null
@@ -35,6 +34,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const authHook = useAuth()
   const { user, loading, refreshUser, refreshSession } = authHook
 
+  // Handle page visibility changes for better session management
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user) {
+        // Refresh session when page becomes visible again
+        setTimeout(() => {
+          refreshSession().catch(console.error)
+        }, 100)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [user, refreshSession])
   const contextValue = {
     user,
     loading,

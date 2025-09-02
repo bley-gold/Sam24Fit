@@ -95,7 +95,6 @@ export default function AuthPage() {
   }, [])
 
   useEffect(() => {
-
     if (redirectAttempted.current) {
       return
     }

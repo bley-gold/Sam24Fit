@@ -30,7 +30,19 @@ export async function getUserProfileById(userId: string): Promise<User | null> {
       },
     })
 
-    const { data: profile, error } = await supabaseAdmin.from("users").select("*").eq("id", userId).single()
+    // Add timeout to prevent hanging
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+
+    try {
+      const { data: profile, error } = await supabaseAdmin
+        .from("users")
+        .select("*")
+        .eq("id", userId)
+        .abortSignal(controller.signal)
+        .single()
+
+      clearTimeout(timeoutId)
 
     if (error) {
       // Log detailed error information for debugging
@@ -45,6 +57,14 @@ export async function getUserProfileById(userId: string): Promise<User | null> {
     }
 
     return profile
+    } catch (fetchError) {
+      clearTimeout(timeoutId)
+      if (fetchError.name === 'AbortError') {
+        console.error("Server Action: Profile fetch timed out")
+        return null
+      }
+      throw fetchError
+    }
   } catch (error) {
     console.error("Server Action: getUserProfileById unexpected error:", error)
     return null
