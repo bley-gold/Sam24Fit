@@ -82,7 +82,7 @@ export default function UploadPage() {
     }
   }, [user, loading, router, toast])
 
-  // Simplified session restoration - only check when page becomes visible
+  // Session restoration when tab becomes visible
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (!document.hidden && user) {
@@ -140,29 +140,6 @@ export default function UploadPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!file) return
-
-    // Always attempt to refresh session before upload
-    try {
-      console.log("[v0] UploadPage: Refreshing session before upload")
-      const currentUser = await refreshUser()
-      if (!currentUser) {
-        // If refresh fails, try to refresh the session
-        const { user: refreshedUser, error } = await refreshSession()
-        if (error || !refreshedUser) {
-          toast({
-            title: "Session Expired",
-            description: "Please log in again to upload receipts.",
-            variant: "destructive",
-          })
-          router.push("/auth")
-          return
-        }
-      }
-      setSessionRestored(true)
-    } catch (error) {
-      console.error("[v0] UploadPage: Session refresh failed before upload:", error)
-      // Continue with upload anyway - the server will validate the session
-    }
 
     setIsUploading(true)
 
