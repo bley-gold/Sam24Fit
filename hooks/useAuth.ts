@@ -331,45 +331,61 @@ export const useAuth = () => {
       )
     }
 
-    const handleVisibilityChange = async () => {
-      if (!document.hidden && mounted) {
-        console.log("useAuth: Tab became visible, checking session...")
+    // hooks/useAuth.ts - Update the handleVisibilityChange function
+const handleVisibilityChange = async () => {
+  if (!document.hidden && mounted) {
+    console.log("useAuth: Tab became visible, checking session...")
 
-        try {
-          const restoredSession = await restoreSupabaseSession()
-
-          if (restoredSession) {
-            console.log("useAuth: Valid session found after tab focus")
-            if (!user || !isSessionValid()) {
-              try {
-                setProfileStatus("loading")
-                const currentUser = await getCurrentUser()
-
-                if (currentUser && mounted) {
-                  setUserWithCache(currentUser)
-                  console.log("useAuth: User data refreshed after tab focus")
-                  clearRetryInfo()
-                } else if (mounted) {
-                  console.log("useAuth: Profile fetch failed after tab focus, keeping session")
-                  setProfileStatus("unavailable")
-                }
-              } catch (error) {
-                console.error("useAuth: Error refreshing user on tab focus:", error)
-                if (mounted) {
-                  setProfileStatus("unavailable")
-                }
-              }
-            }
-          } else {
-            console.log("useAuth: No session found after tab focus")
-            setUserWithCache(null)
-            setProfileStatus("unavailable")
-          }
-        } catch (error) {
-          console.error("useAuth: Error checking session on tab focus:", error)
-        }
-      }
+    // Don't attempt to refresh if we're already in a cooldown period
+    const retryInfo = getRetryInfo()
+    const now = Date.now()
+    
+    if (retryInfo.count >= MAX_RETRIES && now - retryInfo.lastAttempt < RETRY_COOLDOWN) {
+      console.log("useAuth: Skipping session check due to retry cooldown")
+      return
     }
+
+    try {
+      const restoredSession = await restoreSupabaseSession()
+
+      if (restoredSession) {
+        console.log("useAuth: Valid session found after tab focus")
+        if (!user || !isSessionValid()) {
+          try {
+            setProfileStatus("loading")
+            const currentUser = await getCurrentUser()
+
+            if (currentUser && mounted) {
+              setUserWithCache(currentUser)
+              console.log("useAuth: User data refreshed after tab focus")
+              clearRetryInfo()
+            } else if (mounted) {
+              console.log("useAuth: Profile fetch failed after tab focus, keeping session")
+              setProfileStatus("unavailable")
+              // Increment retry count
+              updateRetryInfo(retryInfo.count + 1)
+            }
+          } catch (error) {
+            console.error("useAuth: Error refreshing user on tab focus:", error)
+            if (mounted) {
+              setProfileStatus("unavailable")
+              // Increment retry count
+              updateRetryInfo(retryInfo.count + 1)
+            }
+          }
+        }
+      } else {
+        console.log("useAuth: No session found after tab focus")
+        setUserWithCache(null)
+        setProfileStatus("unavailable")
+      }
+    } catch (error) {
+      console.error("useAuth: Error checking session on tab focus:", error)
+      // Increment retry count
+      updateRetryInfo(retryInfo.count + 1)
+    }
+  }
+}
 
     const {
       data: { subscription },

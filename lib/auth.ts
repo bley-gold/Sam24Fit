@@ -341,6 +341,7 @@ export const resetPassword = async (email: string) => {
   }
 }
 
+// lib/auth.ts - Update the refreshSession function
 export const refreshUserSession = async () => {
   try {
     if (!isSupabaseConfigured()) {
@@ -349,7 +350,13 @@ export const refreshUserSession = async () => {
 
     console.log("Refreshing session to get updated JWT claims...")
 
-    const { data, error } = await supabase.auth.refreshSession()
+    // Add timeout to session refresh
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("Session refresh timeout")), 10000) // 10 second timeout
+    })
+
+    const refreshPromise = supabase.auth.refreshSession()
+    const { data, error } = await Promise.race([refreshPromise, timeoutPromise])
 
     if (error) {
       console.error("Error refreshing session:", error)
@@ -377,6 +384,7 @@ export const refreshUserSession = async () => {
   }
 }
 
+// lib/auth.ts - Update the getCurrentUser function
 export const getCurrentUser = async (): Promise<User | null> => {
   try {
     if (!isSupabaseConfigured()) {
@@ -384,8 +392,9 @@ export const getCurrentUser = async (): Promise<User | null> => {
       return null
     }
 
+    // Reduced timeout from 60 seconds to 10 seconds
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error("getCurrentUser timeout")), 60000)
+      setTimeout(() => reject(new Error("getCurrentUser timeout")), 10000) // 10 seconds instead of 60
     })
 
     const getUserPromise = supabase.auth.getUser()
@@ -406,14 +415,15 @@ export const getCurrentUser = async (): Promise<User | null> => {
 
     console.log("Auth user found:", authUser.email)
 
-    const fetchProfileWithRetry = async (retries = 3): Promise<any> => {
+    const fetchProfileWithRetry = async (retries = 2): Promise<any> => { // Reduced from 3 to 2 retries
       for (let attempt = 0; attempt < retries; attempt++) {
         try {
           const profilePromise = getUserProfileById(authUser.id)
+          // Reduced profile timeout from 60 seconds to 8 seconds
           const profileTimeoutPromise = new Promise<null>((resolve) => {
             setTimeout(() => {
               resolve(null)
-            }, 60000)
+            }, 8000)
           })
 
           const profile = await Promise.race([profilePromise, profileTimeoutPromise])
@@ -448,7 +458,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
       return null
     }
 
-    const profile = await fetchProfileWithRetry(3)
+    const profile = await fetchProfileWithRetry(2) // Reduced from 3 to 2 retries
 
     if (!profile) {
       console.log("Profile fetch failed after retries, using auth user data as fallback")
@@ -477,9 +487,17 @@ export const getCurrentUser = async (): Promise<User | null> => {
   } catch (error) {
     console.error("Get current user unexpected error:", error)
     try {
+      // Use a shorter timeout for the fallback as well
+      const fallbackTimeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("Fallback timeout")), 5000)
+      })
+      
+      const fallbackPromise = supabase.auth.getUser()
+      
       const {
         data: { user: authUser },
-      } = await supabase.auth.getUser()
+      } = await Promise.race([fallbackPromise, fallbackTimeoutPromise])
+      
       if (authUser) {
         console.log("Returning basic auth user data due to profile fetch error")
         return {
