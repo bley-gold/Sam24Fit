@@ -18,7 +18,7 @@ import { Dumbbell, Upload, ArrowLeft, FileText, CheckCircle, User, CreditCard } 
 type PaymentType = "membership" | "admin" | "both"
 
 export default function UploadPage() {
-  const { user, loading, refreshUser, refreshSession } = useAuthContext()
+  const { user, loading } = useAuthContext()
   const router = useRouter()
   const { toast } = useToast()
 
@@ -27,7 +27,6 @@ export default function UploadPage() {
   const [description, setDescription] = useState("Gym membership fee")
   const [isUploading, setIsUploading] = useState(false)
   const [uploadSuccess, setUploadSuccess] = useState(false)
-  const [sessionRestored, setSessionRestored] = useState(false)
 
   useEffect(() => {
     switch (paymentType) {
@@ -75,38 +74,7 @@ export default function UploadPage() {
       router.push("/dashboard")
       return
     }
-
-    if (user) {
-      console.log("[v0] UploadPage: User authenticated, session restored")
-      setSessionRestored(true)
-    }
   }, [user, loading, router, toast])
-
-  // Session restoration when tab becomes visible
-  useEffect(() => {
-    const handleVisibilityChange = async () => {
-      if (!document.hidden && user) {
-        console.log("[v0] UploadPage: Tab became visible, checking session...")
-        try {
-          // Just refresh the user data, not the full session
-          const currentUser = await refreshUser()
-          if (currentUser) {
-            console.log("[v0] UploadPage: User data refreshed after tab focus")
-            setSessionRestored(true)
-          }
-        } catch (error) {
-          console.error("[v0] UploadPage: User refresh error after tab focus:", error)
-          // Don't redirect immediately, let the user try to continue
-        }
-      }
-    }
-
-    document.addEventListener("visibilitychange", handleVisibilityChange)
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange)
-    }
-  }, [user, refreshUser])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -263,11 +231,6 @@ export default function UploadPage() {
         <div className="mb-6 sm:mb-8">
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Upload Receipt</h2>
           <p className="text-sm sm:text-base text-gray-600">Upload your payment receipt for verification</p>
-          {!sessionRestored && (
-            <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
-              <p className="text-xs text-yellow-800">Restoring session... If this persists, please refresh the page.</p>
-            </div>
-          )}
         </div>
 
         <Card>
@@ -428,17 +391,12 @@ export default function UploadPage() {
               <Button
                 type="submit"
                 className="w-full bg-orange-600 hover:bg-orange-700"
-                disabled={!file || isUploading || !sessionRestored}
+                disabled={!file || isUploading}
               >
                 {isUploading ? (
                   <>
                     <LoadingSpinner size="sm" />
                     <span className="ml-2">Uploading...</span>
-                  </>
-                ) : !sessionRestored ? (
-                  <>
-                    <LoadingSpinner size="sm" />
-                    <span className="ml-2">Restoring Session...</span>
                   </>
                 ) : (
                   <>
