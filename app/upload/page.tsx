@@ -14,12 +14,11 @@ import { useAuthContext } from "@/components/auth-provider"
 import { uploadReceipt } from "@/lib/auth"
 import { useToast } from "@/hooks/use-toast"
 import { Dumbbell, Upload, ArrowLeft, FileText, CheckCircle, User, CreditCard } from "lucide-react"
-import { supabase } from "@/lib/supabase"
 
 type PaymentType = "membership" | "admin" | "both"
 
 export default function UploadPage() {
-  const { user, loading, refreshUser } = useAuthContext()
+  const { user, loading, refreshUser, refreshSession } = useAuthContext()
   const router = useRouter()
   const { toast } = useToast()
 
@@ -28,8 +27,7 @@ export default function UploadPage() {
   const [description, setDescription] = useState("Gym membership fee")
   const [isUploading, setIsUploading] = useState(false)
   const [uploadSuccess, setUploadSuccess] = useState(false)
-  const [sessionValid, setSessionValid] = useState(false)
-  const [sessionChecking, setSessionChecking] = useState(false)
+  const [sessionRestored, setSessionRestored] = useState(false)
 
   useEffect(() => {
     switch (paymentType) {
@@ -58,38 +56,6 @@ export default function UploadPage() {
     }
   }
 
-  const validateSession = async (): Promise<boolean> => {
-    try {
-      console.log("[v0] UploadPage: Validating session...")
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession()
-
-      if (error) {
-        console.error("[v0] UploadPage: Session validation error:", error)
-        return false
-      }
-
-      if (!session) {
-        console.log("[v0] UploadPage: No active session found")
-        return false
-      }
-
-      const now = Math.floor(Date.now() / 1000)
-      if (session.expires_at && session.expires_at < now) {
-        console.log("[v0] UploadPage: Session expired")
-        return false
-      }
-
-      console.log("[v0] UploadPage: Session is valid")
-      return true
-    } catch (error) {
-      console.error("[v0] UploadPage: Session validation failed:", error)
-      return false
-    }
-  }
-
   useEffect(() => {
     console.log("[v0] UploadPage useEffect: loading =", loading, ", user =", user)
 
@@ -99,6 +65,7 @@ export default function UploadPage() {
       return
     }
 
+    // Check if user has profile picture
     if (user && !user.profile_picture_url) {
       toast({
         title: "Profile Picture Required",
@@ -110,37 +77,26 @@ export default function UploadPage() {
     }
 
     if (user) {
-      console.log("[v0] UploadPage: User authenticated, validating session")
-      validateSession().then(setSessionValid)
+      console.log("[v0] UploadPage: User authenticated, session restored")
+      setSessionRestored(true)
     }
   }, [user, loading, router, toast])
 
+  // Simplified session restoration - only check when page becomes visible
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (!document.hidden && user) {
         console.log("[v0] UploadPage: Tab became visible, checking session...")
-        setSessionChecking(true)
-
         try {
-          const isValid = await validateSession()
-          setSessionValid(isValid)
-
-          if (!isValid) {
-            console.log("[v0] UploadPage: Session invalid after tab focus, redirecting to auth")
-            toast({
-              title: "Session Expired",
-              description: "Please log in again to continue.",
-              variant: "destructive",
-            })
-            router.push("/auth")
-          } else {
-            console.log("[v0] UploadPage: Session valid after tab focus")
+          // Just refresh the user data, not the full session
+          const currentUser = await refreshUser()
+          if (currentUser) {
+            console.log("[v0] UploadPage: User data refreshed after tab focus")
+            setSessionRestored(true)
           }
         } catch (error) {
-          console.error("[v0] UploadPage: Error checking session on tab focus:", error)
-          setSessionValid(false)
-        } finally {
-          setSessionChecking(false)
+          console.error("[v0] UploadPage: User refresh error after tab focus:", error)
+          // Don't redirect immediately, let the user try to continue
         }
       }
     }
@@ -150,37 +106,13 @@ export default function UploadPage() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
-  }, [user, router, toast])
-
-  useEffect(() => {
-    if (!user) return
-
-    const sessionCheckInterval = setInterval(
-      async () => {
-        try {
-          console.log("[v0] UploadPage: Periodic session check...")
-          const isValid = await validateSession()
-          setSessionValid(isValid)
-
-          if (!isValid && !isUploading) {
-            console.warn("[v0] UploadPage: Session invalid during periodic check")
-          }
-        } catch (error) {
-          console.error("[v0] UploadPage: Error in periodic session check:", error)
-        }
-      },
-      5 * 60 * 1000,
-    ) // Check every 5 minutes
-
-    return () => {
-      clearInterval(sessionCheckInterval)
-    }
-  }, [user, isUploading])
+  }, [user, refreshUser])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0]
 
+      // Validate file size (10MB limit)
       if (selectedFile.size > 10 * 1024 * 1024) {
         toast({
           title: "File too large",
@@ -190,6 +122,7 @@ export default function UploadPage() {
         return
       }
 
+      // Validate file type
       const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "application/pdf"]
       if (!allowedTypes.includes(selectedFile.type)) {
         toast({
@@ -208,17 +141,27 @@ export default function UploadPage() {
     e.preventDefault()
     if (!file) return
 
-    console.log("[v0] UploadPage: Validating session before upload")
-    const isSessionValid = await validateSession()
-
-    if (!isSessionValid) {
-      toast({
-        title: "Session Expired",
-        description: "Please log in again to upload receipts.",
-        variant: "destructive",
-      })
-      router.push("/auth")
-      return
+    // Always attempt to refresh session before upload
+    try {
+      console.log("[v0] UploadPage: Refreshing session before upload")
+      const currentUser = await refreshUser()
+      if (!currentUser) {
+        // If refresh fails, try to refresh the session
+        const { user: refreshedUser, error } = await refreshSession()
+        if (error || !refreshedUser) {
+          toast({
+            title: "Session Expired",
+            description: "Please log in again to upload receipts.",
+            variant: "destructive",
+          })
+          router.push("/auth")
+          return
+        }
+      }
+      setSessionRestored(true)
+    } catch (error) {
+      console.error("[v0] UploadPage: Session refresh failed before upload:", error)
+      // Continue with upload anyway - the server will validate the session
     }
 
     setIsUploading(true)
@@ -229,6 +172,17 @@ export default function UploadPage() {
       const { receipt, error } = await uploadReceipt(file, amount, description, isAdminFee)
 
       if (error) {
+        // Handle specific session-related errors
+        if (error.message.includes("session") || error.message.includes("auth") || error.message.includes("token")) {
+          toast({
+            title: "Session Expired",
+            description: "Please log in again to upload receipts.",
+            variant: "destructive",
+          })
+          router.push("/auth")
+          return
+        }
+        
         toast({
           title: "Upload Failed",
           description: error.message,
@@ -244,6 +198,7 @@ export default function UploadPage() {
           description: "Your receipt has been uploaded and is pending verification.",
         })
 
+        // Reset form after 2 seconds
         setTimeout(() => {
           setUploadSuccess(false)
           setFile(null)
@@ -276,6 +231,7 @@ export default function UploadPage() {
     return null
   }
 
+  // Redirect if no profile picture
   if (!user.profile_picture_url) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
@@ -310,6 +266,7 @@ export default function UploadPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
+      {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 space-y-3 sm:space-y-0">
@@ -329,16 +286,9 @@ export default function UploadPage() {
         <div className="mb-6 sm:mb-8">
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Upload Receipt</h2>
           <p className="text-sm sm:text-base text-gray-600">Upload your payment receipt for verification</p>
-          {sessionChecking && (
-            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
-              <p className="text-xs text-blue-800">Checking session status...</p>
-            </div>
-          )}
-          {!sessionValid && !sessionChecking && (
+          {!sessionRestored && (
             <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
-              <p className="text-xs text-yellow-800">
-                Session validation in progress... If this persists, please refresh the page.
-              </p>
+              <p className="text-xs text-yellow-800">Restoring session... If this persists, please refresh the page.</p>
             </div>
           )}
         </div>
@@ -358,6 +308,7 @@ export default function UploadPage() {
                 Bank Account Details for Payments
               </h3>
               <div className="space-y-4">
+                {/* Business Account */}
                 <div className="bg-white rounded-lg p-4 border border-green-300">
                   <div className="flex items-center mb-3">
                     <div className="bg-green-600 text-white p-1.5 rounded mr-2">
@@ -385,6 +336,7 @@ export default function UploadPage() {
                   </div>
                 </div>
 
+                {/* Personal Account */}
                 <div className="bg-white rounded-lg p-4 border border-blue-300">
                   <div className="flex items-center mb-3">
                     <div className="bg-blue-600 text-white p-1.5 rounded mr-2">
@@ -419,6 +371,7 @@ export default function UploadPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* File Upload */}
               <div className="space-y-2">
                 <Label htmlFor="receipt">Receipt File *</Label>
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
@@ -494,20 +447,21 @@ export default function UploadPage() {
                 <p className="text-xs text-gray-500">Description is automatically set based on payment type</p>
               </div>
 
+              {/* Submit Button */}
               <Button
                 type="submit"
                 className="w-full bg-orange-600 hover:bg-orange-700"
-                disabled={!file || isUploading || sessionChecking}
+                disabled={!file || isUploading || !sessionRestored}
               >
                 {isUploading ? (
                   <>
                     <LoadingSpinner size="sm" />
                     <span className="ml-2">Uploading...</span>
                   </>
-                ) : sessionChecking ? (
+                ) : !sessionRestored ? (
                   <>
                     <LoadingSpinner size="sm" />
-                    <span className="ml-2">Checking Session...</span>
+                    <span className="ml-2">Restoring Session...</span>
                   </>
                 ) : (
                   <>
