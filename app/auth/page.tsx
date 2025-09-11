@@ -117,7 +117,7 @@ export default function AuthPage() {
       redirectAttempted.current = true
 
       // Check if user is admin and redirect accordingly
-      if (user.role === "admin" || user.email === "goldstainmusic22@gmail.com") {
+      if (user.role === "admin" || user.email === "goldstainmusic22@gmail.com" || user.email === "samkelogivenson@gmail.com") {
         console.log("AuthPage: Admin user detected, redirecting to admin dashboard")
         router.push("/admin")
       } else {
