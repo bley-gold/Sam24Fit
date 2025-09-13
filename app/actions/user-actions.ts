@@ -14,7 +14,7 @@ export async function createUserProfile(
   emergencyContactNumber: string,
   profilePictureData: { base64: string; name: string; type: string } | null,
   idNumber: string,
-  acceptedTerms: boolean = true,
+  acceptedTerms: boolean,
 ): Promise<{ success: boolean; message: string }> {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -32,19 +32,7 @@ export async function createUserProfile(
       },
     })
 
-    console.log("Server Action: Creating user profile for:", userId, "with data:", {
-      email,
-      fullName,
-      phone,
-      dateOfBirth,
-      gender,
-      streetAddress,
-      emergencyContactName,
-      emergencyContactNumber,
-      idNumber,
-      acceptedTerms,
-      hasProfilePicture: !!profilePictureData,
-    })
+    console.log("Server Action: Creating user profile for:", userId)
 
     let profilePictureUrl: string | null = null
 
@@ -107,12 +95,7 @@ export async function createUserProfile(
     })
 
     if (insertError) {
-      console.error("Server Action: Error inserting user profile:", {
-        message: insertError.message,
-        details: insertError.details,
-        hint: insertError.hint,
-        code: insertError.code,
-      })
+      console.error("Server Action: Error inserting user profile:", insertError)
       return { success: false, message: `Failed to create user profile: ${insertError.message}` }
     }
 
