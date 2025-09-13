@@ -241,16 +241,17 @@ export default function AuthPage() {
     setFormSubmitting(true)
 
     try {
-      const { user, error, needsEmailConfirmation, message } = await signUp({
-        ...signupData,
-        profilePicture: signupData.profilePicture,
-      })
+     const { user, error, needsEmailConfirmation, message } = await signUp({
+  ...signupData,
+  ...(signupData.profilePicture ? { profilePicture: signupData.profilePicture } : {}),
+})
 
       if (error) {
-        toast({
-          title: "Registration Failed",
-          description: error.message,
-          variant: "destructive",
+         console.error("Sign up error:", error)
+  toast({
+    title: "Registration Failed",
+    description: "An unexpected error occurred. Please try again.",
+    variant: "destructive",
         })
         return
       }
@@ -757,19 +758,20 @@ This agreement will be digitally accepted through the Sam24Fit registration syst
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="profilePicture">Profile Picture (Optional)</Label>
+                      <Label htmlFor="profilePicture">Profile Picture </Label>
                       <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-orange-400 transition-colors bg-gradient-to-br from-orange-50 to-red-50">
                         <input
-                          id="profilePicture"
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files[0]) {
-                              setSignupData({ ...signupData, profilePicture: e.target.files[0] })
-                            }
-                          }}
-                          className="hidden"
-                        />
+  id="profilePicture"
+  type="file"
+  accept="image/*"
+  onChange={(e) => {
+    if (e.target.files && e.target.files[0]) {
+      setSignupData({ ...signupData, profilePicture: e.target.files[0] })
+    }
+  }}
+  className="hidden"
+/>
+
                         <label htmlFor="profilePicture" className="cursor-pointer">
                           {signupData.profilePicture ? (
                             <div className="flex items-center justify-center space-x-2">
