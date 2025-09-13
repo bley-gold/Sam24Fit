@@ -46,6 +46,7 @@ export default function AuthPage() {
   const [passwordError, setPasswordError] = useState("")
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [showGymRules, setShowGymRules] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   const [loginData, setLoginData] = useState<SignInData>({ email: "", password: "" })
   const [signupData, setSignupData] = useState<
@@ -117,7 +118,7 @@ export default function AuthPage() {
       redirectAttempted.current = true
 
       // Check if user is admin and redirect accordingly
-      if (user.role === "admin" || user.email === "goldstainmusic22@gmail.com" || user.email === "samkelogivenson@gmail.com") {
+      if (user.role === "admin" || user.email === "goldstainmusic22@gmail.com") {
         console.log("AuthPage: Admin user detected, redirecting to admin dashboard")
         router.push("/admin")
       } else {
@@ -200,43 +201,40 @@ export default function AuthPage() {
     }
   }
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSignup = async () => {
+    console.log("[v0] Starting signup process")
+    setIsLoading(true)
 
-    if (!acceptedTerms) {
+    // Validate required fields
+    if (
+      !signupData.email ||
+      !signupData.password ||
+      !signupData.fullName ||
+      !signupData.phone ||
+      !signupData.dateOfBirth ||
+      !signupData.gender ||
+      !signupData.streetAddress ||
+      !signupData.emergencyContactName ||
+      !signupData.emergencyContactNumber ||
+      !signupData.idNumber
+    ) {
       toast({
-        title: "Terms and Conditions Required",
-        description: "Please accept the terms and conditions to continue.",
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
         variant: "destructive",
       })
+      setIsLoading(false)
       return
     }
 
+    // Validate password confirmation
     if (signupData.password !== signupData.confirmPassword) {
-      setPasswordError("Passwords do not match")
       toast({
         title: "Password Mismatch",
-        description: "Please ensure both password fields match.",
+        description: "Passwords do not match. Please try again.",
         variant: "destructive",
       })
-      return
-    }
-
-    // Check age validation
-    if (signupData.dateOfBirth) {
-      const age = calculateAge(signupData.dateOfBirth)
-      if (age < 15) {
-        setAgeError("You must be at least 15 years old to join Sam24Fit")
-        return
-      }
-    }
-
-    if (!signupData.profilePicture) {
-      toast({
-        title: "Profile Picture Required",
-        description: "Please upload a profile picture to continue.",
-        variant: "destructive",
-      })
+      setIsLoading(false)
       return
     }
 
@@ -283,6 +281,7 @@ export default function AuthPage() {
       })
     } finally {
       setFormSubmitting(false)
+      setIsLoading(false)
     }
   }
 
@@ -758,7 +757,7 @@ This agreement will be digitally accepted through the Sam24Fit registration syst
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="profilePicture">Profile Picture *</Label>
+                      <Label htmlFor="profilePicture">Profile Picture (Optional)</Label>
                       <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-orange-400 transition-colors bg-gradient-to-br from-orange-50 to-red-50">
                         <input
                           id="profilePicture"
@@ -770,7 +769,6 @@ This agreement will be digitally accepted through the Sam24Fit registration syst
                             }
                           }}
                           className="hidden"
-                          required
                         />
                         <label htmlFor="profilePicture" className="cursor-pointer">
                           {signupData.profilePicture ? (
