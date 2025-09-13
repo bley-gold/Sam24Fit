@@ -163,6 +163,7 @@ export const signUp = async (data: SignUpData) => {
       data.emergencyContactNumber,
       profilePictureData,
       data.idNumber,
+      true, // acceptedTerms - always true since form validates this
     )
 
     if (!result.success) {

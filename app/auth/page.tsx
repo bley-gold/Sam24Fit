@@ -238,20 +238,58 @@ export default function AuthPage() {
       return
     }
 
+    // Validate age
+    if (ageError) {
+      toast({
+        title: "Age Requirement",
+        description: ageError,
+        variant: "destructive",
+      })
+      setIsLoading(false)
+      return
+    }
+
+    // Validate terms acceptance
+    if (!acceptedTerms) {
+      toast({
+        title: "Terms and Conditions",
+        description: "Please accept the terms and conditions to continue.",
+        variant: "destructive",
+      })
+      setIsLoading(false)
+      return
+    }
+
     setFormSubmitting(true)
 
     try {
-     const { user, error, needsEmailConfirmation, message } = await signUp({
-  ...signupData,
-  ...(signupData.profilePicture ? { profilePicture: signupData.profilePicture } : {}),
-})
+      const signupPayload = {
+        email: signupData.email,
+        password: signupData.password,
+        fullName: signupData.fullName,
+        phone: signupData.phone,
+        dateOfBirth: signupData.dateOfBirth,
+        gender: signupData.gender,
+        streetAddress: signupData.streetAddress,
+        emergencyContactName: signupData.emergencyContactName,
+        emergencyContactNumber: signupData.emergencyContactNumber,
+        idNumber: signupData.idNumber,
+        ...(signupData.profilePicture ? { profilePicture: signupData.profilePicture } : {}),
+      }
+
+      console.log("[v0] Signup payload:", {
+        ...signupPayload,
+        profilePicture: signupPayload.profilePicture ? "File selected" : "No file",
+      })
+
+      const { user, error, needsEmailConfirmation, message } = await signUp(signupPayload)
 
       if (error) {
-         console.error("Sign up error:", error)
-  toast({
-    title: "Registration Failed",
-    description: "An unexpected error occurred. Please try again.",
-    variant: "destructive",
+        console.error("[v0] Sign up error:", error)
+        toast({
+          title: "Registration Failed",
+          description: error.message || "An unexpected error occurred. Please try again.",
+          variant: "destructive",
         })
         return
       }
@@ -660,7 +698,7 @@ This agreement will be digitally accepted through the Sam24Fit registration syst
               </TabsContent>
 
               <TabsContent value="signup">
-                <form onSubmit={handleSignup} className="space-y-4">
+                <div className="space-y-4">
                   {/* Personal Information Section */}
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -869,6 +907,12 @@ This agreement will be digitally accepted through the Sam24Fit registration syst
                           onChange={(e) => {
                             setSignupData({ ...signupData, password: e.target.value })
                             if (passwordError) setPasswordError("")
+                            // Validate password confirmation when password changes
+                            if (signupData.confirmPassword && e.target.value !== signupData.confirmPassword) {
+                              setPasswordError("Passwords do not match")
+                            } else if (signupData.confirmPassword && e.target.value === signupData.confirmPassword) {
+                              setPasswordError("")
+                            }
                           }}
                           required
                           className="focus:ring-orange-500 focus:border-orange-500"
@@ -884,7 +928,12 @@ This agreement will be digitally accepted through the Sam24Fit registration syst
                           value={signupData.confirmPassword}
                           onChange={(e) => {
                             setSignupData({ ...signupData, confirmPassword: e.target.value })
-                            if (passwordError) setPasswordError("")
+                            // Validate password confirmation
+                            if (signupData.password && e.target.value !== signupData.password) {
+                              setPasswordError("Passwords do not match")
+                            } else if (signupData.password && e.target.value === signupData.password) {
+                              setPasswordError("")
+                            }
                           }}
                           required
                           className={
@@ -973,11 +1022,12 @@ This agreement will be digitally accepted through the Sam24Fit registration syst
                   </div>
 
                   <Button
-                    type="submit"
+                    type="button"
+                    onClick={handleSignup}
                     className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 mt-6 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!!ageError || !!passwordError || formSubmitting || !acceptedTerms}
+                    disabled={!!ageError || !!passwordError || formSubmitting || !acceptedTerms || isLoading}
                   >
-                    {formSubmitting ? (
+                    {formSubmitting || isLoading ? (
                       <LoadingSpinner size="sm" />
                     ) : (
                       <>
@@ -986,7 +1036,7 @@ This agreement will be digitally accepted through the Sam24Fit registration syst
                       </>
                     )}
                   </Button>
-                </form>
+                </div>
               </TabsContent>
             </Tabs>
           </CardContent>
