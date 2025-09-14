@@ -298,6 +298,10 @@ export default function UploadPage() {
                       <div className="text-gray-900">Capitec Bank</div>
                     </div>
                     <div>
+                      <span className="font-medium text-blue-800">Branch Code:</span>
+                      <div className="text-gray-900 font-semibold">470010</div>
+                    </div>
+                    <div>
                       <span className="font-medium text-blue-800">Account Type:</span>
                       <div className="text-gray-900">Personal Debit</div>
                     </div>

@@ -396,10 +396,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Bank Account Details */}
-            <div className="lg:sticky lg:top-8">
-              {/* Business Account */}
-              <Card className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 shadow-lg">
+             <Card className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 shadow-lg">
                 <CardHeader className="text-center pb-3 sm:pb-4 px-4 sm:px-6 pt-6">
                   <div className="bg-blue-600 rounded-full p-2.5 sm:p-3 w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4">
                     <svg className="h-7 w-7 sm:h-10 sm:w-10 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -415,15 +412,23 @@ export default function LandingPage() {
                 <CardContent className="space-y-3 sm:space-y-4 px-4 sm:px-6 pb-6">
                   <div className="bg-white rounded-lg p-3 sm:p-4 space-y-2 sm:space-y-3">
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
+                      <span className="text-gray-600 font-medium text-sm sm:text-base">Bank:</span>
+                      <span className="text-gray-900 font-semibold text-sm sm:text-base">Capitec Bank</span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
+                      <span className="text-gray-600 font-medium text-sm sm:text-base">Branch Code:</span>
+                      <span className="text-gray-900 font-semibold font-mono text-sm sm:text-base">470010</span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
                       <span className="text-gray-600 font-medium text-sm sm:text-base">Account Name:</span>
-                      <span className="text-gray-900 font-semibold text-sm sm:text-base">Sam24fit</span>
+                      <span className="text-gray-900 font-semibold text-sm:text-base">MR SG NXUMALO</span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
                       <span className="text-gray-600 font-medium text-sm sm:text-base">Account Number:</span>
-                      <span className="text-gray-900 font-semibold font-mono text-sm sm:text-base">1052 6463 87</span>
+                      <span className="text-gray-900 font-semibold font-mono text-sm sm:text-base">1278512703</span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
-                      <span className="text-gray-600 font-medium text-sm:text-base">Account Type:</span>
+                      <span className="text-gray-600 font-medium text-sm sm:text-base">Account Type:</span>
                       <span className="text-gray-900 font-semibold text-sm:text-base">Transact</span>
                     </div>
                   </div>

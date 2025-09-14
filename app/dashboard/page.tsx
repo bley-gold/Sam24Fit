@@ -689,7 +689,7 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
                   variant="outline"
                   size="sm"
                   onClick={handleLogout}
-                  className="text-xs sm:text-sm bg-transparent hover:bg-gray-100 border-gray-300 min-w-[80px] px-3 py-2 relative z-[200]"
+                 className="text-xs sm:text-sm bg-white hover:bg-gray-100 border-gray-300 min-w-[80px] px-3 py-2 shadow-sm"
                 >
                   <LogOut className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   Logout
@@ -955,6 +955,7 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
+                
                 {/* Business Account */}
                 <div className="bg-white rounded-lg p-6 border border-green-300">
                   <div className="flex items-center mb-4">
@@ -1085,7 +1086,7 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-1">
+          <Card className="lg:col-span-3">
             <CardHeader>
               <CardTitle className="flex items-center text-base sm:text-lg">
                 <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />

@@ -3,12 +3,15 @@ import { supabase } from "@/lib/supabase"
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
-  const code = searchParams.get("code")
+  const token = searchParams.get("token") // Changed from code to token
+  const code = searchParams.get("code") // Keep this for backward compatibility
   const error = searchParams.get("error")
   const errorCode = searchParams.get("error_code")
   const errorDescription = searchParams.get("error_description")
   const type = searchParams.get("type")
-  const next = searchParams.get("next") ?? (type === "recovery" ? "/dashboard" : "/auth")
+  const next = searchParams.get("next") ?? "/auth"
+
+  console.log("Auth callback received:", { token, code, error, type })
 
   if (error) {
     console.error("Auth callback error:", { error, errorCode, errorDescription })
@@ -24,28 +27,47 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  if (code) {
-    try {
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-      
-      if (!exchangeError) {
-        console.log(`Auth callback success: redirecting to ${origin}${next}`)
+  // Use either token or code (Supabase uses token in email links)
+  const authCode = token || code;
 
-        if (type === "recovery") {
+  if (authCode) {
+    try {
+      console.log("Exchanging auth code for session...")
+      
+      // For token-based verification (email links), we need to use verifyOtp instead
+      if (token && type === "recovery") {
+        const { error: verifyError, data } = await supabase.auth.verifyOtp({
+          token_hash: authCode,
+          type: 'recovery'
+        })
+        
+        if (!verifyError) {
+          console.log("Password recovery successful")
           return NextResponse.redirect(
             `${origin}/dashboard?recovery=true&message=Password reset successful! Welcome back.`,
           )
-        } else if (type === "signup") {
-          return NextResponse.redirect(
-            `${origin}/auth?confirmed=true&message=Email confirmed successfully! You can now log in.`,
-          )
+        } else {
+          console.error("OTP verification error:", verifyError)
+          return NextResponse.redirect(`${origin}/auth?error=session_error&message=Failed to verify reset token`)
         }
-
-        // Default redirect for other types
-        return NextResponse.redirect(`${origin}${next}`)
       } else {
-        console.error("Session exchange error:", exchangeError)
-        return NextResponse.redirect(`${origin}/auth?error=session_error&message=Failed to establish session`)
+        // For OAuth flows that use code parameter
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(authCode)
+        
+        if (!exchangeError) {
+          console.log(`Auth callback success: redirecting to ${origin}${next}`)
+
+          if (type === "signup") {
+            return NextResponse.redirect(
+              `${origin}/auth?confirmed=true&message=Email confirmed successfully! You can now log in.`,
+            )
+          }
+
+          return NextResponse.redirect(`${origin}${next}`)
+        } else {
+          console.error("Session exchange error:", exchangeError)
+          return NextResponse.redirect(`${origin}/auth?error=session_error&message=Failed to establish session`)
+        }
       }
     } catch (error) {
       console.error("Auth callback error:", error)
@@ -53,6 +75,6 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // If no code and no error, redirect to auth page
+  console.error("No auth code provided in callback")
   return NextResponse.redirect(`${origin}/auth?error=callback_error&message=No authorization code provided`)
 }
