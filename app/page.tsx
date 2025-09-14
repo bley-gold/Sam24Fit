@@ -396,7 +396,10 @@ export default function LandingPage() {
               </div>
             </div>
 
-             <Card className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 shadow-lg">
+            {/* Bank Account Details */}
+            <div className="lg:sticky lg:top-8">
+              {/* Business Account */}
+              <Card className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 shadow-lg">
                 <CardHeader className="text-center pb-3 sm:pb-4 px-4 sm:px-6 pt-6">
                   <div className="bg-blue-600 rounded-full p-2.5 sm:p-3 w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4">
                     <svg className="h-7 w-7 sm:h-10 sm:w-10 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -707,6 +710,7 @@ export default function LandingPage() {
                           src={
                             review.users?.profile_picture_url ||
                             "/placeholder.svg?height=32&width=32&query=user profile" ||
+                            "/placeholder.svg" ||
                             "/placeholder.svg" ||
                             "/placeholder.svg"
                           }
