@@ -26,25 +26,25 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     try {
-      const { error } = await supabase.auth.exchangeCodeForSession(code)
-      if (!error) {
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+      
+      if (!exchangeError) {
         console.log(`Auth callback success: redirecting to ${origin}${next}`)
-
-        if (type !== "recovery") {
-          return NextResponse.redirect(
-            `${origin}/auth?confirmed=true&message=Email confirmed successfully! You can now log in.`,
-          )
-        }
 
         if (type === "recovery") {
           return NextResponse.redirect(
             `${origin}/dashboard?recovery=true&message=Password reset successful! Welcome back.`,
           )
+        } else if (type === "signup") {
+          return NextResponse.redirect(
+            `${origin}/auth?confirmed=true&message=Email confirmed successfully! You can now log in.`,
+          )
         }
 
+        // Default redirect for other types
         return NextResponse.redirect(`${origin}${next}`)
       } else {
-        console.error("Session exchange error:", error)
+        console.error("Session exchange error:", exchangeError)
         return NextResponse.redirect(`${origin}/auth?error=session_error&message=Failed to establish session`)
       }
     } catch (error) {
@@ -53,5 +53,6 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // If no code and no error, redirect to auth page
   return NextResponse.redirect(`${origin}/auth?error=callback_error&message=No authorization code provided`)
 }

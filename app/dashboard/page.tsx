@@ -246,6 +246,15 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
       console.log("DashboardPage: User authenticated, fetching receipts.")
       fetchReceipts()
       checkJWTRole()
+      const fetchUserReviews = async () => {
+        if (user) {
+          const reviewsResult = await getUserReviews(user.id)
+          if (reviewsResult.success) {
+            setUserReviews(reviewsResult.data)
+          }
+        }
+      }
+      fetchUserReviews()
       if (shouldShowWelcomeDialog()) {
         setIsWelcomeDialogOpen(true)
       }
@@ -259,6 +268,15 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
         if (result.success) {
           setCanSubmitReview(result.canSubmit)
           setNextReviewDate(result.nextSubmissionDate)
+        }
+      }
+    }
+
+    const fetchUserReviews = async () => {
+      if (user) {
+        const reviewsResult = await getUserReviews(user.id)
+        if (reviewsResult.success) {
+          setUserReviews(reviewsResult.data)
         }
       }
     }
@@ -967,11 +985,11 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
                     <div className="space-y-3">
                       <div>
                         <label className="text-sm font-medium text-green-800">Bank Name</label>
-                        <p className="text-gray-900 font-semibold">First National Bank (FNB)</p>
+                        <p className="text-gray-900 font-semibold">Capitec Bank</p>
                       </div>
                       <div>
                         <label className="text-sm font-medium text-green-800">Branch Code</label>
-                        <p className="text-gray-900 font-semibold">250655</p>
+                        <p className="text-gray-900 font-semibold">470010</p>
                       </div>
                       <div>
                         <label className="text-sm font-medium text-green-800">Reference</label>
@@ -1067,7 +1085,7 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-3">
+          <Card className="lg:col-span-1">
             <CardHeader>
               <CardTitle className="flex items-center text-base sm:text-lg">
                 <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
