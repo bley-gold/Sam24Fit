@@ -127,7 +127,7 @@ export default function UploadPage() {
           router.push("/auth")
           return
         }
-        
+
         toast({
           title: "Upload Failed",
           description: error.message,

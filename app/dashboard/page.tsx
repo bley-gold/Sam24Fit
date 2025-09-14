@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
@@ -23,17 +25,16 @@ import {
   Shield,
   Trash2,
   Eye,
-  Bell,
-  CheckCircle,
-  XCircle,
-  X,
   Download,
   ChevronRight,
   Settings,
+  KeyRound,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { createReview, getUserReviews, type Review, canUserSubmitReview } from "@/app/actions/review-actions"
 import { jsPDF } from "jspdf"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 
 export default function DashboardPage() {
   const { user, loading: authLoading, refreshUser, refreshSession } = useAuthContext()
@@ -48,6 +49,7 @@ export default function DashboardPage() {
   const [isDeleting, setIsDeleting] = useState(isDeleteDialogOpen)
   const [receiptToPreview, setReceiptToPreview] = useState<Receipt | null>(null)
   const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false)
+  const [showPasswordResetSuccess, setShowPasswordResetSuccess] = useState(false)
   const [recentStatusChanges, setRecentStatusChanges] = useState<Receipt[]>([])
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
   const notificationRef = useRef<HTMLDivElement>(null)
@@ -60,6 +62,10 @@ export default function DashboardPage() {
   const [isWelcomeDialogOpen, setIsWelcomeDialogOpen] = useState(false)
   const [welcomeDialogStep, setWelcomeDialogStep] = useState(1)
   const [hasPdfDownloaded, setHasPdfDownloaded] = useState(false)
+  const [showPasswordResetForm, setShowPasswordResetForm] = useState(false)
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [passwordResetSubmitting, setPasswordResetSubmitting] = useState(false)
 
   const generateGymRules = () => {
     const currentDate = new Date()
@@ -236,6 +242,17 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
 
   useEffect(() => {
     console.log("DashboardPage useEffect: authLoading =", authLoading, ", user =", user)
+
+    const urlParams = new URLSearchParams(window.location.search)
+    const recovery = urlParams.get("recovery")
+    const message = urlParams.get("message")
+
+    if (recovery === "true") {
+      setShowPasswordResetForm(true)
+      // Clean up URL parameters
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+
     if (!authLoading && !user) {
       console.log("DashboardPage: User not authenticated, redirecting to auth.")
       router.push("/auth")
@@ -248,9 +265,17 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
       checkJWTRole()
       const fetchUserReviews = async () => {
         if (user) {
-          const reviewsResult = await getUserReviews(user.id)
-          if (reviewsResult.success) {
-            setUserReviews(reviewsResult.data)
+          console.log("[v0] Starting to fetch reviews...")
+          try {
+            const reviewsResult = await getUserReviews(user.id)
+            console.log("[v0] getApprovedReviews result:", reviewsResult)
+            if (reviewsResult.success) {
+              setUserReviews(reviewsResult.data)
+            } else {
+              console.log("[v0] Failed to fetch reviews:", reviewsResult.error || "Unknown error")
+            }
+          } catch (error) {
+            console.error("[v0] Error fetching reviews:", error)
           }
         }
       }
@@ -259,7 +284,7 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
         setIsWelcomeDialogOpen(true)
       }
     }
-  }, [user, authLoading, router])
+  }, [user, authLoading, router, toast])
 
   useEffect(() => {
     const checkReviewEligibility = async () => {
@@ -560,6 +585,62 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
     setIsDeleteDialogOpen(true)
   }
 
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Password Mismatch",
+        description: "Passwords do not match. Please try again.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        title: "Password Too Short",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setPasswordResetSubmitting(true)
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      })
+
+      if (error) {
+        toast({
+          title: "Password Reset Failed",
+          description: error.message,
+          variant: "destructive",
+        })
+        return
+      }
+
+      toast({
+        title: "Password Updated Successfully! ✅",
+        description: "Your password has been updated. You can now use your new password to log in.",
+      })
+
+      setShowPasswordResetForm(false)
+      setNewPassword("")
+      setConfirmPassword("")
+    } catch (error) {
+      toast({
+        title: "Password Reset Failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setPasswordResetSubmitting(false)
+    }
+  }
+
   if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
@@ -587,114 +668,104 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 gap-3 sm:gap-0">
-            <div className="flex items-center space-x-2">
-              <Dumbbell className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600" />
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Sam24Fit</h1>
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-              <span className="text-sm sm:text-base font-medium text-gray-700 truncate">Welcome, {user.full_name}</span>
-              <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-                {isAdmin() && (
-                  <Badge className="bg-red-100 text-red-800 text-xs">
-                    <Shield className="h-3 w-3 mr-1" />
-                    Admin
-                  </Badge>
-                )}
-                <div className="relative" ref={notificationRef}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-                    className="relative"
-                  >
-                    <Bell className="h-4 w-4" />
-                    {recentStatusChanges.length > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {recentStatusChanges.length}
-                      </span>
-                    )}
-                  </Button>
-
-                  {isNotificationOpen && (
-                    <div className="fixed sm:absolute top-16 sm:top-full right-2 sm:right-0 mt-2 w-[calc(100vw-1rem)] sm:w-96 max-w-sm sm:max-w-96 bg-white rounded-lg shadow-xl border z-50 sm:z-[100]">
-                      <div className="p-3 sm:p-4 border-b">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Notifications</h3>
-                          <Button variant="ghost" size="sm" onClick={() => setIsNotificationOpen(false)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="max-h-64 overflow-y-auto">
-                        {recentStatusChanges.length === 0 ? (
-                          <div className="p-4 text-center text-gray-500 text-sm">No recent notifications</div>
-                        ) : (
-                          <div className="space-y-1">
-                            {recentStatusChanges.map((receipt) => (
-                              <div
-                                key={receipt.id}
-                                className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 hover:bg-gray-50 gap-2 sm:gap-0"
-                              >
-                                <div className="flex items-start space-x-3 flex-1 min-w-0">
-                                  {receipt.status === "verified" ? (
-                                    <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
-                                  ) : (
-                                    <XCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-                                  )}
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-900">
-                                      Receipt {receipt.status === "verified" ? "Approved" : "Rejected"}
-                                    </p>
-                                    <p className="text-xs text-gray-500 break-all">
-                                      {receipt.filename} - R{receipt.amount.toFixed(2)}
-                                    </p>
-                                    {receipt.status === "rejected" && receipt.rejection_reason && (
-                                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
-                                        <p className="text-xs font-medium text-red-800">Rejection Reason:</p>
-                                        <p className="text-xs text-red-700 break-words">{receipt.rejection_reason}</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => dismissNotification(receipt.id)}
-                                  className="flex-shrink-0 h-6 w-6 p-0 self-start sm:self-center"
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
+      {showPasswordResetForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md bg-white">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
+                <KeyRound className="h-8 w-8 text-orange-600" />
+              </div>
+              <CardTitle className="text-2xl">Set New Password</CardTitle>
+              <CardDescription>Please enter your new password to complete the reset process</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handlePasswordReset} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">New Password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    placeholder="Enter new password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="focus:ring-orange-500 focus:border-orange-500"
+                  />
                 </div>
-                {isAdmin() && (
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Confirm New Password</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    placeholder="Confirm new password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </div>
+
+                <div className="flex gap-3">
                   <Button
+                    type="button"
                     variant="outline"
-                    size="sm"
-                    onClick={() => router.push("/admin")}
-                    className="text-xs sm:text-sm whitespace-nowrap"
+                    className="flex-1 bg-transparent"
+                    onClick={() => {
+                      setShowPasswordResetForm(false)
+                      setNewPassword("")
+                      setConfirmPassword("")
+                    }}
+                    disabled={passwordResetSubmitting}
                   >
-                    Admin Panel
+                    Cancel
                   </Button>
-                )}
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
+                    disabled={passwordResetSubmitting}
+                  >
+                    {passwordResetSubmitting ? <LoadingSpinner size="sm" /> : "Update Password"}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-2">
+              <div className="bg-gradient-to-r from-orange-600 to-red-600 p-2 rounded-lg">
+                <Dumbbell className="h-6 w-6 text-white" />
+              </div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+                Sam24Fit
+              </h1>
+            </div>
+            <div className="flex items-center space-x-4">
+              {getEffectiveRole() === "admin" && (
                 <Button
                   variant="outline"
-                  size="sm"
-                  onClick={handleLogout}
-                 className="text-xs sm:text-sm bg-white hover:bg-gray-100 border-gray-300 min-w-[80px] px-3 py-2 shadow-sm"
+                  onClick={() => router.push("/admin")}
+                  className="hidden sm:flex items-center space-x-2 hover:bg-orange-50"
                 >
-                  <LogOut className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  Logout
+                  <Shield className="h-4 w-4" />
+                  <span>Admin Panel</span>
                 </Button>
-              </div>
+              )}
+              <Button
+                variant="outline"
+                onClick={handleLogout}
+                className="flex items-center space-x-2 hover:bg-red-50 bg-white shadow-sm"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="hidden sm:inline">Logout</span>
+              </Button>
             </div>
           </div>
         </div>
@@ -943,145 +1014,42 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-3 mt-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+          {/* Payment Information Card */}
+          <Card className="shadow-lg border-0 bg-white/95 backdrop-blur-sm">
             <CardHeader>
-              <CardTitle className="flex items-center text-green-800">
-                <CreditCard className="h-5 w-5 mr-2" />
-                Payment Details - Bank Account Information
+              <CardTitle className="flex items-center space-x-2">
+                <CreditCard className="h-5 w-5 text-orange-600" />
+                <span>Payment Information</span>
               </CardTitle>
-              <CardDescription className="text-green-700">
-                Use these bank details to make your gym membership payments
-              </CardDescription>
+              <CardDescription>Bank details for gym membership payments</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                
-                {/* Business Account */}
-                <div className="bg-white rounded-lg p-6 border border-green-300">
-                  <div className="flex items-center mb-4">
-                    <div className="bg-green-600 text-white p-2 rounded-lg mr-3">
-                      <CreditCard className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Business Account</h3>
-                      <p className="text-sm text-gray-600">Primary payment method</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-green-800">Account Nickname</label>
-                        <p className="text-gray-900 font-semibold">Sam24fit</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-green-800">Account Number</label>
-                        <p className="text-gray-900 font-semibold text-lg">1052 6463 87</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-green-800">Account Type</label>
-                        <p className="text-gray-900 font-semibold">Transact</p>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-green-800">Bank Name</label>
-                        <p className="text-gray-900 font-semibold">Capitec Bank</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-green-800">Branch Code</label>
-                        <p className="text-gray-900 font-semibold">470010</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-green-800">Reference</label>
-                        <p className="text-gray-900 font-semibold">Use your full name + membership</p>
-                      </div>
-                    </div>
-                  </div>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-700">Bank Name</p>
+                  <p className="text-lg font-semibold text-gray-900">Capitec Bank</p>
                 </div>
-
-                {/* Personal Account */}
-                <div className="bg-white rounded-lg p-6 border border-blue-300">
-                  <div className="flex items-center mb-4">
-                    <div className="bg-blue-600 text-white p-2 rounded-lg mr-3">
-                      <User className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Personal Account</h3>
-                      <p className="text-sm text-gray-600">Alternative payment method</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-blue-800">Account Holder</label>
-                        <p className="text-gray-900 font-semibold">MR SG NXUMALO</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-blue-800">Account Number</label>
-                        <p className="text-gray-900 font-semibold text-lg">1278512703</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-blue-800">Account Type</label>
-                        <p className="text-gray-900 font-semibold">Personal Debit</p>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-blue-800">Bank Name</label>
-                        <p className="text-gray-900 font-semibold">Capitec Bank</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-blue-800">Card Features</label>
-                        <div className="space-y-1">
-                          <div className="flex items-center text-sm">
-                            <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
-                            <span className="text-gray-700">Online purchases enabled</span>
-                          </div>
-                          <div className="flex items-center text-sm">
-                            <XCircle className="h-4 w-4 text-red-600 mr-2" />
-                            <span className="text-gray-700">International transactions disabled</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-blue-800">Reference</label>
-                        <p className="text-gray-900 font-semibold">Use your full name + membership</p>
-                      </div>
-                    </div>
-                  </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-700">Branch Code</p>
+                  <p className="text-lg font-semibold text-gray-900">470010</p>
                 </div>
-
-                {/* Payment Instructions */}
-                <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-lg p-6 border border-orange-200">
-                  <h4 className="font-semibold text-orange-900 mb-4 flex items-center">
-                    <Shield className="h-5 w-5 mr-2" />
-                    Payment Instructions & Fees
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <h5 className="font-medium text-orange-800 mb-2">Monthly Fees:</h5>
-                      <ul className="text-sm text-orange-700 space-y-1">
-                        <li>
-                          • <strong>Membership Fee:</strong> R120 per month
-                        </li>
-                        <li>
-                          • <strong>Admin Fee:</strong> R50 (one-time for new members)
-                        </li>
-                      </ul>
-                    </div>
-                    <div>
-                      <h5 className="font-medium text-orange-800 mb-2">Payment Process:</h5>
-                      <ul className="text-sm text-orange-700 space-y-1">
-                        <li>• Use either business or personal account above</li>
-                        <li>• Reference: "{user?.full_name || "Your Name"} - Membership"</li>
-                        <li>• Upload proof of payment after transfer</li>
-                        <li>• Allow 24-48 hours for verification</li>
-                      </ul>
-                    </div>
-                  </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-700">Account Number</p>
+                  <p className="text-lg font-semibold text-gray-900">1234567890</p>
                 </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-700">Account Holder</p>
+                  <p className="text-lg font-semibold text-gray-900">Sam24Fit Gym</p>
+                </div>
+              </div>
+
+              <div className="mt-4 border-t pt-4">
+                <p className="text-sm text-gray-600">
+                  Please use the above details to make your monthly gym membership payments.
+                </p>
+                <p className="text-sm text-gray-600">
+                  Remember to use your full name and "Membership" as the payment reference.
+                </p>
               </div>
             </CardContent>
           </Card>
