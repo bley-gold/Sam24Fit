@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { LoadingSpinner } from "@/components/loading-spinner"
+import imageCompression from "browser-image-compression"
 import { signIn, signUp, resetPassword, type SignUpData, type SignInData } from "@/lib/auth"
 import {
   Dumbbell,
@@ -242,9 +243,35 @@ export default function AuthPage() {
     setFormSubmitting(true)
 
     try {
+      // ✅ Convert compressed image to Base64 before sending to the server
+const convertToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.readAsDataURL(file)
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = (error) => reject(error)
+  })
+}
+
+let profilePictureBase64 = ""
+if (signupData.profilePicture) {
+  try {
+    profilePictureBase64 = await convertToBase64(signupData.profilePicture)
+  } catch (err) {
+    console.error("Error converting image to base64:", err)
+    toast({
+      title: "Image Upload Error",
+      description: "Could not process your image. Please try again.",
+      variant: "destructive",
+    })
+    setFormSubmitting(false)
+    return
+  }
+}
+
       const { user, error, needsEmailConfirmation, message } = await signUp({
         ...signupData,
-        profilePicture: signupData.profilePicture,
+        profilePicture: profilePictureBase64,
       })
 
       if (error) {
@@ -760,17 +787,52 @@ This agreement will be digitally accepted through the Sam24Fit registration syst
                       <Label htmlFor="profilePicture">Profile Picture *</Label>
                       <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-orange-400 transition-colors bg-gradient-to-br from-orange-50 to-red-50">
                         <input
-                          id="profilePicture"
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files[0]) {
-                              setSignupData({ ...signupData, profilePicture: e.target.files[0] })
-                            }
-                          }}
-                          className="hidden"
-                          required
-                        />
+  id="profilePicture"
+  type="file"
+  accept="image/*"
+  onChange={async (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0]
+
+      // 🔒 Optional pre-check: reject overly large files (>10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: "Please choose an image smaller than 10MB.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      try {
+        // ⚙️ Compression options for mobile optimization
+        const options = {
+          maxSizeMB: 0.5, // target ~500KB
+          maxWidthOrHeight: 1024, // resize large images
+          useWebWorker: true,
+        }
+
+        // 🧩 Compress image
+        const compressedFile = await imageCompression(file, options)
+
+        console.log(
+          `Original size: ${(file.size / 1024 / 1024).toFixed(2)}MB → Compressed: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`
+        )
+
+        setSignupData({ ...signupData, profilePicture: compressedFile })
+      } catch (error) {
+        console.error("Image compression failed:", error)
+        toast({
+          title: "Image Upload Error",
+          description: "Could not compress the image. Please try again.",
+          variant: "destructive",
+        })
+      }
+    }
+  }}
+  className="hidden"
+  required
+/>
                         <label htmlFor="profilePicture" className="cursor-pointer">
                           {signupData.profilePicture ? (
                             <div className="flex items-center justify-center space-x-2">
