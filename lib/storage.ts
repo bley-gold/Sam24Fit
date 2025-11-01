@@ -2,7 +2,10 @@ import { supabase, isSupabaseConfigured } from "./supabase";
 
 // ------------------- HELPERS -------------------
 
-// Convert Base64 string to Blob (browser-safe)
+// Detect if running in browser
+const isBrowser = typeof window !== "undefined";
+
+// Convert Base64 string to Blob (browser)
 const base64ToBlob = (base64: string): Blob => {
   const [metadata, base64Data] = base64.split(',');
   const mime = metadata.match(/:(.*?);/)?.[1] || 'application/octet-stream';
@@ -17,28 +20,36 @@ const base64ToBlob = (base64: string): Blob => {
   return new Blob([uint8Array], { type: mime });
 };
 
+// Convert Base64 string to Node Buffer
+const base64ToBuffer = (base64: string): Buffer => {
+  const base64Data = base64.split(',')[1];
+  return Buffer.from(base64Data, "base64");
+};
+
 // ------------------- VALIDATION -------------------
 
 export const validateFile = (file: File | string) => {
   const maxSize = 10 * 1024 * 1024; // 10MB
   const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "application/pdf"];
 
+  let mimeType: string;
+  let sizeInBytes: number;
+
   if (typeof file === "string") {
     const mimeMatch = file.match(/^data:(.*?);base64,/);
-    const mimeType = mimeMatch ? mimeMatch[1] : "";
-
-    if (!allowedTypes.includes(mimeType)) {
-      return { valid: false, error: "Only JPG, PNG, and PDF files are allowed" };
-    }
-
-    const base64Length = file.split(",")[1].length;
-    const sizeInBytes = (base64Length * 3) / 4;
-    if (sizeInBytes > maxSize) {
-      return { valid: false, error: "File size must be less than 10MB" };
-    }
+    mimeType = mimeMatch ? mimeMatch[1] : "";
+    sizeInBytes = ((file.split(",")[1].length) * 3) / 4;
   } else {
-    if (file.size > maxSize) return { valid: false, error: "File size must be less than 10MB" };
-    if (!allowedTypes.includes(file.type)) return { valid: false, error: "Only JPG, PNG, and PDF files are allowed" };
+    mimeType = file.type;
+    sizeInBytes = file.size;
+  }
+
+  if (!allowedTypes.includes(mimeType)) {
+    return { valid: false, error: "Only JPG, PNG, and PDF files are allowed" };
+  }
+
+  if (sizeInBytes > maxSize) {
+    return { valid: false, error: "File size must be less than 10MB" };
   }
 
   return { valid: true, error: null };
@@ -48,22 +59,24 @@ export const validateProfilePicture = (file: File | string) => {
   const maxSize = 5 * 1024 * 1024; // 5MB
   const allowedTypes = ["image/jpeg", "image/png", "image/jpg"];
 
+  let mimeType: string;
+  let sizeInBytes: number;
+
   if (typeof file === "string") {
     const mimeMatch = file.match(/^data:(.*?);base64,/);
-    const mimeType = mimeMatch ? mimeMatch[1] : "";
-
-    if (!allowedTypes.includes(mimeType)) {
-      return { valid: false, error: "Only JPG and PNG files are allowed for profile pictures" };
-    }
-
-    const base64Length = file.split(",")[1].length;
-    const sizeInBytes = (base64Length * 3) / 4;
-    if (sizeInBytes > maxSize) {
-      return { valid: false, error: "Profile picture size must be less than 5MB" };
-    }
+    mimeType = mimeMatch ? mimeMatch[1] : "";
+    sizeInBytes = ((file.split(",")[1].length) * 3) / 4;
   } else {
-    if (file.size > maxSize) return { valid: false, error: "Profile picture size must be less than 5MB" };
-    if (!allowedTypes.includes(file.type)) return { valid: false, error: "Only JPG and PNG files are allowed for profile pictures" };
+    mimeType = file.type;
+    sizeInBytes = file.size;
+  }
+
+  if (!allowedTypes.includes(mimeType)) {
+    return { valid: false, error: "Only JPG and PNG files are allowed for profile pictures" };
+  }
+
+  if (sizeInBytes > maxSize) {
+    return { valid: false, error: "Profile picture size must be less than 5MB" };
   }
 
   return { valid: true, error: null };
@@ -75,23 +88,29 @@ export const uploadFile = async (file: File | string, userId: string) => {
   try {
     if (!isSupabaseConfigured()) throw new Error("Supabase is not properly configured");
 
-    let uploadFile: File;
+    let uploadData: File | Blob | Buffer;
     let fileExt: string;
 
     if (typeof file === "string") {
-      const blob = base64ToBlob(file);
-      fileExt = blob.type.split("/")[1];
-      uploadFile = new File([blob], `${Date.now()}.${fileExt}`, { type: blob.type });
+      if (isBrowser) {
+        const blob = base64ToBlob(file);
+        fileExt = blob.type.split("/")[1];
+        uploadData = new File([blob], `${Date.now()}.${fileExt}`, { type: blob.type });
+      } else {
+        const buffer = base64ToBuffer(file);
+        fileExt = file.split(':')[1].split(';')[0].split('/')[1];
+        uploadData = buffer;
+      }
     } else {
       fileExt = file.name.split(".").pop()!;
-      uploadFile = file;
+      uploadData = file;
     }
 
     const fileName = `${userId}/${Date.now()}.${fileExt}`;
 
     const { data, error } = await supabase.storage
       .from("receipts")
-      .upload(fileName, uploadFile, { cacheControl: "3600", upsert: false });
+      .upload(fileName, uploadData, { cacheControl: "3600", upsert: false });
 
     if (error) throw error;
 
@@ -108,23 +127,29 @@ export const uploadProfilePicture = async (file: File | string, userId: string) 
   try {
     if (!isSupabaseConfigured()) throw new Error("Supabase is not properly configured");
 
-    let uploadFile: File;
+    let uploadData: File | Blob | Buffer;
     let fileExt: string;
 
     if (typeof file === "string") {
-      const blob = base64ToBlob(file);
-      fileExt = blob.type.split("/")[1];
-      uploadFile = new File([blob], `profile-${Date.now()}.${fileExt}`, { type: blob.type });
+      if (isBrowser) {
+        const blob = base64ToBlob(file);
+        fileExt = blob.type.split("/")[1];
+        uploadData = new File([blob], `profile-${Date.now()}.${fileExt}`, { type: blob.type });
+      } else {
+        const buffer = base64ToBuffer(file);
+        fileExt = file.split(':')[1].split(';')[0].split('/')[1];
+        uploadData = buffer;
+      }
     } else {
       fileExt = file.name.split(".").pop()!;
-      uploadFile = file;
+      uploadData = file;
     }
 
     const fileName = `${userId}/profile-${Date.now()}.${fileExt}`;
 
     const { data, error } = await supabase.storage
       .from("profile-pictures")
-      .upload(fileName, uploadFile, { cacheControl: "3600", upsert: false });
+      .upload(fileName, uploadData, { cacheControl: "3600", upsert: false });
 
     if (error) throw error;
 
