@@ -479,7 +479,6 @@ export const getCurrentUser = async (): Promise<User | null> => {
         updated_at: new Date().toISOString(),
         id_number: null,
         last_payment_date: null,
-        accepted_terms: true,
       }
     }
 
@@ -517,7 +516,6 @@ export const getCurrentUser = async (): Promise<User | null> => {
           updated_at: new Date().toISOString(),
           id_number: null,
           last_payment_date: null,
-          accepted_terms: true,
         }
       }
     } catch (fallbackError) {
