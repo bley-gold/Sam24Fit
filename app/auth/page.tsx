@@ -244,26 +244,23 @@ export default function AuthPage() {
 
     try {
       // ✅ Convert compressed image to Base64 before sending to the server
-const convertToBase64 = (file: File): Promise<string> => {
+const convertToBase64 = (file: File | Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
+    if (!(file instanceof Blob)) {
+      reject(new Error("Provided file is not a Blob"))
+      return
+    }
     const reader = new FileReader()
     reader.readAsDataURL(file)
     reader.onload = () => resolve(reader.result as string)
-    reader.onerror = (error) => reject(error)
+    reader.onerror = (err) => reject(err)
   })
 }
 
 let profilePictureBase64 = ""
 if (signupData.profilePicture) {
   try {
-    profilePictureBase64 = await new Promise<string>((resolve, reject) => {
-  const fileOrBlob = signupData.profilePicture instanceof Blob ? signupData.profilePicture : new Blob([signupData.profilePicture])
-  const reader = new FileReader()
-  reader.readAsDataURL(fileOrBlob)
-  reader.onload = () => resolve(reader.result as string)
-  reader.onerror = (err) => reject(err)
-})
-
+    profilePictureBase64 = await convertToBase64(signupData.profilePicture)
   } catch (err) {
     console.error("Error converting image to base64:", err)
     toast({
@@ -275,6 +272,7 @@ if (signupData.profilePicture) {
     return
   }
 }
+
 
       const { user, error, needsEmailConfirmation, message } = await signUp({
         ...signupData,
