@@ -260,7 +260,16 @@ const convertToBase64 = (file: File | Blob): Promise<string> => {
 let profilePictureBase64 = ""
 if (signupData.profilePicture) {
   try {
-    profilePictureBase64 = await convertToBase64(signupData.profilePicture)
+    const fileOrBlob = signupData.profilePicture instanceof Blob
+      ? signupData.profilePicture
+      : new Blob([signupData.profilePicture], { type: signupData.profilePicture.type || "image/jpeg" })
+
+    profilePictureBase64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(fileOrBlob)
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = (err) => reject(err)
+    })
   } catch (err) {
     console.error("Error converting image to base64:", err)
     toast({
@@ -272,6 +281,9 @@ if (signupData.profilePicture) {
     return
   }
 }
+
+
+
 
 
       const { user, error, needsEmailConfirmation, message } = await signUp({
