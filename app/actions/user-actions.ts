@@ -86,7 +86,6 @@ export async function createUserProfile(
       emergency_contact_number: emergencyContactNumber,
       profile_picture_url: profilePictureUrl,
       id_number: idNumber,
-      accepted_terms: true,
       role: "user",
       membership_status: "active",
       created_at: new Date().toISOString(),
