@@ -585,7 +585,7 @@ export const uploadReceipt = async (file: File, amount: number, description?: st
       .from("receipts")
       .insert({
         user_id: user.id,
-        filename: file.name,
+        filename: uploadResult.path,
         file_url: uploadResult.publicUrl!,
         amount,
         description,
