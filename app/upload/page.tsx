@@ -77,11 +77,11 @@ export default function UploadPage() {
   }, [user, loading, router, toast])
 
  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
+  const selected = e.target.files?.[0];
+  if (!selected) return;
 
-  // ✅ Validate file size (10MB limit)
-  if (file.size > 10 * 1024 * 1024) {
+  // Validate file size (10MB limit)
+  if (selected.size > 10 * 1024 * 1024) {
     toast({
       title: "File too large",
       description: "Please select a file smaller than 10MB.",
@@ -90,9 +90,9 @@ export default function UploadPage() {
     return;
   }
 
-  // ✅ Validate file type
+  // Validate file type
   const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "application/pdf"];
-  if (!allowedTypes.includes(file.type)) {
+  if (!allowedTypes.includes(selected.type)) {
     toast({
       title: "Invalid file type",
       description: "Please select a JPG, PNG, or PDF file.",
@@ -101,13 +101,26 @@ export default function UploadPage() {
     return;
   }
 
-  // ✅ Convert to Base64 right here to ensure Blob safety
-  const reader = new FileReader();
-  reader.onloadend = () => {
-    // Store base64 string in state for upload
-    setFile(reader.result as string);
-  };
-  reader.readAsDataURL(file); // <-- ensures this is a valid Blob
+  try {
+    // ✅ Always wrap it into a real Blob to support mobile
+    const blob =
+      selected instanceof Blob
+        ? selected
+        : new Blob([selected], { type: selected.type || "image/jpeg" });
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFile(reader.result as string);
+    };
+    reader.readAsDataURL(blob);
+  } catch (err) {
+    console.error("File conversion error:", err);
+    toast({
+      title: "Image Upload Error",
+      description: "Could not process your image. Please try again.",
+      variant: "destructive",
+    });
+  }
 };
 
 
