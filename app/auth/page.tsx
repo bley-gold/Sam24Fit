@@ -257,20 +257,37 @@ const convertToBase64 = (file: File | Blob): Promise<string> => {
   })
 }
 
+// ✅ FIX: Handle both File and Blob objects properly for mobile compatibility
 let profilePictureBase64 = ""
 
 if (signupData.profilePicture) {
   try {
-    profilePictureBase64 = await new Promise<string>((resolve, reject) => {
-      // Ensure we have a proper Blob instance
-      const fileOrBlob = new Blob([signupData.profilePicture], { 
-        type: signupData.profilePicture.type || "image/jpeg" 
+    let fileToProcess: File | Blob = signupData.profilePicture
+    
+    // If it's already a File object, use it directly
+    if (signupData.profilePicture instanceof File) {
+      fileToProcess = signupData.profilePicture
+    } 
+    // If it's a Blob (from compression), convert it to File
+    else if (signupData.profilePicture instanceof Blob) {
+      fileToProcess = new File([signupData.profilePicture], "profile-picture.jpg", {
+        type: signupData.profilePicture.type || "image/jpeg",
+        lastModified: Date.now(),
       })
+    }
 
+    // ✅ Convert to Base64 using proper File/Blob handling
+    profilePictureBase64 = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
-      reader.readAsDataURL(fileOrBlob)
-      reader.onload = () => resolve(reader.result as string)
-      reader.onerror = (err) => reject(err)
+      reader.onloadend = () => {
+        if (typeof reader.result === "string") {
+          resolve(reader.result)
+        } else {
+          reject(new Error("Failed to read file as base64 string"))
+        }
+      }
+      reader.onerror = () => reject(new Error("File reading failed"))
+      reader.readAsDataURL(fileToProcess)
     })
   } catch (err) {
     console.error("Error converting image to base64:", err)
@@ -283,7 +300,6 @@ if (signupData.profilePicture) {
     return
   }
 }
-
 
 
 
@@ -831,14 +847,20 @@ This agreement will be digitally accepted through the Sam24Fit registration syst
           useWebWorker: true,
         }
 
-        // 🧩 Compress image
-        const compressedFile = await imageCompression(file, options)
+       // 🧩 Compress image
+const compressedBlob = await imageCompression(file, options)
 
-        console.log(
-          `Original size: ${(file.size / 1024 / 1024).toFixed(2)}MB → Compressed: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`
-        )
+console.log(
+  `Original size: ${(file.size / 1024 / 1024).toFixed(2)}MB → Compressed: ${(compressedBlob.size / 1024 / 1024).toFixed(2)}MB`
+)
 
-        setSignupData({ ...signupData, profilePicture: compressedFile })
+// ✅ Convert Blob to File for consistent handling
+const compressedFile = new File([compressedBlob], file.name, {
+  type: compressedBlob.type || "image/jpeg",
+  lastModified: Date.now(),
+})
+
+setSignupData({ ...signupData, profilePicture: compressedFile })
       } catch (error) {
         console.error("Image compression failed:", error)
         toast({
