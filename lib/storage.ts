@@ -91,19 +91,35 @@ export const uploadFile = async (file: File | string, userId: string) => {
     let uploadData: File | Blob | Buffer;
     let fileExt: string;
 
+    // Detect if it's a string (Base64)
     if (typeof file === "string") {
       if (isBrowser) {
-        const blob = base64ToBlob(file);
+        let blob = base64ToBlob(file);
         fileExt = blob.type.split("/")[1];
+
+        // ✅ Compress images if not PDF
+        if (blob.type.startsWith("image/")) {
+          const compressedBlob = await compressImage(blob);
+          blob = compressedBlob;
+          fileExt = blob.type.split("/")[1];
+        }
+
         uploadData = new File([blob], `${Date.now()}.${fileExt}`, { type: blob.type });
       } else {
         const buffer = base64ToBuffer(file);
-        fileExt = file.split(':')[1].split(';')[0].split('/')[1];
+        fileExt = file.split(":")[1].split(";")[0].split("/")[1];
         uploadData = buffer;
       }
     } else {
       fileExt = file.name.split(".").pop()!;
-      uploadData = file;
+
+      // ✅ Compress images if File object is an image
+      if (file.type.startsWith("image/") && isBrowser) {
+        const compressedBlob = await compressImage(file);
+        uploadData = new File([compressedBlob], `${Date.now()}.${fileExt}`, { type: compressedBlob.type });
+      } else {
+        uploadData = file;
+      }
     }
 
     const fileName = `${userId}/${Date.now()}.${fileExt}`;
@@ -122,6 +138,47 @@ export const uploadFile = async (file: File | string, userId: string) => {
     return { path: null, publicUrl: null, error: error as Error };
   }
 };
+
+// ------------------- IMAGE COMPRESSION HELPER -------------------
+
+const compressImage = async (blob: Blob): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("Canvas context not available"));
+
+      // Limit width/height to max 1920px
+      const MAX_DIM = 1920;
+      let { width, height } = img;
+      if (width > MAX_DIM || height > MAX_DIM) {
+        const scale = Math.min(MAX_DIM / width, MAX_DIM / height);
+        width = width * scale;
+        height = height * scale;
+      }
+      canvas.width = width;
+      canvas.height = height;
+
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (compressedBlob) => {
+          if (!compressedBlob) return reject(new Error("Compression failed"));
+          resolve(compressedBlob);
+        },
+        blob.type,
+        0.8 // quality 80%
+      );
+    };
+
+    img.onerror = (err) => reject(err);
+    img.src = url;
+  });
+};
+
 
 export const uploadProfilePicture = async (file: File | string, userId: string) => {
   try {
