@@ -128,26 +128,37 @@ export const signUp = async (data: SignUpData) => {
         throw new Error(validation.error || "Invalid file")
       }
 
-      console.log("Client: Reading profile picture as Base64...")
-      const reader = new FileReader()
-      const fileReadPromise = new Promise<string>((resolve, reject) => {
-        reader.onloadend = () => {
-          if (typeof reader.result === "string") {
-            resolve(reader.result)
-          } else {
-            reject(new Error("Failed to read file as string"))
-          }
-        }
-        reader.onerror = reject
-        reader.readAsDataURL(data.profilePicture as Blob)
-      })
-      const base64String = await fileReadPromise
-      profilePictureData = {
-        base64: base64String,
-        name: data.profilePicture.name,
-        type: data.profilePicture.type,
-      }
-      console.log("Client: Profile picture read as Base64 successfully.")
+      console.log("Client: Preparing profile picture...")
+
+let base64String = ""
+
+if (typeof data.profilePicture === "string" && data.profilePicture.startsWith("data:image")) {
+  // Already Base64 encoded (from compression or preview)
+  base64String = data.profilePicture
+} else if (data.profilePicture instanceof Blob) {
+  // Normal <input type="file" /> upload
+  const reader = new FileReader()
+  base64String = await new Promise<string>((resolve, reject) => {
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") resolve(reader.result)
+      else reject(new Error("Failed to read file as string"))
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(data.profilePicture)
+  })
+} else {
+  console.warn("Unknown profile picture format:", typeof data.profilePicture)
+  throw new Error("Invalid profile picture format — expected image file or Base64 string.")
+}
+
+profilePictureData = {
+  base64: base64String,
+  name: (data.profilePicture as any).name || "profile-picture.jpg",
+  type: (data.profilePicture as any).type || "image/jpeg",
+}
+
+console.log("Client: Profile picture prepared successfully.")
+
     }
 
     console.log("Client: Calling createUserProfile server action...")

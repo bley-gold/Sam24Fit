@@ -76,34 +76,40 @@ export default function UploadPage() {
     }
   }, [user, loading, router, toast])
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0]
+ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-      // Validate file size (10MB limit)
-      if (selectedFile.size > 10 * 1024 * 1024) {
-        toast({
-          title: "File too large",
-          description: "Please select a file smaller than 10MB.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      // Validate file type
-      const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "application/pdf"]
-      if (!allowedTypes.includes(selectedFile.type)) {
-        toast({
-          title: "Invalid file type",
-          description: "Please select a JPG, PNG, or PDF file.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      setFile(selectedFile)
-    }
+  // ✅ Validate file size (10MB limit)
+  if (file.size > 10 * 1024 * 1024) {
+    toast({
+      title: "File too large",
+      description: "Please select a file smaller than 10MB.",
+      variant: "destructive",
+    });
+    return;
   }
+
+  // ✅ Validate file type
+  const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "application/pdf"];
+  if (!allowedTypes.includes(file.type)) {
+    toast({
+      title: "Invalid file type",
+      description: "Please select a JPG, PNG, or PDF file.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  // ✅ Convert to Base64 right here to ensure Blob safety
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    // Store base64 string in state for upload
+    setFile(reader.result as string);
+  };
+  reader.readAsDataURL(file); // <-- ensures this is a valid Blob
+};
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
