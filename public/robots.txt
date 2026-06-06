@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://sam24fit.co.za/sitemap.xml
+
+# Block crawling of admin and auth pages
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /dashboard/
+Disallow: /upload/
+
+# Allow public pages
+Allow: /
+Allow: /gallery
+Allow: /our-story
