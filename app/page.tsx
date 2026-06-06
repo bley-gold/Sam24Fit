@@ -19,6 +19,7 @@ import {
   BookOpen,
   MessageCircle,
   AlertCircle,
+  CreditCard,
 } from "lucide-react"
 import Image from "next/image"
 import { getApprovedReviews } from "@/app/actions/review-actions"
@@ -467,7 +468,7 @@ export default function LandingPage() {
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
                       <span className="text-gray-600 font-medium text-sm:text-base">Account Number:</span>
-                      <span className="text-gray-900 font-semibold font-mono text-sm:text-base">1278512703</span>
+                      <span className="text-gray-900 font-semibold font-mono text-sm sm:text-base">1278512703</span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0">
                       <span className="text-gray-600 font-medium text-sm:text-base">Account Type:</span>
@@ -502,6 +503,53 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Card Payments Coming Soon Section */}
+      <section className="py-12 sm:py-16 md:py-20 bg-gradient-to-r from-indigo-50 to-blue-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Card className="bg-white shadow-2xl border-0 overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 sm:px-8 py-8 sm:py-12">
+              <div className="flex items-center justify-center mb-4">
+                <div className="bg-white/20 rounded-full p-3 sm:p-4">
+                  <CreditCard className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
+                </div>
+              </div>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white text-center">
+                Secure Online Card Payments Coming Soon
+              </h2>
+            </div>
+            <CardContent className="px-6 sm:px-8 py-8 sm:py-12 text-center space-y-6">
+              <p className="text-base sm:text-lg text-gray-700 leading-relaxed max-w-2xl mx-auto">
+                We are currently finalizing secure online payment processing. Members will soon be able to make secure card payments directly through Sam24Fit.
+              </p>
+              <div className="flex items-center justify-center gap-4 sm:gap-6 flex-wrap">
+                <div className="bg-blue-50 rounded-lg p-3 sm:p-4">
+                  <svg className="h-8 w-8 sm:h-10 sm:w-10 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 8H4V6h16m0 12H4v-2h16m0-6H4v2h16z" />
+                  </svg>
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 mt-2">Visa</p>
+                </div>
+                <div className="bg-red-50 rounded-lg p-3 sm:p-4">
+                  <svg className="h-8 w-8 sm:h-10 sm:w-10 text-red-600" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="9" cy="12" r="7" />
+                    <circle cx="15" cy="12" r="7" />
+                  </svg>
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 mt-2">Mastercard</p>
+                </div>
+                <div className="bg-yellow-50 rounded-lg p-3 sm:p-4">
+                  <svg className="h-8 w-8 sm:h-10 sm:w-10 text-yellow-600" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
+                  </svg>
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 mt-2">Digital Wallets</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600">
+                Your security and convenience are our top priority.
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
@@ -702,16 +750,12 @@ export default function LandingPage() {
                       animationDuration: `${4 + (index % 3)}s`,
                     }}
                   >
-                    <div
-                      className={`bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-lg hover:shadow-2xl transition-all duration-300 w-64 sm:w-72 md:max-w-xs group hover:scale-110 cursor-pointer hover:rotate-1`}
-                    >
+                    <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-lg hover:shadow-2xl transition-all duration-300 w-64 sm:w-72 md:max-w-xs group hover:scale-110 cursor-pointer">
                       <div className="flex items-center space-x-2 sm:space-x-3 mb-2 sm:mb-3">
                         <Image
                           src={
                             review.users?.profile_picture_url ||
                             "/placeholder.svg?height=32&width=32&query=user profile" ||
-                            "/placeholder.svg" ||
-                            "/placeholder.svg" ||
                             "/placeholder.svg"
                           }
                           alt={review.users?.full_name || "User"}
@@ -1029,7 +1073,7 @@ export default function LandingPage() {
                 </div>
                 <div className="flex items-center space-x-2">
                   <Mail className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-                  <span>info@sam24fit.com</span>
+                  <span>contact@sam24fit.co.za</span>
                 </div>
               </div>
             </div>
