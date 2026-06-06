@@ -1,6 +1,22 @@
 "use server"
 import { revalidatePath } from "next/cache"
 
+type ReviewRecord = {
+  id: string
+  user_id: string
+  review_text: string
+  rating: number
+  status: string
+  created_at: string
+  rejection_reason?: string | null
+  is_featured?: boolean | null
+}
+
+type ReviewUser = {
+  full_name: string
+  profile_picture_url: string | null
+}
+
 function validateSupabaseConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -152,7 +168,10 @@ export async function getApprovedReviews() {
       setTimeout(() => reject(new Error("Reviews fetch timeout")), 10000)
     })
 
-    const { data: reviews, error: reviewsError } = await Promise.race([reviewsPromise, timeoutPromise])
+    const { data: reviews, error: reviewsError } = (await Promise.race([
+      reviewsPromise,
+      timeoutPromise,
+    ])) as { data: ReviewRecord[] | null; error: { message: string } | null }
 
     if (reviewsError) {
       console.error("Error fetching reviews:", reviewsError)
@@ -179,7 +198,10 @@ export async function getApprovedReviews() {
             setTimeout(() => resolve({ data: null, error: { message: "User fetch timeout" } }), 3000)
           })
 
-          const { data: userData, error: userError } = await Promise.race([userPromise, userTimeoutPromise])
+          const { data: userData, error: userError } = (await Promise.race([
+            userPromise,
+            userTimeoutPromise,
+          ])) as { data: ReviewUser | null; error: { message: string } | null }
 
           return {
             id: review.id,
@@ -613,16 +635,16 @@ export async function toggleReviewFeatured(reviewId: string, featured: boolean) 
 
 export type Review = {
   id: string
-  user_id: string
+  user_id?: string
   review_text: string
   rating: number
   status: string
   created_at: string
   updated_at?: string
-  rejection_reason?: string
+  rejection_reason?: string | null
   is_featured?: boolean
   users?: {
     full_name: string
-    profile_picture_url?: string
-  }
+    profile_picture_url?: string | null
+  } | null
 }

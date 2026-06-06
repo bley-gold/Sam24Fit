@@ -259,6 +259,8 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
         setIsWelcomeDialogOpen(true)
       }
     }
+    // Run the initial dashboard load only when the authenticated user changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading, router])
 
   useEffect(() => {
@@ -267,7 +269,7 @@ This agreement has been digitally accepted through the Sam24Fit registration sys
         const result = await canUserSubmitReview(user.id)
         if (result.success) {
           setCanSubmitReview(result.canSubmit)
-          setNextReviewDate(result.nextSubmissionDate)
+          setNextReviewDate(result.nextSubmissionDate ?? null)
         }
       }
     }

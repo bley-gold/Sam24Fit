@@ -321,6 +321,8 @@ export function MembershipForm() {
                         className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
                       >
                         {photoPreview ? (
+                          // A blob/data URL preview is intentionally rendered directly before upload.
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={photoPreview || "/placeholder.svg"}
                             alt="Profile preview"

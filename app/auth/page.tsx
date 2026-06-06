@@ -28,6 +28,7 @@ import {
 } from "lucide-react"
 import { useAuthContext } from "@/components/auth-provider"
 import { testEnvironmentVariables } from "@/app/actions/test-env-action"
+import { supabase } from "@/lib/supabase"
 
 export default function AuthPage() {
   const router = useRouter()
@@ -42,6 +43,10 @@ export default function AuthPage() {
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("")
   const [forgotPasswordSubmitting, setForgotPasswordSubmitting] = useState(false)
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false)
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmNewPassword, setConfirmNewPassword] = useState("")
+  const [passwordResetSubmitting, setPasswordResetSubmitting] = useState(false)
   const [ageError, setAgeError] = useState("")
   const [passwordError, setPasswordError] = useState("")
   const [acceptedTerms, setAcceptedTerms] = useState(false)
@@ -70,6 +75,11 @@ export default function AuthPage() {
     const confirmed = urlParams.get("confirmed")
     const message = urlParams.get("message")
     const error = urlParams.get("error")
+    const recovery = urlParams.get("recovery")
+
+    if (recovery === "true") {
+      setIsRecoveryMode(true)
+    }
 
     if (confirmed === "true" && message) {
       toast({
@@ -112,7 +122,11 @@ export default function AuthPage() {
     }
 
     // Redirect authenticated users
-    if (!authLoading && user) {
+    const recoveryRequested =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("recovery") === "true"
+
+    if (!authLoading && user && !isRecoveryMode && !recoveryRequested) {
       console.log("AuthPage: User logged in, checking role for redirect")
       redirectAttempted.current = true
 
@@ -125,7 +139,7 @@ export default function AuthPage() {
         router.push("/dashboard")
       }
     }
-  }, [user, authLoading, router, showEmailConfirmation])
+  }, [user, authLoading, router, showEmailConfirmation, isRecoveryMode])
 
   const calculateAge = (birthDate: string) => {
     const today = new Date()
@@ -262,19 +276,7 @@ let profilePictureBase64 = ""
 
 if (signupData.profilePicture) {
   try {
-    let fileToProcess: File | Blob = signupData.profilePicture
-    
-    // If it's already a File object, use it directly
-    if (signupData.profilePicture instanceof File) {
-      fileToProcess = signupData.profilePicture
-    } 
-    // If it's a Blob (from compression), convert it to File
-    else if (signupData.profilePicture instanceof Blob) {
-      fileToProcess = new File([signupData.profilePicture], "profile-picture.jpg", {
-        type: signupData.profilePicture.type || "image/jpeg",
-        lastModified: Date.now(),
-      })
-    }
+    const fileToProcess: Blob = signupData.profilePicture
 
     // ✅ Convert to Base64 using proper File/Blob handling
     profilePictureBase64 = await new Promise<string>((resolve, reject) => {
@@ -381,6 +383,60 @@ if (signupData.profilePicture) {
     }
   }
 
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (newPassword.length < 8) {
+      toast({
+        title: "Password Too Short",
+        description: "Use at least 8 characters for your new password.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      toast({
+        title: "Passwords Do Not Match",
+        description: "Enter the same new password in both fields.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setPasswordResetSubmitting(true)
+
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+
+      if (error) throw error
+
+      toast({
+        title: "Password Updated",
+        description: "Your new password is active.",
+      })
+
+      setIsRecoveryMode(false)
+      window.history.replaceState({}, document.title, "/auth")
+
+      const updatedUser = await refreshUser()
+      const isAdmin =
+        updatedUser?.role === "admin" ||
+        updatedUser?.email === "goldstainmusic22@gmail.com" ||
+        updatedUser?.email === "samkelogivenson@gmail.com"
+
+      router.replace(isAdmin ? "/admin" : "/dashboard")
+    } catch (error) {
+      toast({
+        title: "Password Update Failed",
+        description: error instanceof Error ? error.message : "Please request a new reset link and try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setPasswordResetSubmitting(false)
+    }
+  }
+
   const handleTestEnv = async () => {
     setTestEnvLoading(true)
     const result = await testEnvironmentVariables()
@@ -435,6 +491,57 @@ This agreement will be digitally accepted through the Sam24Fit registration syst
             Continue Anyway
           </Button>
         </div>
+      </div>
+    )
+  }
+
+  if (isRecoveryMode) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center px-4">
+        <Card className="w-full max-w-md shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
+              <KeyRound className="h-8 w-8 text-orange-600" />
+            </div>
+            <CardTitle className="text-2xl">Choose a New Password</CardTitle>
+            <CardDescription>Enter a secure password for your Sam24Fit account.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handlePasswordUpdate} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-new-password">Confirm New Password</Label>
+                <Input
+                  id="confirm-new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  value={confirmNewPassword}
+                  onChange={(event) => setConfirmNewPassword(event.target.value)}
+                  required
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
+                disabled={passwordResetSubmitting}
+              >
+                {passwordResetSubmitting ? <LoadingSpinner size="sm" /> : "Update Password"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     )
   }

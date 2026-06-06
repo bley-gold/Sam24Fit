@@ -34,7 +34,7 @@ export function JWTDebugger() {
         full_payload: payload
       })
     } catch (error) {
-      setJwtInfo({ error: error.message })
+      setJwtInfo({ error: error instanceof Error ? error.message : "Unable to inspect the session" })
     } finally {
       setLoading(false)
     }

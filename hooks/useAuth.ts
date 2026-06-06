@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { supabase, type User } from "@/lib/supabase"
 import { getCurrentUser, refreshUserSession } from "@/lib/auth"
 
@@ -126,6 +126,7 @@ const isSessionValid = (): boolean => {
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(() => getCachedUser())
+  const userRef = useRef(user)
   const [loading, setLoading] = useState(true)
   const [profileStatus, setProfileStatus] = useState<"loading" | "available" | "unavailable">("loading")
 
@@ -134,6 +135,10 @@ export const useAuth = () => {
     setCachedUser(newUser)
     setProfileStatus(newUser ? "available" : "unavailable")
   }, [])
+
+  useEffect(() => {
+    userRef.current = user
+  }, [user])
 
   const refreshUser = useCallback(async () => {
     try {
@@ -316,7 +321,7 @@ export const useAuth = () => {
             if (session) {
               const expiresAt = session.expires_at
               const now = Math.floor(Date.now() / 1000)
-              const timeUntilExpiry = expiresAt - now
+              const timeUntilExpiry = (expiresAt ?? now) - now
 
               if (timeUntilExpiry < 900) {
                 console.log("useAuth: Auto-refreshing session to prevent timeout")
@@ -350,7 +355,7 @@ const handleVisibilityChange = async () => {
 
       if (restoredSession) {
         console.log("useAuth: Valid session found after tab focus")
-        if (!user || !isSessionValid()) {
+        if (!userRef.current || !isSessionValid()) {
           try {
             setProfileStatus("loading")
             const currentUser = await getCurrentUser()

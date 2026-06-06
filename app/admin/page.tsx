@@ -209,6 +209,8 @@ export default function AdminDashboard() {
     if (user && user.role === "admin") {
       loadAdminData()
     }
+    // This effect is intentionally keyed to auth state; loadAdminData is also used by action handlers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading, router])
 
   const loadAdminData = async () => {
@@ -384,7 +386,7 @@ export default function AdminDashboard() {
   const handleReviewAction = async (reviewId: string, approve: boolean) => {
     setLoadingReviews(true)
     try {
-      const { success, message } = await updateReviewStatus(reviewId, approve)
+      const { success, error } = await updateReviewStatus(reviewId, approve)
       if (success) {
         toast({
           title: approve ? "Review Approved" : "Review Rejected",
@@ -409,7 +411,7 @@ export default function AdminDashboard() {
       } else {
         toast({
           title: "Action Failed",
-          description: message || "Failed to update review status.",
+          description: error || "Failed to update review status.",
           variant: "destructive",
         })
       }

@@ -22,11 +22,11 @@ import {
   CreditCard,
 } from "lucide-react"
 import Image from "next/image"
-import { getApprovedReviews } from "@/app/actions/review-actions"
+import { getApprovedReviews, type Review } from "@/app/actions/review-actions"
 import { useEffect, useState } from "react"
 
 export default function LandingPage() {
-  const [reviews, setReviews] = useState<any[]>([])
+  const [reviews, setReviews] = useState<Review[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(true)
   const [reviewsError, setReviewsError] = useState<string | null>(null)
 
@@ -70,6 +70,24 @@ export default function LandingPage() {
     fetchReviews()
   }, [])
 
+  useEffect(() => {
+    const revealElements = document.querySelectorAll<HTMLElement>("[data-reveal]")
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible")
+            observer.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.12 },
+    )
+
+    revealElements.forEach((element) => observer.observe(element))
+    return () => observer.disconnect()
+  }, [])
+
   const handleGetStarted = () => {
     window.location.href = "/auth"
   }
@@ -105,7 +123,7 @@ export default function LandingPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="sam-home min-h-screen bg-[#070a0f] text-white">
       {reviewsError === "database_config" && (
         <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-3">
           <div className="max-w-7xl mx-auto flex items-center justify-center space-x-2">
@@ -121,29 +139,31 @@ export default function LandingPage() {
       )}
 
       {/* Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-50">
+      <header className="premium-nav sticky top-0 z-50 border-b border-white/10 bg-[#070a0f]/85 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-3 sm:py-4">
             <div className="flex items-center space-x-2 sm:space-x-3">
-              <div className="bg-blue-600 p-1.5 sm:p-2 rounded-lg sm:rounded-xl">
-                <Dumbbell className="h-5 w-5 sm:h-6 md:h-7 sm:w-6 md:w-7 text-white" />
+              <div className="brand-mark p-1.5 sm:p-2 rounded-lg sm:rounded-xl">
+                <Dumbbell className="h-5 w-5 sm:h-6 md:h-7 sm:w-6 md:w-7 text-[#07100b]" />
               </div>
               <div>
-                <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">Sam24Fit</h1>
-                <p className="text-xs text-gray-500 hidden sm:block">Pretoria Fitness</p>
+                <h1 className="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-white">SAM24FIT</h1>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-lime-300 hidden sm:block">
+                  Pretoria Fitness
+                </p>
               </div>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4">
               <Button
                 variant="ghost"
-                className="text-gray-600 hover:text-blue-600 text-sm sm:text-base px-2 sm:px-4"
+                className="text-white/70 hover:bg-white/5 hover:text-white text-sm sm:text-base px-2 sm:px-4"
                 onClick={handleGetStarted}
               >
                 <span className="hidden sm:inline">Member Login</span>
                 <span className="sm:hidden">Login</span>
               </Button>
               <Button
-                className="bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-base px-3 sm:px-6"
+                className="energy-button rounded-full bg-lime-300 hover:bg-lime-200 text-[#07100b] font-extrabold text-sm sm:text-base px-4 sm:px-7"
                 onClick={handleGetStarted}
               >
                 <span className="hidden sm:inline">Join Now</span>
@@ -155,29 +175,33 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 sm:py-16 md:py-20 relative overflow-hidden">
-        <div className="absolute top-10 right-10 opacity-10 rotate-12 hidden lg:block">
+      <section className="hero-stage relative min-h-[760px] overflow-hidden py-16 sm:py-20 lg:min-h-[820px] lg:py-24">
+        <div className="hero-grid absolute inset-0" />
+        <div className="hero-orb hero-orb-one" />
+        <div className="hero-orb hero-orb-two" />
+        <div className="absolute inset-0 opacity-25">
           <Image
-            src="/urban-fitness-graffiti.png"
-            alt="Urban fitness vibe"
-            width={300}
-            height={200}
-            className="object-contain"
+            src="/gym-interior-1.png"
+            alt=""
+            fill
+            priority
+            className="object-cover object-center"
           />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#070a0f] via-[#070a0f]/95 to-[#070a0f]/55" />
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 items-center">
-          <div className="space-y-6 sm:space-y-8 text-center lg:text-left">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-[1.05fr_.95fr] gap-10 lg:gap-16 items-center">
+          <div className="hero-copy space-y-7 sm:space-y-9 text-center lg:text-left">
             <div className="space-y-3 sm:space-y-4">
               <Badge className="bg-blue-100 text-blue-800 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium">
                 🏆 Pretoria's Community Gym
               </Badge>
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
-                Your Fitness
-                <span className="text-blue-600 block">Journey Starts</span>
-                <span className="text-purple-600">Here</span>
+              <h1 className="hero-title text-[3.5rem] sm:text-7xl lg:text-[5.7rem] font-black uppercase tracking-[-0.065em] text-white leading-[0.87]">
+                Built to
+                <span className="text-lime-300 block">Move You.</span>
+                <span className="text-white">Made to Last.</span>
               </h1>
-              <p className="text-base sm:text-lg md:text-xl text-gray-600 leading-relaxed max-w-lg mx-auto lg:mx-0">
+              <p className="text-base sm:text-lg md:text-xl text-white/65 leading-relaxed max-w-xl mx-auto lg:mx-0">
                 Join Sam24Fit and become part of our tight-knit fitness family in the heart of Pretoria. Real people,
                 real results, real community.
               </p>
@@ -186,16 +210,16 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-center lg:items-start">
               <Button
                 size="lg"
-                className="bg-blue-600 hover:bg-blue-700 text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto"
+                className="energy-button h-14 rounded-full bg-lime-300 hover:bg-lime-200 text-[#07100b] font-extrabold text-base sm:text-lg px-7 sm:px-9 w-full sm:w-auto"
                 onClick={handleGetStarted}
               >
-                Start Your Journey
+                Start Training
                 <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
               <Button
                 size="lg"
                 variant="outline"
-                className="text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 border-gray-300 hover:bg-gray-50 bg-transparent w-full sm:w-auto"
+                className="h-14 rounded-full text-base sm:text-lg px-7 sm:px-9 border-white/20 text-white hover:bg-white/10 hover:text-white bg-white/5 w-full sm:w-auto"
                 onClick={handleOurStory}
               >
                 <BookOpen className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
@@ -203,32 +227,32 @@ export default function LandingPage() {
               </Button>
             </div>
 
-            <div className="flex items-center justify-center lg:justify-start space-x-6 sm:space-x-8 pt-4">
+            <div className="hero-stats grid grid-cols-3 divide-x divide-white/10 rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-md">
               <div className="text-center">
-                <div className="text-2xl sm:text-3xl font-bold text-blue-600">120+</div>
-                <div className="text-xs sm:text-sm text-gray-500">Active Members</div>
+                <div className="text-2xl sm:text-3xl font-black text-white">120+</div>
+                <div className="text-[10px] sm:text-xs uppercase tracking-wider text-white/45">Members</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl sm:text-3xl font-bold text-purple-600">R120</div>
-                <div className="text-xs sm:text-sm text-gray-500">Per Month</div>
+                <div className="text-2xl sm:text-3xl font-black text-lime-300">R120</div>
+                <div className="text-[10px] sm:text-xs uppercase tracking-wider text-white/45">Per month</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl sm:text-3xl font-bold text-green-600">6</div>
-                <div className="text-xs sm:text-sm text-gray-500">Days a Week</div>
+                <div className="text-2xl sm:text-3xl font-black text-white">6</div>
+                <div className="text-[10px] sm:text-xs uppercase tracking-wider text-white/45">Days weekly</div>
               </div>
             </div>
           </div>
 
-          <div className="relative mt-8 lg:mt-0">
-            <div className="bg-gradient-to-br from-blue-400 to-purple-500 rounded-2xl sm:rounded-3xl p-6 sm:p-8 text-white">
+          <div className="hero-visual relative mt-4 lg:mt-0">
+            <div className="membership-glass rounded-[2rem] border border-white/15 bg-[#10151d]/85 p-6 sm:p-8 text-white shadow-2xl backdrop-blur-xl">
               <div className="space-y-4 sm:space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-xl sm:text-2xl font-bold">Monthly Membership</h3>
-                    <p className="opacity-90 text-sm sm:text-base">Everything you need to succeed</p>
+                    <p className="text-white/50 text-sm sm:text-base">Everything you need to succeed</p>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl sm:text-3xl font-bold">R120</div>
+                    <div className="text-3xl sm:text-4xl font-black text-lime-300">R120</div>
                     <div className="text-xs sm:text-sm opacity-75">/month</div>
                   </div>
                 </div>
@@ -253,7 +277,7 @@ export default function LandingPage() {
                 </div>
 
                 <Button
-                  className="w-full bg-white text-blue-600 hover:bg-gray-100 font-semibold py-2.5 sm:py-3 text-sm sm:text-base"
+                  className="energy-button w-full rounded-full bg-lime-300 text-[#07100b] hover:bg-lime-200 font-extrabold py-2.5 sm:py-3 text-sm sm:text-base"
                   onClick={handleGetStarted}
                 >
                   Get Started Today
@@ -261,33 +285,34 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="absolute -top-2 sm:-top-4 -right-2 sm:-right-4 bg-yellow-400 rounded-full p-2 sm:p-3 shadow-lg">
-              <Trophy className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-800" />
+            <div className="floating-accent absolute -top-2 sm:-top-5 -right-2 sm:-right-5 bg-lime-300 rounded-full p-3 sm:p-4 shadow-lg">
+              <Trophy className="h-4 w-4 sm:h-6 sm:w-6 text-[#07100b]" />
             </div>
-            <div className="absolute -bottom-2 sm:-bottom-4 -left-2 sm:-left-4 bg-green-400 rounded-full p-2 sm:p-3 shadow-lg">
-              <Heart className="h-4 w-4 sm:h-6 sm:w-6 text-green-800" />
+            <div className="floating-accent-delayed absolute -bottom-2 sm:-bottom-5 -left-2 sm:-left-5 border border-white/15 bg-white/10 rounded-full p-3 sm:p-4 shadow-lg backdrop-blur-xl">
+              <Heart className="h-4 w-4 sm:h-6 sm:w-6 text-lime-300" />
             </div>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="py-12 sm:py-16 md:py-20 bg-gray-50">
+      <section data-reveal className="reveal-section section-dark py-16 sm:py-20 md:py-28">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">
+            <p className="section-kicker">Why Sam24Fit</p>
+            <h2 className="section-title text-3xl sm:text-5xl md:text-6xl font-black text-white mb-4">
               Why Choose Sam24Fit?
             </h2>
-            <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto px-4">
+            <p className="text-base sm:text-lg text-white/55 max-w-2xl mx-auto px-4">
               We're more than just a gym - we're your neighborhood fitness family where everyone knows your name.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-shadow duration-300">
+            <Card className="premium-card">
               <CardHeader className="text-center pb-3 sm:pb-4 px-4 sm:px-6 pt-6 sm:pt-8">
-                <div className="bg-blue-100 rounded-full p-3 sm:p-4 w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4">
-                  <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
+                <div className="feature-icon">
+                  <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-lime-300" />
                 </div>
                 <CardTitle className="text-lg sm:text-xl">Flexible Hours</CardTitle>
               </CardHeader>
@@ -299,10 +324,10 @@ export default function LandingPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-shadow duration-300">
+            <Card className="premium-card">
               <CardHeader className="text-center pb-3 sm:pb-4 px-4 sm:px-6 pt-6 sm:pt-8">
-                <div className="bg-purple-100 rounded-full p-3 sm:p-4 w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4">
-                  <Users className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
+                <div className="feature-icon">
+                  <Users className="h-6 w-6 sm:h-8 sm:w-8 text-lime-300" />
                 </div>
                 <CardTitle className="text-lg sm:text-xl">Community Spirit</CardTitle>
               </CardHeader>
@@ -314,10 +339,10 @@ export default function LandingPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-shadow duration-300 sm:col-span-2 lg:col-span-1">
+            <Card className="premium-card sm:col-span-2 lg:col-span-1">
               <CardHeader className="text-center pb-3 sm:pb-4 px-4 sm:px-6 pt-6 sm:pt-8">
-                <div className="bg-green-100 rounded-full p-3 sm:p-4 w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4">
-                  <Trophy className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
+                <div className="feature-icon">
+                  <Trophy className="h-6 w-6 sm:h-8 sm:w-8 text-lime-300" />
                 </div>
                 <CardTitle className="text-lg sm:text-xl">Personal Touch</CardTitle>
               </CardHeader>
@@ -333,18 +358,19 @@ export default function LandingPage() {
       </section>
 
       {/* How It Works Section */}
-      <section className="py-12 sm:py-16 md:py-20 bg-white">
+      <section data-reveal className="reveal-section journey-section py-16 sm:py-20 md:py-28 bg-[#0b0f15]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">How It Works</h2>
-            <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto px-4">
+            <p className="section-kicker">Four simple steps</p>
+            <h2 className="section-title text-3xl sm:text-5xl md:text-6xl font-black text-white mb-4">How It Works</h2>
+            <p className="text-base sm:text-lg text-white/55 max-w-2xl mx-auto px-4">
               Getting started with Sam24Fit is simple. Follow these easy steps to begin your fitness journey.
             </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 items-start">
             {/* Steps */}
-            <div className="space-y-6 sm:space-y-8">
+            <div className="journey-steps space-y-4 sm:space-y-5">
               <div className="flex items-start space-x-3 sm:space-x-4">
                 <div className="bg-blue-600 text-white rounded-full w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center font-bold text-sm sm:text-lg flex-shrink-0">
                   1
@@ -398,7 +424,7 @@ export default function LandingPage() {
             </div>
 
             {/* Bank Account Details */}
-            <div className="lg:sticky lg:top-8">
+            <div className="banking-panel lg:sticky lg:top-24">
               {/* Business Account */}
               <Card className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 shadow-lg">
                 <CardHeader className="text-center pb-3 sm:pb-4 px-4 sm:px-6 pt-6">
@@ -507,10 +533,10 @@ export default function LandingPage() {
       </section>
 
       {/* Card Payments Coming Soon Section */}
-      <section className="py-12 sm:py-16 md:py-20 bg-gradient-to-r from-indigo-50 to-blue-50">
+      <section data-reveal className="reveal-section card-payments-section py-16 sm:py-20 md:py-28 bg-[#070a0f]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Card className="bg-white shadow-2xl border-0 overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 sm:px-8 py-8 sm:py-12">
+          <Card className="payment-card bg-[#10151d] shadow-2xl border border-white/10 overflow-hidden">
+            <div className="payment-card-head px-6 sm:px-8 py-8 sm:py-12">
               <div className="flex items-center justify-center mb-4">
                 <div className="bg-white/20 rounded-full p-3 sm:p-4">
                   <CreditCard className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
@@ -554,13 +580,14 @@ export default function LandingPage() {
       </section>
 
       {/* Gallery Section */}
-      <section className="py-12 sm:py-16 md:py-20 bg-white">
+      <section data-reveal className="reveal-section gallery-section py-16 sm:py-20 md:py-28 bg-[#0b0f15]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">
+            <p className="section-kicker">Inside Sam24Fit</p>
+            <h2 className="section-title text-3xl sm:text-5xl md:text-6xl font-black text-white mb-4">
               Take a Look Inside
             </h2>
-            <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto px-4">
+            <p className="text-base sm:text-lg text-white/55 max-w-2xl mx-auto px-4">
               Check out our community space where neighbors become training partners and fitness goals become reality.
             </p>
           </div>
@@ -569,15 +596,17 @@ export default function LandingPage() {
             {galleryImages.map((image, index) => (
               <div
                 key={image.id}
-                className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-gray-200 aspect-square hover:scale-105 transition-transform duration-300 cursor-pointer"
+                className={`gallery-tile group relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gray-900 cursor-pointer ${
+                  index === 0 || index === 5 ? "sm:col-span-2 aspect-[2/1]" : "aspect-square"
+                }`}
               >
                 <Image
                   src={image.src || "/placeholder.svg"}
                   alt={image.title}
                   fill
-                  className="object-cover group-hover:scale-110 transition-transform duration-300"
+                  className="object-cover group-hover:scale-110 transition-transform duration-700"
                 />
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/60 to-purple-600/60 group-hover:from-blue-500/40 group-hover:to-purple-600/40 transition-all duration-300" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-transparent group-hover:from-black/75 transition-all duration-500" />
                 <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 text-white">
                   <Badge className="bg-white/20 text-white mb-1.5 sm:mb-2 text-xs px-2 py-1">{image.category}</Badge>
                   <h3 className="font-semibold text-xs sm:text-sm leading-tight">{image.title}</h3>
@@ -873,15 +902,16 @@ export default function LandingPage() {
       )}
 
       {/* Operating Hours */}
-      <section className="py-12 sm:py-16 md:py-20 bg-gray-50">
+      <section data-reveal className="reveal-section hours-section py-16 sm:py-20 md:py-28 bg-[#070a0f]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">When We're Open</h2>
-            <p className="text-lg sm:text-xl text-gray-600 px-4">Convenient hours designed around your lifestyle</p>
+            <p className="section-kicker">Make every hour count</p>
+            <h2 className="section-title text-3xl sm:text-5xl md:text-6xl font-black text-white mb-4">When We&apos;re Open</h2>
+            <p className="text-base sm:text-lg text-white/55 px-4">Convenient hours designed around your lifestyle</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            <Card className="bg-white border-0 shadow-lg sm:col-span-2 lg:col-span-1">
+            <Card className="premium-card sm:col-span-2 lg:col-span-1">
               <CardContent className="p-6 sm:p-8 text-center">
                 <div className="bg-blue-100 rounded-full p-3 sm:p-4 w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 sm:mb-6">
                   <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
@@ -894,7 +924,7 @@ export default function LandingPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white border-0 shadow-lg">
+            <Card className="premium-card">
               <CardContent className="p-6 sm:p-8 text-center">
                 <div className="bg-purple-100 rounded-full p-3 sm:p-4 w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 sm:mb-6">
                   <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
@@ -905,7 +935,7 @@ export default function LandingPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white border-0 shadow-lg sm:col-span-2 lg:col-span-1">
+            <Card className="premium-card sm:col-span-2 lg:col-span-1">
               <CardContent className="p-6 sm:p-8 text-center">
                 <div className="bg-gray-100 rounded-full p-3 sm:p-4 w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 sm:mb-6">
                   <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-gray-600" />
@@ -920,22 +950,23 @@ export default function LandingPage() {
       </section>
 
       {/* Membership Section */}
-      <section className="py-12 sm:py-16 md:py-20 bg-gradient-to-br from-blue-600 to-purple-700 text-white">
+      <section data-reveal className="reveal-section pricing-section py-16 sm:py-20 md:py-28 text-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">Simple, Transparent Pricing</h2>
+          <p className="section-kicker text-lime-200">No complicated contracts</p>
+          <h2 className="section-title text-3xl sm:text-5xl md:text-6xl font-black mb-4 sm:mb-6">Simple, Transparent Pricing</h2>
           <p className="text-lg sm:text-xl mb-8 sm:mb-12 opacity-90 px-4">
             One membership plan with everything you need to achieve your fitness goals.
           </p>
 
           <div className="max-w-sm sm:max-w-md mx-auto">
-            <Card className="bg-white text-gray-900 border-0 shadow-2xl">
+            <Card className="pricing-card bg-[#10151d] text-white border border-white/15 shadow-2xl">
               <CardHeader className="text-center pb-3 sm:pb-4 px-4 sm:px-6 pt-6">
-                <Badge className="bg-yellow-400 text-yellow-900 mx-auto mb-3 sm:mb-4 px-3 sm:px-4 py-1.5 sm:py-2 text-sm">
+                <Badge className="bg-lime-300 text-[#07100b] mx-auto mb-3 sm:mb-4 px-3 sm:px-4 py-1.5 sm:py-2 text-sm">
                   Most Popular
                 </Badge>
                 <CardTitle className="text-2xl sm:text-3xl">Monthly Membership</CardTitle>
-                <div className="text-4xl sm:text-5xl font-bold text-blue-600 my-3 sm:my-4">
-                  R120<span className="text-base sm:text-lg text-gray-500">/month</span>
+                <div className="text-5xl sm:text-6xl font-black text-lime-300 my-3 sm:my-4">
+                  R120<span className="text-base sm:text-lg text-white/45">/month</span>
                 </div>
                 <p className="text-base sm:text-lg text-orange-600 font-semibold">+ R50 joining fee (one-time)</p>
               </CardHeader>
@@ -963,7 +994,7 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <Button
-                  className="w-full mt-4 sm:mt-6 bg-blue-600 hover:bg-blue-700 text-base sm:text-lg py-2.5 sm:py-3"
+                  className="energy-button w-full mt-4 sm:mt-6 rounded-full bg-lime-300 hover:bg-lime-200 text-[#07100b] font-extrabold text-base sm:text-lg py-2.5 sm:py-3"
                   onClick={handleMembership}
                 >
                   Join Sam24Fit Today
@@ -975,19 +1006,19 @@ export default function LandingPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-12 sm:py-16 md:py-20 bg-white">
+      <section data-reveal className="reveal-section final-cta py-16 sm:py-20 md:py-28 bg-[#0b0f15]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4 sm:mb-6">
+          <h2 className="section-title text-4xl sm:text-6xl md:text-7xl font-black uppercase text-white mb-5 sm:mb-7">
             Ready to Transform Your Life?
           </h2>
-          <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-8 sm:mb-12 max-w-2xl mx-auto px-4">
+          <p className="text-base sm:text-lg md:text-xl text-white/55 mb-8 sm:mb-12 max-w-2xl mx-auto px-4">
             Join our family of 120+ members who have already started their fitness journey with Sam24Fit. Your
             transformation begins with a single step.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
             <Button
               size="lg"
-              className="bg-blue-600 hover:bg-blue-700 text-base sm:text-lg px-8 sm:px-12 py-3 sm:py-4 w-full sm:w-auto"
+              className="energy-button h-14 rounded-full bg-lime-300 hover:bg-lime-200 text-[#07100b] font-extrabold text-base sm:text-lg px-8 sm:px-12 w-full sm:w-auto"
               onClick={handleGetStarted}
             >
               Start Your Journey
@@ -996,7 +1027,7 @@ export default function LandingPage() {
             <Button
               size="lg"
               variant="outline"
-              className="text-base sm:text-lg px-8 sm:px-12 py-3 sm:py-4 border-gray-300 bg-transparent w-full sm:w-auto"
+              className="h-14 rounded-full text-white hover:text-white hover:bg-white/10 text-base sm:text-lg px-8 sm:px-12 border-white/20 bg-white/5 w-full sm:w-auto"
               onClick={handleContact}
             >
               <MessageCircle className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
@@ -1007,7 +1038,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12 sm:py-16">
+      <footer className="premium-footer bg-[#05070a] text-white py-12 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-8">
             <div className="sm:col-span-2 lg:col-span-1">
@@ -1080,7 +1111,7 @@ export default function LandingPage() {
           </div>
 
           <div className="border-t border-gray-800 mt-8 sm:mt-12 pt-6 sm:pt-8 text-center text-xs sm:text-sm text-gray-400">
-            <p>&copy; 2024 Sam24Fit. All rights reserved. Built for fitness enthusiasts in Pretoria.</p>
+            <p>&copy; 2026 Sam24Fit. All rights reserved.</p>
           </div>
         </div>
       </footer>

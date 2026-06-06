@@ -4,8 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  NPM_VERSION = "9"
-  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,NEXT_PUBLIC_SITE_URL,SUPABASE_SERVICE_ROLE_KEY"
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,NEXT_PUBLIC_SITE_URL"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
@@ -15,17 +14,7 @@
 
 # Environment variables for production
 [context.production.environment]
-  NEXT_PUBLIC_SITE_URL = "https://sam24fit.netlify.app"
-  NODE_ENV = "production"
-
-# Environment variables for deploy previews
-[context.deploy-preview.environment]
-  NEXT_PUBLIC_SITE_URL = "https://deploy-preview-$DEPLOY_ID--sam24fit.netlify.app"
-  NODE_ENV = "production"
-
-# Environment variables for branch deploys
-[context.branch-deploy.environment]
-  NEXT_PUBLIC_SITE_URL = "https://$BRANCH--sam24fit.netlify.app"
+  NEXT_PUBLIC_SITE_URL = "https://sam24fit.co.za"
   NODE_ENV = "production"
 
 # Headers for security and performance

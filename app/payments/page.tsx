@@ -25,32 +25,32 @@ export default function PaymentsPage() {
       return
     }
 
-    if (user) {
-      fetchPayments()
-    }
-  }, [user, authLoading, router])
+    if (!user) return
 
-  const fetchPayments = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("payments")
-        .select("*")
-        .eq("user_id", user?.id)
-        .order("payment_date", { ascending: false })
+    const fetchPayments = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("payments")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("payment_date", { ascending: false })
 
-      if (error) throw error
-      setPayments(data || [])
-    } catch (error) {
-      console.error("Error fetching payments:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load payment history. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoadingPayments(false)
+        if (error) throw error
+        setPayments(data || [])
+      } catch (error) {
+        console.error("Error fetching payments:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load payment history. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoadingPayments(false)
+      }
     }
-  }
+
+    void fetchPayments()
+  }, [user, authLoading, router, toast])
 
   const handleLogout = async () => {
     try {

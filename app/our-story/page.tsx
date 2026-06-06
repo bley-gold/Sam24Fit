@@ -116,15 +116,15 @@ export default function OurStoryPage() {
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") {
-        prevSlide()
+        setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length)
       } else if (e.key === "ArrowRight") {
-        nextSlide()
+        setCurrentSlide((prev) => (prev + 1) % slides.length)
       }
     }
 
     window.addEventListener("keydown", handleKeyPress)
     return () => window.removeEventListener("keydown", handleKeyPress)
-  }, [])
+  }, [slides.length])
 
   const handleBackHome = () => {
     window.location.href = "/"

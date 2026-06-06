@@ -2,8 +2,8 @@
 export const SITE_CONFIG = {
   name: "Sam24Fit",
   description: "Premium Gym in Pretoria - Your fitness journey starts here",
-  url: process.env.NEXT_PUBLIC_SITE_URL || "https://sam24fit.netlify.app",
-  ogImage: "/og-image.jpg",
+  url: process.env.NEXT_PUBLIC_SITE_URL || "https://sam24fit.co.za",
+  ogImage: "/modern-gym.png",
   links: {
     github: "https://github.com/yourusername/sam24fit-gym-site",
   },
@@ -15,7 +15,7 @@ export const GYM_INFO = {
   tagline: "Pretoria Fitness",
   address: "438 De Kock St, Sunnyside, Pretoria, 0002",
   phone: "+27 67 993 4104",
-  email: "info@sam24fit.com",
+  email: "contact@sam24fit.co.za",
   hours: {
     weekdays: "5:30 AM - 8:00 PM",
     saturday: "6:30 AM - 6:00 PM",

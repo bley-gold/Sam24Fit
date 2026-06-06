@@ -14,7 +14,7 @@ export interface SignUpData {
   streetAddress: string
   emergencyContactName: string
   emergencyContactNumber: string
-  profilePicture?: File
+  profilePicture?: File | string
   idNumber: string
 }
 
@@ -122,7 +122,8 @@ export const signUp = async (data: SignUpData) => {
 
     let profilePictureData: { base64: string; name: string; type: string } | null = null
     if (data.profilePicture) {
-      const validation = validateFile(data.profilePicture)
+      const profilePicture = data.profilePicture
+      const validation = validateFile(profilePicture)
       if (!validation.valid) {
         console.error("Client: Profile picture validation failed:", validation.error)
         throw new Error(validation.error || "Invalid file")
@@ -132,10 +133,10 @@ export const signUp = async (data: SignUpData) => {
 
 let base64String = ""
 
-if (typeof data.profilePicture === "string" && data.profilePicture.startsWith("data:image")) {
+if (typeof profilePicture === "string" && profilePicture.startsWith("data:image")) {
   // Already Base64 encoded (from compression or preview)
-  base64String = data.profilePicture
-} else if (data.profilePicture instanceof Blob) {
+  base64String = profilePicture
+} else if (profilePicture instanceof Blob) {
   // Normal <input type="file" /> upload
   const reader = new FileReader()
   base64String = await new Promise<string>((resolve, reject) => {
@@ -144,7 +145,7 @@ if (typeof data.profilePicture === "string" && data.profilePicture.startsWith("d
       else reject(new Error("Failed to read file as string"))
     }
     reader.onerror = reject
-    reader.readAsDataURL(data.profilePicture)
+    reader.readAsDataURL(profilePicture)
   })
 } else {
   console.warn("Unknown profile picture format:", typeof data.profilePicture)
@@ -153,8 +154,8 @@ if (typeof data.profilePicture === "string" && data.profilePicture.startsWith("d
 
 profilePictureData = {
   base64: base64String,
-  name: (data.profilePicture as any).name || "profile-picture.jpg",
-  type: (data.profilePicture as any).type || "image/jpeg",
+  name: (profilePicture as File).name || "profile-picture.jpg",
+  type: (profilePicture as File).type || "image/jpeg",
 }
 
 console.log("Client: Profile picture prepared successfully.")
@@ -479,11 +480,12 @@ export const getCurrentUser = async (): Promise<User | null> => {
         password_hash: null,
         full_name: authUser.user_metadata?.full_name || authUser.email!,
         phone: authUser.user_metadata?.phone || "",
-        date_of_birth: null,
-        gender: null,
-        street_address: null,
-        emergency_contact_name: null,
-        emergency_contact_number: null,
+        date_of_birth: "",
+        gender: "other",
+        street_address: "",
+        emergency_contact_name: "",
+        emergency_contact_number: "",
+        role: "user",
         profile_picture_url: null,
         membership_status: "active",
         created_at: authUser.created_at,
@@ -516,11 +518,12 @@ export const getCurrentUser = async (): Promise<User | null> => {
           password_hash: null,
           full_name: authUser.user_metadata?.full_name || authUser.email!,
           phone: authUser.user_metadata?.phone || "",
-          date_of_birth: null,
-          gender: null,
-          street_address: null,
-          emergency_contact_name: null,
-          emergency_contact_number: null,
+          date_of_birth: "",
+          gender: "other",
+          street_address: "",
+          emergency_contact_name: "",
+          emergency_contact_number: "",
+          role: "user",
           profile_picture_url: null,
           membership_status: "active",
           created_at: authUser.created_at,

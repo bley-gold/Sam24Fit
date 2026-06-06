@@ -24,9 +24,9 @@ export const metadata: Metadata = {
     siteName: "Sam24Fit",
     images: [
       {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
+        url: "/modern-gym.png",
+        width: 1016,
+        height: 405,
         alt: "Sam24Fit Community Gym",
       },
     ],
@@ -37,24 +37,20 @@ export const metadata: Metadata = {
     title: "Sam24Fit | Community Gym in Sunnyside Pretoria",
     description:
       "Join Sam24Fit, a community-focused gym in Sunnyside Pretoria offering affordable memberships, fitness coaching, strength training and transformation support.",
-    images: ["/og-image.png"],
+    images: ["/modern-gym.png"],
   },
   icons: {
     icon: [
       {
-        url: "/favicon.ico",
-        sizes: "any",
-      },
-      {
         url: "/icon.jpg",
-        type: "image/svg+xml",
+        type: "image/jpeg",
       },
     ],
     apple: [
       {
-        url: "/apple-touch-icon.jpg",
+        url: "/icon.jpg",
         sizes: "180x180",
-        type: "image/png",
+        type: "image/jpeg",
       },
     ],
   },
@@ -107,7 +103,7 @@ export default function RootLayout({
                 },
               ],
               priceRange: "R120",
-              image: "/og-image.png",
+              image: "https://sam24fit.co.za/modern-gym.png",
             }),
           }}
         />

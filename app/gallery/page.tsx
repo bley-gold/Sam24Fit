@@ -33,7 +33,7 @@ const galleryImages = [
   },
   {
     id: 5,
-    src: "/gym-interior-5.png",
+    src: "/functional-training.png",
     alt: "Modern gym interior view 5",
     category: "Facility",
   },

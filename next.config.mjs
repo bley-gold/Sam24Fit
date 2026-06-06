@@ -1,44 +1,29 @@
+const supabaseImageHosts = new Set([
+  'cybjdyouocdxrcedtjkq.supabase.co',
+  'noidkepohqhgdalkvzze.supabase.co',
+])
+
+if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  try {
+    supabaseImageHosts.add(new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname)
+  } catch (error) {
+    console.warn('Invalid NEXT_PUBLIC_SUPABASE_URL:', error)
+  }
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Optimize for production
-  swcMinify: true,
+  outputFileTracingRoot: process.cwd(),
 
-  // Image optimization for Vercel
   images: {
-    // IMPORTANT: Replace 'cybjdyouocdxrcedtjkq.supabase.co' with YOUR ACTUAL Supabase Project URL
-    // You can find this in your Supabase Dashboard -> Project Settings -> API -> Project URL
-    domains: (() => {
-      const domains = [];
-      
-      // Extract domain from NEXT_PUBLIC_SUPABASE_URL if available
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
-        try {
-          const url = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL);
-          domains.push(url.hostname);
-        } catch (error) {
-          console.warn('Invalid NEXT_PUBLIC_SUPABASE_URL:', error);
-        }
-      }
-      
-      // Common Supabase domain patterns (without wildcards which Next.js doesn't support)
-      domains.push(
-        'cybjdyouocdxrcedtjkq.supabase.co',
-        'noidkepohqhgdalkvzze.supabase.co'
-      );
-      
-      return domains;
-    })(),
+    remotePatterns: Array.from(supabaseImageHosts, (hostname) => ({
+      protocol: 'https',
+      hostname,
+      pathname: '/**',
+    })),
     formats: ['image/webp', 'image/avif'],
-    unoptimized: false,
   },
 
-  // Environment variables
-  env: {
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  },
-
-  // Redirects
   async redirects() {
     return [
       {
@@ -49,7 +34,6 @@ const nextConfig = {
     ]
   },
 
-  // Headers for security
   async headers() {
     return [
       {
@@ -76,17 +60,8 @@ const nextConfig = {
     ]
   },
 
-  // Experimental features
   experimental: {
     optimizePackageImports: ['lucide-react'],
-  },
-
-  // ESLint and TypeScript configurations
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
   },
 }
 

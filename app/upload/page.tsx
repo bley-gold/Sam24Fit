@@ -103,16 +103,7 @@ export default function UploadPage() {
 
   try {
     // ✅ Always wrap it into a real Blob to support mobile
-    const blob =
-      selected instanceof Blob
-        ? selected
-        : new Blob([selected], { type: selected.type || "image/jpeg" });
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setFile(reader.result as string);
-    };
-    reader.readAsDataURL(blob);
+    setFile(selected);
   } catch (err) {
     console.error("File conversion error:", err);
     toast({
