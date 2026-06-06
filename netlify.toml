@@ -15,7 +15,6 @@
 # Environment variables for production
 [context.production.environment]
   NEXT_PUBLIC_SITE_URL = "https://sam24fit.co.za"
-  NODE_ENV = "production"
 
 # Headers for security and performance
 [[headers]]
